@@ -61,7 +61,7 @@ export function DDISelector({ value, onChange, name }: Props) {
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1 h-[42px] px-2 border border-sand/40 rounded-l-lg bg-white hover:bg-sand/10 transition-colors text-sm font-medium text-forest border-r-0 shrink-0"
+        className="flex items-center gap-1 h-[42px] px-2 min-w-[72px] border border-sand/40 rounded-l-lg bg-white hover:bg-sand/10 transition-colors text-sm font-medium text-forest border-r-0 shrink-0"
         title={`${selected.flag} ${selected.country} (${selected.code})`}
       >
         <span className="text-lg leading-none">{selected.flag}</span>

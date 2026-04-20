@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { format, addDays, addWeeks, subWeeks, isSameDay } from "date-fns";
+import { format, addDays, addWeeks, subWeeks, isSameDay, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
@@ -43,7 +43,7 @@ interface Props {
   pacientes: Paciente[];
   horariosDisponiveis: HorarioDisponivel[];
   salas: Sala[];
-  weekStart: Date;
+  weekStartStr: string;
   userRole: string;
 }
 
@@ -372,8 +372,14 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, o
 }
 
 // ── Componente principal ──────────────────────────────────────────
-export function CalendarioSemanal({ agendamentos, profissionais, pacientes, horariosDisponiveis, salas, weekStart, userRole }: Props) {
+export function CalendarioSemanal({ agendamentos, profissionais, pacientes, horariosDisponiveis, salas, weekStartStr, userRole }: Props) {
   const router = useRouter();
+  const datePickerRef = useRef<HTMLInputElement>(null);
+
+  // Parse weekStart from string in local time (avoids UTC timezone offset bug)
+  const [y, m, d] = weekStartStr.split("-").map(Number);
+  const weekStart = new Date(y, m - 1, d);
+
   const [viewMode, setViewMode] = useState<ViewMode>("semana");
   const [filtroProf, setFiltroProf] = useState("todos");
   const [filtroSalaId, setFiltroSalaId] = useState<number | null>(salas[0]?.id ?? null);
@@ -483,6 +489,27 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
         <button onClick={()=>navSemana(-1)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-sand/40 hover:bg-sand/20 text-forest"><ChevronLeft className="w-4 h-4" /></button>
         <button onClick={irParaHoje} className={`px-3 h-8 text-sm rounded-lg border transition-colors ${isCurrentWeek&&viewMode==="dia"&&format(selectedDay,"yyyy-MM-dd")===hoje?"bg-forest text-cream border-forest":"border-sand/40 hover:bg-sand/20 text-forest"}`}>Hoje</button>
         <button onClick={()=>navSemana(1)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-sand/40 hover:bg-sand/20 text-forest"><ChevronRight className="w-4 h-4" /></button>
+        <div className="relative">
+          <button
+            onClick={() => datePickerRef.current?.showPicker?.() ?? datePickerRef.current?.click()}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-sand/40 hover:bg-sand/20 text-forest"
+            title="Ir para data"
+          >
+            <CalendarDays className="w-4 h-4" />
+          </button>
+          <input
+            ref={datePickerRef}
+            type="date"
+            className="absolute opacity-0 pointer-events-none w-0 h-0 top-0 left-0"
+            onChange={e => {
+              if (!e.target.value) return;
+              const [py, pm, pd] = e.target.value.split("-").map(Number);
+              const picked = new Date(py, pm - 1, pd);
+              const ws = startOfWeek(picked, { weekStartsOn: 1 });
+              router.push(`/dashboard?semana=${format(ws, "yyyy-MM-dd")}`);
+            }}
+          />
+        </div>
         <div className="flex-1" />
         <div className="flex rounded-lg border border-sand/40 overflow-hidden text-sm">
           {(["dia","semana"] as const).map(mode=>(

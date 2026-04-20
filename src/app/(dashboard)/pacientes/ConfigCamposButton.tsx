@@ -12,7 +12,6 @@ const CAMPOS_LABELS: Record<string, string> = {
   cpf_cnpj:                       "CPF ou CNPJ",
   sexo:                           "Sexo",
   rg:                             "RG",
-  nome_mae:                       "Nome da mãe",
   emite_nfse:                     "Emissão de NFS-e",
   responsavel_nome:               "Nome do responsável",
   responsavel_data_nascimento:    "Data de nasc. do responsável",
@@ -41,7 +40,7 @@ const CAMPOS_LABELS: Record<string, string> = {
 const SEMPRE_OBRIGATORIOS = new Set(["nome_completo", "data_nascimento", "cpf_cnpj", "sexo"]);
 
 const GRUPOS = [
-  { label: "Dados Pessoais", campos: ["foto","rg","nome_mae","emite_nfse","responsavel_nome","responsavel_data_nascimento","responsavel_cpf"] },
+  { label: "Dados Pessoais", campos: ["foto","rg","emite_nfse","responsavel_nome","responsavel_data_nascimento","responsavel_cpf"] },
   { label: "Endereço",       campos: ["cep","estado","cidade","bairro","endereco","numero"] },
   { label: "Contato",        campos: ["telefone_1","telefone_2","email","instagram","contato_emergencia_nome","contato_emergencia_telefone"] },
   { label: "Dados Complementares", campos: ["estado_civil","profissao","grau_instrucao","indicacao","observacoes"] },

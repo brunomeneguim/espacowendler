@@ -39,7 +39,6 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
     cpf:                            get("cpf_cnpj"),
     rg:                             get("rg"),
     sexo:                           get("sexo"),
-    nome_mae:                       get("nome_mae"),
     emite_nfse:                     formData.get("emite_nfse") === "true",
     responsavel_nome:               isMinor ? get("responsavel_nome") : null,
     responsavel_data_nascimento:    isMinor ? get("responsavel_data_nascimento") : null,

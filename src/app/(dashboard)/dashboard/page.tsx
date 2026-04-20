@@ -72,7 +72,7 @@ export default async function DashboardPage({
         horariosDisponiveis={(horarios as any) ?? []}
         salas={(salas as any) ?? []}
         pacientes={(pacientes as any) ?? []}
-        weekStart={weekStart}
+        weekStartStr={format(weekStart, "yyyy-MM-dd")}
         userRole={profile.role}
       />
     </div>

@@ -81,8 +81,8 @@ export function NovoPacienteForm({ camposConfig }: Props) {
   const [rg, setRg] = useState("");
   const [ddi1, setDdi1] = useState("+55");
   const [ddi2, setDdi2] = useState("+55");
-  const [tel1, setTel1] = useState("");
-  const [tel2, setTel2] = useState("");
+  const [tel1, setTel1] = useState("(42) ");
+  const [tel2, setTel2] = useState("(42) ");
   const [cep, setCep] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
   const [endereco, setEndereco] = useState({ estado: "", cidade: "", bairro: "", logradouro: "" });
@@ -245,10 +245,6 @@ export function NovoPacienteForm({ camposConfig }: Props) {
                 <option value="feminino">Feminino</option>
                 <option value="outros">Outros</option>
               </select>
-            </div>
-            <div>
-              {req("Nome da mãe", "nome_mae")}
-              <input name="nome_mae" type="text" className="input-field" required={isReq("nome_mae")} placeholder="Nome completo da mãe" />
             </div>
           </div>
 
@@ -416,7 +412,7 @@ export function NovoPacienteForm({ camposConfig }: Props) {
               <input name="profissao" type="text" className="input-field" required={isReq("profissao")} placeholder="Ex: Engenheiro, Professora…" />
             </div>
             <div>
-              {req("Grau de instrução", "grau_instrucao")}
+              {req("Grau de escolaridade", "grau_instrucao")}
               <select name="grau_instrucao" className="input-field" required={isReq("grau_instrucao")} defaultValue="">
                 <option value="" disabled>Selecione</option>
                 <option value="fundamental_incompleto">Fundamental incompleto</option>
