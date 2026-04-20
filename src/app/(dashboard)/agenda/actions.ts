@@ -54,4 +54,5 @@ export async function atualizarStatusAgendamento(
 
   if (error) throw new Error(error.message);
   revalidatePath("/agenda");
+  revalidatePath("/dashboard");
 }
