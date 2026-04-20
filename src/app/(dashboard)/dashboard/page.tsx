@@ -29,25 +29,34 @@ export default async function DashboardPage({
   const inicioPeriodo = format(weekStart, "yyyy-MM-dd") + "T00:00:00";
   const fimPeriodo = format(weekEnd, "yyyy-MM-dd") + "T23:59:59";
 
-  const [{ data: agendamentos }, { data: profissionais }, { data: horarios }] =
-    await Promise.all([
-      supabase
-        .from("agendamentos")
-        .select(
-          "id, data_hora_inicio, data_hora_fim, status, observacoes, paciente:pacientes(id, nome_completo, telefone), profissional:profissionais(id, profile:profiles(nome_completo))"
-        )
-        .gte("data_hora_inicio", inicioPeriodo)
-        .lte("data_hora_inicio", fimPeriodo)
-        .order("data_hora_inicio"),
-      supabase
-        .from("profissionais")
-        .select("id, profile:profiles(nome_completo)")
-        .eq("ativo", true)
-        .order("id"),
-      supabase
-        .from("horarios_disponiveis")
-        .select("profissional_id, dia_semana, hora_inicio, hora_fim"),
-    ]);
+  const [
+    { data: agendamentos },
+    { data: profissionais },
+    { data: horarios },
+    { data: salas },
+  ] = await Promise.all([
+    supabase
+      .from("agendamentos")
+      .select(
+        "id, data_hora_inicio, data_hora_fim, status, observacoes, paciente:pacientes(id, nome_completo, telefone), profissional:profissionais(id, profile:profiles(nome_completo)), sala:salas(id, nome)"
+      )
+      .gte("data_hora_inicio", inicioPeriodo)
+      .lte("data_hora_inicio", fimPeriodo)
+      .order("data_hora_inicio"),
+    supabase
+      .from("profissionais")
+      .select("id, profile:profiles(nome_completo)")
+      .eq("ativo", true)
+      .order("id"),
+    supabase
+      .from("horarios_disponiveis")
+      .select("profissional_id, dia_semana, hora_inicio, hora_fim"),
+    supabase
+      .from("salas")
+      .select("id, nome")
+      .eq("ativo", true)
+      .order("id"),
+  ]);
 
   return (
     <div className="p-4 md:p-6 max-w-full">
@@ -55,6 +64,7 @@ export default async function DashboardPage({
         agendamentos={(agendamentos as any) ?? []}
         profissionais={(profissionais as any) ?? []}
         horariosDisponiveis={(horarios as any) ?? []}
+        salas={(salas as any) ?? []}
         weekStart={weekStart}
         userRole={profile.role}
       />

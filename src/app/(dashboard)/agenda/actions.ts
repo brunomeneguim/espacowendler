@@ -9,6 +9,7 @@ export async function criarAgendamento(formData: FormData) {
 
   const profissional_id = formData.get("profissional_id") as string;
   const paciente_id = formData.get("paciente_id") as string;
+  const sala_id = formData.get("sala_id") as string;
   const data = formData.get("data") as string; // YYYY-MM-DD
   const hora = formData.get("hora") as string; // HH:mm
   const duracao = parseInt((formData.get("duracao") as string) || "50", 10);
@@ -24,6 +25,7 @@ export async function criarAgendamento(formData: FormData) {
   const { error } = await supabase.from("agendamentos").insert({
     profissional_id,
     paciente_id,
+    sala_id: sala_id ? parseInt(sala_id) : null,
     data_hora_inicio: inicio.toISOString(),
     data_hora_fim: fim.toISOString(),
     status: "agendado",
@@ -62,6 +64,7 @@ export async function editarAgendamento(id: string, formData: FormData) {
 
   const profissional_id = formData.get("profissional_id") as string;
   const paciente_id = formData.get("paciente_id") as string;
+  const sala_id = formData.get("sala_id") as string;
   const data = formData.get("data") as string;
   const hora = formData.get("hora") as string;
   const duracao = parseInt((formData.get("duracao") as string) || "50", 10);
@@ -76,6 +79,7 @@ export async function editarAgendamento(id: string, formData: FormData) {
     .update({
       profissional_id,
       paciente_id,
+      sala_id: sala_id ? parseInt(sala_id) : null,
       data_hora_inicio: inicio.toISOString(),
       data_hora_fim: fim.toISOString(),
       status,

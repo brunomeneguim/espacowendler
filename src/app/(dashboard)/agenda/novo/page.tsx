@@ -7,22 +7,29 @@ import { ArrowLeft } from "lucide-react";
 export default async function NovoAgendamentoPage({
   searchParams,
 }: {
-  searchParams: { error?: string };
+  searchParams: { error?: string; data?: string; hora?: string; sala_id?: string };
 }) {
   const supabase = createClient();
 
-  const [profs, pacs] = await Promise.all([
+  const [{ data: profs }, { data: pacs }, { data: salas }] = await Promise.all([
     supabase
       .from("profissionais")
-      .select(
-        "id, duracao_padrao_min, profile:profiles(nome_completo), especialidade:especialidades(nome)"
-      )
-      .eq("ativo", true),
+      .select("id, profile:profiles(nome_completo), especialidade:especialidades(nome)")
+      .eq("ativo", true)
+      .order("id"),
     supabase
       .from("pacientes")
       .select("id, nome_completo, telefone")
+      .eq("ativo", true)
       .order("nome_completo"),
+    supabase
+      .from("salas")
+      .select("id, nome")
+      .eq("ativo", true)
+      .order("id"),
   ]);
+
+  const hoje = new Date().toISOString().split("T")[0];
 
   return (
     <div className="p-6 md:p-10 max-w-3xl">
@@ -61,26 +68,26 @@ export default async function NovoAgendamentoPage({
             <option value="" disabled>
               Selecione um profissional
             </option>
-            {(profs.data ?? []).map((p: any) => (
+            {(profs ?? []).map((p: any) => (
               <option key={p.id} value={p.id}>
                 {p.profile?.nome_completo}
                 {p.especialidade?.nome ? ` — ${p.especialidade.nome}` : ""}
               </option>
             ))}
           </select>
+          {(profs ?? []).length === 0 && (
+            <p className="text-xs text-rust mt-1">Nenhum profissional ativo encontrado.</p>
+          )}
         </div>
 
         <div>
           <label htmlFor="paciente_id" className="label">
             Paciente
           </label>
-          {(pacs.data ?? []).length === 0 ? (
+          {(pacs ?? []).length === 0 ? (
             <div className="p-4 bg-peach/10 border border-peach/30 rounded-xl text-sm text-rust">
               Nenhum paciente cadastrado.{" "}
-              <Link
-                href="/pacientes/novo"
-                className="font-medium underline"
-              >
+              <Link href="/pacientes/novo" className="font-medium underline">
                 Cadastrar paciente
               </Link>
             </div>
@@ -95,13 +102,36 @@ export default async function NovoAgendamentoPage({
               <option value="" disabled>
                 Selecione um paciente
               </option>
-              {(pacs.data ?? []).map((p: any) => (
+              {(pacs ?? []).map((p: any) => (
                 <option key={p.id} value={p.id}>
-                  {p.nome_completo} — {p.telefone}
+                  {p.nome_completo}
+                  {p.telefone ? ` — ${p.telefone}` : ""}
                 </option>
               ))}
             </select>
           )}
+        </div>
+
+        <div>
+          <label htmlFor="sala_id" className="label">
+            Sala de atendimento
+          </label>
+          <select
+            id="sala_id"
+            name="sala_id"
+            required
+            className="input-field"
+            defaultValue={searchParams.sala_id ?? ""}
+          >
+            <option value="" disabled>
+              Selecione a sala
+            </option>
+            {(salas ?? []).map((s: any) => (
+              <option key={s.id} value={s.id}>
+                {s.nome}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-4">
@@ -115,7 +145,7 @@ export default async function NovoAgendamentoPage({
               type="date"
               required
               className="input-field"
-              min={new Date().toISOString().split("T")[0]}
+              defaultValue={searchParams.data ?? hoje}
             />
           </div>
           <div>
@@ -128,7 +158,7 @@ export default async function NovoAgendamentoPage({
               type="time"
               required
               className="input-field"
-              defaultValue="09:00"
+              defaultValue={searchParams.hora ?? "09:00"}
             />
           </div>
           <div>
