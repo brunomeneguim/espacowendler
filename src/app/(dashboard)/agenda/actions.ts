@@ -28,7 +28,7 @@ export async function criarAgendamento(formData: FormData) {
     data_hora_fim: fim.toISOString(),
     status: "agendado",
     observacoes,
-    criado_por: user?.id,
+    created_by: user?.id,
   });
 
   if (error) {
@@ -55,4 +55,50 @@ export async function atualizarStatusAgendamento(
   if (error) throw new Error(error.message);
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
+}
+
+export async function editarAgendamento(id: string, formData: FormData) {
+  const supabase = createClient();
+
+  const profissional_id = formData.get("profissional_id") as string;
+  const paciente_id = formData.get("paciente_id") as string;
+  const data = formData.get("data") as string;
+  const hora = formData.get("hora") as string;
+  const duracao = parseInt((formData.get("duracao") as string) || "50", 10);
+  const status = formData.get("status") as string;
+  const observacoes = (formData.get("observacoes") as string) || null;
+
+  const inicio = new Date(`${data}T${hora}:00`);
+  const fim = new Date(inicio.getTime() + duracao * 60_000);
+
+  const { error } = await supabase
+    .from("agendamentos")
+    .update({
+      profissional_id,
+      paciente_id,
+      data_hora_inicio: inicio.toISOString(),
+      data_hora_fim: fim.toISOString(),
+      status,
+      observacoes,
+    })
+    .eq("id", id);
+
+  if (error) {
+    return redirect(
+      `/agenda/${id}/editar?error=${encodeURIComponent(error.message)}`
+    );
+  }
+
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  redirect("/agenda");
+}
+
+export async function excluirAgendamento(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("agendamentos").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  redirect("/agenda");
 }

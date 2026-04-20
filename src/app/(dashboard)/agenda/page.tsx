@@ -1,12 +1,31 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { createClient } from "@/lib/supabase/server";
-import { Plus, Calendar } from "lucide-react";
+import { getCurrentProfile } from "@/lib/auth";
+import { Plus, Calendar, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+const STATUS_BADGE: Record<string, string> = {
+  confirmado: "bg-forest text-cream",
+  realizado:  "bg-teal-600 text-white",
+  cancelado:  "bg-rust/10 text-rust",
+  faltou:     "bg-orange-100 text-orange-700",
+  agendado:   "bg-peach/30 text-rust",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  agendado:   "Agendado",
+  confirmado: "Confirmado",
+  realizado:  "Realizado",
+  cancelado:  "Cancelado",
+  faltou:     "Faltou",
+};
+
 export default async function AgendaPage() {
   const supabase = createClient();
+  const profile = await getCurrentProfile();
+  const canEdit = ["admin", "supervisor", "secretaria"].includes(profile.role);
 
   const { data: agendamentos } = await supabase
     .from("agendamentos")
@@ -15,7 +34,6 @@ export default async function AgendaPage() {
     )
     .order("data_hora_inicio", { ascending: true });
 
-  // Agrupa por data
   const grupos: Record<string, any[]> = {};
   (agendamentos ?? []).forEach((a: any) => {
     const key = format(new Date(a.data_hora_inicio), "yyyy-MM-dd");
@@ -30,46 +48,38 @@ export default async function AgendaPage() {
         title="Agenda"
         description="Todos os agendamentos da clínica"
       >
-        <Link href="/agenda/novo" className="btn-primary">
-          <Plus className="w-4 h-4" />
-          Novo agendamento
-        </Link>
+        {canEdit && (
+          <Link href="/agenda/novo" className="btn-primary">
+            <Plus className="w-4 h-4" />
+            Novo agendamento
+          </Link>
+        )}
       </PageHeader>
 
       {Object.keys(grupos).length === 0 ? (
         <div className="card text-center py-16">
-          <Calendar
-            className="w-12 h-12 mx-auto mb-4 text-sand"
-            strokeWidth={1}
-          />
-          <h3 className="font-display text-2xl text-forest mb-2">
-            Agenda vazia
-          </h3>
-          <p className="text-forest-600 mb-6">
-            Comece criando seu primeiro agendamento.
-          </p>
-          <Link href="/agenda/novo" className="btn-primary">
-            <Plus className="w-4 h-4" />
-            Criar agendamento
-          </Link>
+          <Calendar className="w-12 h-12 mx-auto mb-4 text-sand" strokeWidth={1} />
+          <h3 className="font-display text-2xl text-forest mb-2">Agenda vazia</h3>
+          <p className="text-forest-600 mb-6">Comece criando seu primeiro agendamento.</p>
+          {canEdit && (
+            <Link href="/agenda/novo" className="btn-primary">
+              <Plus className="w-4 h-4" />
+              Criar agendamento
+            </Link>
+          )}
         </div>
       ) : (
         <div className="space-y-8">
           {Object.entries(grupos).map(([data, itens]) => (
             <section key={data}>
               <h2 className="font-display text-xl text-forest mb-3">
-                {format(new Date(data + "T12:00:00"), "EEEE, d 'de' MMMM", {
-                  locale: ptBR,
-                })}
+                {format(new Date(data + "T12:00:00"), "EEEE, d 'de' MMMM", { locale: ptBR })}
               </h2>
               <div className="card p-0 overflow-hidden">
                 <ul className="divide-y divide-sand/20">
                   {itens.map((a: any) => (
-                    <li
-                      key={a.id}
-                      className="flex items-center gap-4 px-6 py-4"
-                    >
-                      <div className="w-16 text-center">
+                    <li key={a.id} className="flex items-center gap-4 px-6 py-4 hover:bg-cream/40 transition-colors">
+                      <div className="w-16 text-center shrink-0">
                         <p className="font-display text-xl text-forest">
                           {format(new Date(a.data_hora_inicio), "HH:mm")}
                         </p>
@@ -83,24 +93,21 @@ export default async function AgendaPage() {
                         </p>
                         <p className="text-sm text-forest-600 truncate">
                           com {a.profissional?.profile?.nome_completo ?? "—"}
-                          {a.paciente?.telefone && (
-                            <>  ·  {a.paciente.telefone}</>
-                          )}
+                          {a.paciente?.telefone && <> · {a.paciente.telefone}</>}
                         </p>
                       </div>
-                      <span
-                        className={`text-xs px-3 py-1 rounded-full font-medium ${
-                          a.status === "confirmado"
-                            ? "bg-forest text-cream"
-                            : a.status === "realizado"
-                            ? "bg-olive text-cream"
-                            : a.status === "cancelado" || a.status === "faltou"
-                            ? "bg-rust/10 text-rust"
-                            : "bg-peach/30 text-rust"
-                        }`}
-                      >
-                        {a.status}
+                      <span className={`text-xs px-3 py-1 rounded-full font-medium shrink-0 ${STATUS_BADGE[a.status] ?? STATUS_BADGE.agendado}`}>
+                        {STATUS_LABEL[a.status] ?? a.status}
                       </span>
+                      {canEdit && (
+                        <Link
+                          href={`/agenda/${a.id}/editar`}
+                          className="shrink-0 p-2 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors"
+                          title="Editar agendamento"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>

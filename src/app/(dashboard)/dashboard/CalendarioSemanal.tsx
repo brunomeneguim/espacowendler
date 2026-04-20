@@ -14,6 +14,9 @@ import {
   XCircle,
   LayoutGrid,
   AlignLeft,
+  Pencil,
+  CalendarDays,
+  Clock,
 } from "lucide-react";
 import { atualizarStatusAgendamento } from "../agenda/actions";
 
@@ -25,13 +28,15 @@ const TOTAL_HORAS = HORA_FIM - HORA_INICIO;
 
 // ── Tipos ───────────────────────────────────────────────────────
 type Status = "agendado" | "confirmado" | "realizado" | "cancelado" | "faltou";
+type ViewMode = "semana" | "dia";
 
 interface Agendamento {
   id: string;
   data_hora_inicio: string;
   data_hora_fim: string;
   status: Status;
-  paciente: { nome_completo: string } | null;
+  observacoes?: string | null;
+  paciente: { id: string; nome_completo: string; telefone?: string } | null;
   profissional: {
     id: string;
     profile: { nome_completo: string } | null;
@@ -43,13 +48,28 @@ interface Profissional {
   profile: { nome_completo: string } | null;
 }
 
+interface HorarioDisponivel {
+  profissional_id: string;
+  dia_semana: number; // 0=dom, 1=seg, ..., 6=sab (JS getDay())
+  hora_inicio: string; // "HH:MM:SS"
+  hora_fim: string;
+}
+
+interface Props {
+  agendamentos: Agendamento[];
+  profissionais: Profissional[];
+  horariosDisponiveis: HorarioDisponivel[];
+  weekStart: Date;
+  userRole: string;
+}
+
 // ── Cores por status ────────────────────────────────────────────
-const STATUS: Record<Status, { label: string; card: string; dot: string }> = {
-  agendado:   { label: "Agendado",   card: "bg-blue-50 border-blue-200 text-blue-900",   dot: "bg-blue-400"   },
-  confirmado: { label: "Confirmado", card: "bg-green-50 border-green-200 text-green-900", dot: "bg-green-500"  },
-  realizado:  { label: "Realizado",  card: "bg-teal-50 border-teal-200 text-teal-900",   dot: "bg-teal-500"   },
-  cancelado:  { label: "Cancelado",  card: "bg-red-50 border-red-200 text-red-800",      dot: "bg-red-400"    },
-  faltou:     { label: "Faltou",     card: "bg-orange-50 border-orange-200 text-orange-900", dot: "bg-orange-400" },
+const STATUS: Record<Status, { label: string; card: string; dot: string; badge: string }> = {
+  agendado:   { label: "Agendado",   card: "bg-blue-50 border-blue-200 text-blue-900",        dot: "bg-blue-400",   badge: "bg-blue-100 text-blue-700"   },
+  confirmado: { label: "Confirmado", card: "bg-green-50 border-green-200 text-green-900",     dot: "bg-green-500",  badge: "bg-green-100 text-green-700" },
+  realizado:  { label: "Realizado",  card: "bg-teal-50 border-teal-200 text-teal-900",        dot: "bg-teal-500",   badge: "bg-teal-100 text-teal-700"   },
+  cancelado:  { label: "Cancelado",  card: "bg-red-50 border-red-200 text-red-800",           dot: "bg-red-400",    badge: "bg-red-100 text-red-600"     },
+  faltou:     { label: "Faltou",     card: "bg-orange-50 border-orange-200 text-orange-900",  dot: "bg-orange-400", badge: "bg-orange-100 text-orange-700"},
 };
 
 // Cor da borda esquerda por profissional (rotativa)
@@ -63,6 +83,23 @@ const BORDA_PROF = [
   "border-l-fuchsia-500",
   "border-l-lime-600",
 ];
+
+const BG_PROF_LIGHT = [
+  "bg-blue-500",
+  "bg-violet-500",
+  "bg-teal-500",
+  "bg-rose-500",
+  "bg-amber-500",
+  "bg-cyan-600",
+  "bg-fuchsia-500",
+  "bg-lime-600",
+];
+
+// ── Helpers ─────────────────────────────────────────────────────
+function parseTimeToMinutes(hora: string): number {
+  const [h, m] = hora.split(":").map(Number);
+  return h * 60 + m;
+}
 
 // ── Detecção de sobreposição ────────────────────────────────────
 function calcularColunas(ags: Agendamento[]): Map<string, { col: number; total: number }> {
@@ -108,9 +145,10 @@ interface CardProps {
   onToggle: () => void;
   onStatus: (s: Status) => void;
   pending: boolean;
+  canEdit: boolean;
 }
 
-function AgendamentoCard({ ag, style, bordaProf, expanded, onToggle, onStatus, pending }: CardProps) {
+function AgendamentoCard({ ag, style, bordaProf, expanded, onToggle, onStatus, pending, canEdit }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
 
@@ -129,12 +167,12 @@ function AgendamentoCard({ ag, style, bordaProf, expanded, onToggle, onStatus, p
         </p>
       </div>
 
-      {expanded && ativo && (
+      {expanded && (
         <div
           className="px-1.5 pb-1 flex flex-wrap gap-1 mt-0.5"
           onClick={(e) => e.stopPropagation()}
         >
-          {ag.status === "agendado" && (
+          {ativo && ag.status === "agendado" && (
             <button
               onClick={() => onStatus("confirmado")}
               className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5"
@@ -142,7 +180,7 @@ function AgendamentoCard({ ag, style, bordaProf, expanded, onToggle, onStatus, p
               <Check className="w-3 h-3" /> Confirmar
             </button>
           )}
-          {ag.status === "confirmado" && (
+          {ativo && ag.status === "confirmado" && (
             <button
               onClick={() => onStatus("realizado")}
               className="text-xs bg-teal-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5"
@@ -150,18 +188,30 @@ function AgendamentoCard({ ag, style, bordaProf, expanded, onToggle, onStatus, p
               <Check className="w-3 h-3" /> Finalizar
             </button>
           )}
-          <button
-            onClick={() => onStatus("faltou")}
-            className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5"
-          >
-            <UserX className="w-3 h-3" /> Faltou
-          </button>
-          <button
-            onClick={() => onStatus("cancelado")}
-            className="text-xs bg-red-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5"
-          >
-            <XCircle className="w-3 h-3" /> Cancelar
-          </button>
+          {ativo && (
+            <>
+              <button
+                onClick={() => onStatus("faltou")}
+                className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5"
+              >
+                <UserX className="w-3 h-3" /> Faltou
+              </button>
+              <button
+                onClick={() => onStatus("cancelado")}
+                className="text-xs bg-red-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5"
+              >
+                <XCircle className="w-3 h-3" /> Cancelar
+              </button>
+            </>
+          )}
+          {canEdit && (
+            <Link
+              href={`/agenda/${ag.id}/editar`}
+              className="text-xs bg-forest text-cream px-1.5 py-0.5 rounded flex items-center gap-0.5"
+            >
+              <Pencil className="w-3 h-3" /> Editar
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -171,19 +221,23 @@ function AgendamentoCard({ ag, style, bordaProf, expanded, onToggle, onStatus, p
 // ── Coluna de um dia ────────────────────────────────────────────
 interface ColunaProps {
   ags: Agendamento[];
+  horariosParaDia: HorarioDisponivel[];
+  mostrarHorarios: boolean;
   profColorMap: Map<string, string>;
   expandedId: string | null;
   onToggle: (id: string) => void;
   onStatus: (id: string, s: Status) => void;
   pending: boolean;
+  canEdit: boolean;
 }
 
-function DiaColuna({ ags, profColorMap, expandedId, onToggle, onStatus, pending }: ColunaProps) {
+function DiaColuna({ ags, horariosParaDia, mostrarHorarios, profColorMap, expandedId, onToggle, onStatus, pending, canEdit }: ColunaProps) {
   const colMap = calcularColunas(ags);
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
 
   return (
     <div className="relative flex-1 min-w-0" style={{ height: TOTAL_HORAS * PX_POR_HORA }}>
+      {/* Linhas de hora */}
       {horas.map((h) => (
         <div
           key={h}
@@ -191,6 +245,24 @@ function DiaColuna({ ags, profColorMap, expandedId, onToggle, onStatus, pending 
           style={{ top: (h - HORA_INICIO) * PX_POR_HORA }}
         />
       ))}
+
+      {/* Faixas de horário disponível */}
+      {mostrarHorarios && horariosParaDia.map((h, i) => {
+        const startMin = parseTimeToMinutes(h.hora_inicio) - HORA_INICIO * 60;
+        const endMin = parseTimeToMinutes(h.hora_fim) - HORA_INICIO * 60;
+        if (startMin >= TOTAL_HORAS * 60 || endMin <= 0) return null;
+        const top = (Math.max(0, startMin) / 60) * PX_POR_HORA;
+        const height = ((Math.min(TOTAL_HORAS * 60, endMin) - Math.max(0, startMin)) / 60) * PX_POR_HORA;
+        return (
+          <div
+            key={i}
+            className="absolute left-0 right-0 bg-green-50 border-l-2 border-green-200"
+            style={{ top, height, zIndex: 0 }}
+          />
+        );
+      })}
+
+      {/* Cards de agendamento */}
       {ags.map((ag) => {
         const inicio = new Date(ag.data_hora_inicio);
         const fim = new Date(ag.data_hora_fim);
@@ -215,6 +287,7 @@ function DiaColuna({ ags, profColorMap, expandedId, onToggle, onStatus, pending 
             onToggle={() => onToggle(ag.id)}
             onStatus={(s) => onStatus(ag.id, s)}
             pending={pending}
+            canEdit={canEdit}
           />
         );
       })}
@@ -223,25 +296,30 @@ function DiaColuna({ ags, profColorMap, expandedId, onToggle, onStatus, pending 
 }
 
 // ── Componente principal ────────────────────────────────────────
-interface Props {
-  agendamentos: Agendamento[];
-  profissionais: Profissional[];
-  weekStart: Date;
-}
-
-export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Props) {
+export function CalendarioSemanal({ agendamentos, profissionais, horariosDisponiveis, weekStart, userRole }: Props) {
   const router = useRouter();
-  const [viewMode, setViewMode] = useState<"semana" | "dia">("semana");
+  const [viewMode, setViewMode] = useState<ViewMode>("semana");
   const [filtroProf, setFiltroProf] = useState("todos");
-  const [selectedDay, setSelectedDay] = useState<Date>(weekStart);
+  const [selectedDay, setSelectedDay] = useState<Date>(() => {
+    const hoje = new Date();
+    const weekDaysArr = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i));
+    const hojeNaSemana = weekDaysArr.find((d) => isSameDay(d, hoje));
+    return hojeNaSemana ?? weekStart;
+  });
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const canEdit = userRole === "admin" || userRole === "supervisor" || userRole === "secretaria";
+  const isAdmin = userRole === "admin";
 
   const profColorMap = new Map(
     profissionais.map((p, i) => [p.id, BORDA_PROF[i % BORDA_PROF.length]])
   );
+  const profBgMap = new Map(
+    profissionais.map((p, i) => [p.id, BG_PROF_LIGHT[i % BG_PROF_LIGHT.length]])
+  );
 
-  const weekDays = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i)); // Seg–Sáb
+  const weekDays = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i));
   const hoje = format(new Date(), "yyyy-MM-dd");
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
 
@@ -253,9 +331,28 @@ export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Pr
     return agsFiltrados.filter((a) => isSameDay(new Date(a.data_hora_inicio), dia));
   }
 
+  function horariosParaDia(dia: Date): HorarioDisponivel[] {
+    const diaSemana = dia.getDay();
+    if (filtroProf === "todos") return [];
+    return horariosDisponiveis.filter(
+      (h) => h.profissional_id === filtroProf && h.dia_semana === diaSemana
+    );
+  }
+
   function navSemana(delta: 1 | -1) {
     const nova = delta === 1 ? addWeeks(weekStart, 1) : subWeeks(weekStart, 1);
     router.push(`/dashboard?semana=${format(nova, "yyyy-MM-dd")}`);
+  }
+
+  function irParaHoje() {
+    const hojeDate = new Date();
+    setSelectedDay(hojeDate);
+    setViewMode("dia");
+    // Se hoje não está na semana atual, navega
+    const isCurrentWeek = weekDays.some((d) => isSameDay(d, hojeDate));
+    if (!isCurrentWeek) {
+      router.push("/dashboard");
+    }
   }
 
   function handleStatus(id: string, novoStatus: Status) {
@@ -267,11 +364,51 @@ export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Pr
 
   const isCurrentWeek = weekDays.some((d) => format(d, "yyyy-MM-dd") === hoje);
 
+  // ── Stats da semana ──
+  const totalSemana = agsFiltrados.length;
+  const confirmadosHoje = agendamentos.filter(
+    (a) => isSameDay(new Date(a.data_hora_inicio), new Date()) && a.status === "confirmado"
+  ).length;
+  const agendadosHoje = agendamentos.filter(
+    (a) => isSameDay(new Date(a.data_hora_inicio), new Date()) &&
+      (a.status === "agendado" || a.status === "confirmado")
+  ).length;
+
   return (
     <div className="flex flex-col gap-4">
+      {/* ── Header com título e stats ── */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.15em] text-forest-500 mb-0.5">Agenda</p>
+          <h1 className="font-display text-2xl text-forest">
+            {viewMode === "semana"
+              ? `${format(weekDays[0], "d MMM", { locale: ptBR })} – ${format(weekDays[5], "d 'de' MMMM yyyy", { locale: ptBR })}`
+              : format(selectedDay, "EEEE, d 'de' MMMM", { locale: ptBR })}
+          </h1>
+        </div>
+
+        {/* Stats rápidas */}
+        <div className="flex gap-3">
+          <div className="flex items-center gap-2 bg-white border border-sand/40 rounded-xl px-3 py-2">
+            <CalendarDays className="w-4 h-4 text-forest-500" strokeWidth={1.5} />
+            <div>
+              <p className="text-xs text-forest-500 leading-none">Hoje</p>
+              <p className="text-lg font-semibold text-forest leading-tight">{agendadosHoje}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 bg-white border border-sand/40 rounded-xl px-3 py-2">
+            <Clock className="w-4 h-4 text-forest-500" strokeWidth={1.5} />
+            <div>
+              <p className="text-xs text-forest-500 leading-none">Semana</p>
+              <p className="text-lg font-semibold text-forest leading-tight">{totalSemana}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── Toolbar ── */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Navegação */}
+        {/* Navegação semana */}
         <button
           onClick={() => navSemana(-1)}
           className="w-8 h-8 flex items-center justify-center rounded-lg border border-sand/40 hover:bg-sand/20 text-forest"
@@ -279,9 +416,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Pr
           <ChevronLeft className="w-4 h-4" />
         </button>
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={irParaHoje}
           className={`px-3 h-8 text-sm rounded-lg border transition-colors ${
-            isCurrentWeek
+            isCurrentWeek && viewMode === "dia" && format(selectedDay, "yyyy-MM-dd") === hoje
               ? "bg-forest text-cream border-forest"
               : "border-sand/40 hover:bg-sand/20 text-forest"
           }`}
@@ -294,12 +431,6 @@ export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Pr
         >
           <ChevronRight className="w-4 h-4" />
         </button>
-
-        <span className="font-display text-lg text-forest ml-1">
-          {viewMode === "semana"
-            ? `${format(weekDays[0], "d MMM", { locale: ptBR })} – ${format(weekDays[5], "d 'de' MMMM yyyy", { locale: ptBR })}`
-            : format(selectedDay, "EEEE, d 'de' MMMM", { locale: ptBR })}
-        </span>
 
         <div className="flex-1" />
 
@@ -341,6 +472,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Pr
       {/* ── Grid ── */}
       <div className="rounded-xl border border-sand/30 bg-white overflow-auto">
         {viewMode === "semana" ? (
+          /* ── Vista semanal ── */
           <div className="flex min-w-[700px]">
             {/* Coluna de horas */}
             <div className="w-14 shrink-0 border-r border-gray-100">
@@ -354,30 +486,41 @@ export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Pr
               ))}
             </div>
 
-            {/* Colunas dos dias */}
             {weekDays.map((dia, i) => {
               const isHoje = format(dia, "yyyy-MM-dd") === hoje;
+              const agsDay = agsParaDia(dia);
+              const ativos = agsDay.filter((a) => a.status === "agendado" || a.status === "confirmado").length;
               return (
                 <div key={i} className="flex-1 min-w-0 border-r border-gray-100 last:border-r-0 flex flex-col">
                   <div
-                    className={`h-10 border-b border-gray-100 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 ${isHoje ? "bg-forest/5" : ""}`}
+                    className={`h-10 border-b border-gray-100 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors ${isHoje ? "bg-forest/5" : ""}`}
                     onClick={() => { setSelectedDay(dia); setViewMode("dia"); }}
                   >
                     <span className="text-[10px] text-gray-400 uppercase tracking-wide capitalize">
                       {format(dia, "EEE", { locale: ptBR })}
                     </span>
-                    <span className={`text-sm font-semibold ${isHoje ? "text-forest" : "text-gray-700"}`}>
-                      {format(dia, "d")}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-sm font-semibold ${isHoje ? "text-forest" : "text-gray-700"}`}>
+                        {format(dia, "d")}
+                      </span>
+                      {ativos > 0 && (
+                        <span className="text-[10px] bg-forest/10 text-forest rounded-full px-1 leading-4">
+                          {ativos}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="relative px-0.5">
                     <DiaColuna
-                      ags={agsParaDia(dia)}
+                      ags={agsDay}
+                      horariosParaDia={horariosParaDia(dia)}
+                      mostrarHorarios={filtroProf !== "todos"}
                       profColorMap={profColorMap}
                       expandedId={expandedId}
                       onToggle={(id) => setExpandedId(expandedId === id ? null : id)}
                       onStatus={handleStatus}
                       pending={isPending}
+                      canEdit={canEdit}
                     />
                   </div>
                 </div>
@@ -385,8 +528,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Pr
             })}
           </div>
         ) : (
-          // Vista dia
+          /* ── Vista diária ── */
           <div>
+            {/* Seletor de dia */}
             <div className="flex border-b border-gray-100 overflow-x-auto">
               <div className="w-14 shrink-0 border-r border-gray-100" />
               {weekDays.map((dia, i) => {
@@ -408,6 +552,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Pr
                 );
               })}
             </div>
+
             <div className="flex min-w-0">
               <div className="w-14 shrink-0 border-r border-gray-100">
                 {horas.map((h) => (
@@ -421,29 +566,103 @@ export function CalendarioSemanal({ agendamentos, profissionais, weekStart }: Pr
               <div className="flex-1 px-1">
                 <DiaColuna
                   ags={agsParaDia(selectedDay)}
+                  horariosParaDia={horariosParaDia(selectedDay)}
+                  mostrarHorarios={filtroProf !== "todos"}
                   profColorMap={profColorMap}
                   expandedId={expandedId}
                   onToggle={(id) => setExpandedId(expandedId === id ? null : id)}
                   onStatus={handleStatus}
                   pending={isPending}
+                  canEdit={canEdit}
                 />
               </div>
+            </div>
+
+            {/* ── Resumo do dia (view dia) ── */}
+            <div className="border-t border-gray-100 p-4">
+              <p className="text-xs font-medium text-forest-500 uppercase tracking-wider mb-3">
+                Resumo do dia — {agsParaDia(selectedDay).length} atendimento(s)
+              </p>
+              {filtroProf !== "todos" && horariosParaDia(selectedDay).length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {horariosParaDia(selectedDay).map((h, i) => (
+                    <span key={i} className="flex items-center gap-1.5 text-xs bg-green-50 border border-green-200 text-green-800 px-2.5 py-1 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      Disponível: {h.hora_inicio.slice(0, 5)} – {h.hora_fim.slice(0, 5)}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {agsParaDia(selectedDay).length === 0 ? (
+                <p className="text-sm text-forest-400">Nenhum agendamento para este dia.</p>
+              ) : (
+                <div className="space-y-2">
+                  {agsParaDia(selectedDay)
+                    .sort((a, b) => new Date(a.data_hora_inicio).getTime() - new Date(b.data_hora_inicio).getTime())
+                    .map((ag) => {
+                      const cfg = STATUS[ag.status] ?? STATUS.agendado;
+                      const profIdx = profissionais.findIndex((p) => p.id === ag.profissional?.id);
+                      const profColor = BG_PROF_LIGHT[profIdx % BG_PROF_LIGHT.length];
+                      return (
+                        <div key={ag.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <div className={`w-1.5 h-8 rounded-full ${profColor} shrink-0`} />
+                          <div className="w-16 text-center shrink-0">
+                            <p className="text-sm font-semibold text-forest">
+                              {format(new Date(ag.data_hora_inicio), "HH:mm")}
+                            </p>
+                            <p className="text-xs text-forest-400">
+                              {format(new Date(ag.data_hora_fim), "HH:mm")}
+                            </p>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-forest truncate">
+                              {ag.paciente?.nome_completo ?? "—"}
+                            </p>
+                            <p className="text-xs text-forest-500 truncate">
+                              {ag.profissional?.profile?.nome_completo}
+                              {ag.paciente?.telefone ? ` · ${ag.paciente.telefone}` : ""}
+                            </p>
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${cfg.badge}`}>
+                            {cfg.label}
+                          </span>
+                          {canEdit && (
+                            <Link
+                              href={`/agenda/${ag.id}/editar`}
+                              className="shrink-0 p-1.5 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Link>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
 
       {/* ── Legenda ── */}
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(STATUS).map(([key, cfg]) => (
-          <span
-            key={key}
-            className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border ${cfg.card}`}
-          >
-            <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-            {cfg.label}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(STATUS).map(([key, cfg]) => (
+            <span
+              key={key}
+              className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border ${cfg.card}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+              {cfg.label}
+            </span>
+          ))}
+        </div>
+        {filtroProf !== "todos" && (
+          <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-green-50 border-green-200 text-green-800">
+            <span className="w-2 h-2 rounded-full bg-green-400" />
+            Horário disponível
           </span>
-        ))}
+        )}
       </div>
     </div>
   );
