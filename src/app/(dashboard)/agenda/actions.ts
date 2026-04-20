@@ -98,6 +98,40 @@ export async function editarAgendamento(id: string, formData: FormData) {
   redirect("/agenda");
 }
 
+export async function atualizarAgendamento(
+  id: string,
+  profissional_id: string,
+  paciente_id: string,
+  sala_id: string | null,
+  data: string,
+  hora: string,
+  duracao: number,
+  status: string,
+  observacoes: string | null
+): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const inicio = new Date(`${data}T${hora}:00`);
+  const fim = new Date(inicio.getTime() + duracao * 60_000);
+
+  const { error } = await supabase
+    .from("agendamentos")
+    .update({
+      profissional_id,
+      paciente_id,
+      sala_id: sala_id ? parseInt(sala_id) : null,
+      data_hora_inicio: inicio.toISOString(),
+      data_hora_fim: fim.toISOString(),
+      status,
+      observacoes: observacoes || null,
+    })
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+  revalidatePath("/agenda");
+  return { error: null };
+}
+
 export async function excluirAgendamento(id: string) {
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").delete().eq("id", id);

@@ -34,6 +34,7 @@ export default async function DashboardPage({
     { data: profissionais },
     { data: horarios },
     { data: salas },
+    { data: pacientes },
   ] = await Promise.all([
     supabase
       .from("agendamentos")
@@ -56,6 +57,11 @@ export default async function DashboardPage({
       .select("id, nome")
       .eq("ativo", true)
       .order("id"),
+    supabase
+      .from("pacientes")
+      .select("id, nome_completo, telefone")
+      .eq("ativo", true)
+      .order("nome_completo"),
   ]);
 
   return (
@@ -65,6 +71,7 @@ export default async function DashboardPage({
         profissionais={(profissionais as any) ?? []}
         horariosDisponiveis={(horarios as any) ?? []}
         salas={(salas as any) ?? []}
+        pacientes={(pacientes as any) ?? []}
         weekStart={weekStart}
         userRole={profile.role}
       />
