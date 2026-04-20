@@ -24,7 +24,7 @@ export default async function EditarProfissionalPage({
   searchParams: { error?: string };
 }) {
   const profile = await getCurrentProfile();
-  if (profile.role !== "admin") redirect("/profissionais");
+  if (!["admin", "supervisor"].includes(profile.role)) redirect("/profissionais");
 
   const supabase = createClient();
 

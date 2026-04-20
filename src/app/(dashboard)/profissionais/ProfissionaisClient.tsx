@@ -2,23 +2,24 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Search, Pencil, Stethoscope, Plus } from "lucide-react";
+import { Search, Pencil, Stethoscope, Plus, User } from "lucide-react";
 
 interface Profissional {
   id: string;
   registro_profissional?: string | null;
   valor_consulta?: number | null;
   ativo: boolean;
+  foto_url?: string | null;
   profile: { nome_completo: string; email: string } | null;
   especialidade: { nome: string } | null;
 }
 
 interface Props {
   profissionais: Profissional[];
-  isAdmin: boolean;
+  canManage: boolean;
 }
 
-export function ProfissionaisClient({ profissionais, isAdmin }: Props) {
+export function ProfissionaisClient({ profissionais, canManage }: Props) {
   const [busca, setBusca] = useState("");
 
   const filtrados = useMemo(() =>
@@ -49,7 +50,7 @@ export function ProfissionaisClient({ profissionais, isAdmin }: Props) {
           <p className="text-forest-600 mb-6">
             {busca ? "Nenhum profissional com esse nome." : "Adicione o primeiro profissional da clínica."}
           </p>
-          {isAdmin && !busca && (
+          {canManage && !busca && (
             <Link href="/profissionais/novo" className="btn-primary inline-flex items-center gap-2">
               <Plus className="w-4 h-4" /> Cadastrar
             </Link>
@@ -60,14 +61,18 @@ export function ProfissionaisClient({ profissionais, isAdmin }: Props) {
           {filtrados.map((p, i) => (
             <div key={p.id} className="card hover:shadow-warm transition-shadow animate-slide-up" style={{ animationDelay: `${i * 50}ms` }}>
               <div className="flex items-start justify-between mb-3">
-                <div className="w-12 h-12 rounded-full bg-forest text-cream flex items-center justify-center font-display text-lg">
-                  {p.profile?.nome_completo?.charAt(0) ?? "?"}
-                </div>
+                {p.foto_url ? (
+                  <img src={p.foto_url} alt={p.profile?.nome_completo ?? ""} className="w-12 h-12 rounded-full object-cover border border-sand/30" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-forest text-cream flex items-center justify-center font-display text-lg">
+                    {p.profile?.nome_completo?.charAt(0) ?? "?"}
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   {!p.ativo && (
                     <span className="text-xs px-2 py-0.5 bg-rust/10 text-rust rounded-full">inativo</span>
                   )}
-                  {isAdmin && (
+                  {canManage && (
                     <Link href={`/profissionais/${p.id}/editar`} className="p-1.5 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors" title="Editar profissional">
                       <Pencil className="w-4 h-4" />
                     </Link>

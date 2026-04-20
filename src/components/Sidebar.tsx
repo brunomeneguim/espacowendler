@@ -21,15 +21,15 @@ const NAV_ITEMS: Record<
   admin: [
     { href: "/dashboard", label: "Agenda do dia", icon: Calendar },
     { href: "/agenda", label: "Todos os agendamentos", icon: LayoutDashboard },
-    { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
     { href: "/pacientes", label: "Pacientes", icon: Users },
+    { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
     { href: "/equipe", label: "Equipe", icon: UserCircle },
   ],
   supervisor: [
     { href: "/dashboard", label: "Agenda do dia", icon: Calendar },
     { href: "/agenda", label: "Todos os agendamentos", icon: LayoutDashboard },
-    { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
     { href: "/pacientes", label: "Pacientes", icon: Users },
+    { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
   ],
   profissional: [
     { href: "/dashboard", label: "Minha agenda", icon: Calendar },
