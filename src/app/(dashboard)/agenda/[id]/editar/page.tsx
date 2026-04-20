@@ -142,7 +142,7 @@ export default async function EditarAgendamentoPage({
 
         <div className="flex gap-3 pt-2">
           <button type="submit" className="btn-primary flex-1">Salvar alterações</button>
-          <Link href="/agenda" className="btn-ghost">Cancelar</Link>
+          <Link href="/dashboard" className="btn-ghost">Cancelar</Link>
         </div>
       </form>
 

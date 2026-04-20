@@ -17,7 +17,7 @@ export default async function DashboardPage({
       const d = parseISO(searchParams.semana);
       weekStart = isNaN(d.getTime())
         ? startOfWeek(new Date(), { weekStartsOn: 1 })
-        : d;
+        : startOfWeek(d, { weekStartsOn: 1 });
     } catch {
       weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
     }
