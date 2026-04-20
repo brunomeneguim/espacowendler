@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --forest: #2f5d50;
+  --cream: #faf0e8;
+  --white: #ffffff;
+  --olive: #51552e;
+  --peach: #f0b987;
+  --rust: #612300;
+  --sand: #cdac79;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-cream text-forest-800 antialiased;
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+
+  ::selection {
+    background-color: var(--peach);
+    color: var(--rust);
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-forest text-cream rounded-full
+           font-medium text-sm tracking-wide transition-all duration-200
+           hover:bg-forest-600 hover:shadow-warm active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-peach text-rust rounded-full
+           font-medium text-sm tracking-wide transition-all duration-200
+           hover:bg-peach-600 hover:shadow-warm active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-forest rounded-full
+           font-medium text-sm tracking-wide transition-all duration-200
+           hover:bg-forest/5 active:scale-[0.98];
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-white border border-sand/40 rounded-xl
+           text-forest-800 placeholder:text-forest-400
+           focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest
+           transition-colors;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl shadow-soft border border-sand/20 p-6;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-forest-700 mb-1.5;
+  }
+}
