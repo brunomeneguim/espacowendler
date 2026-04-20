@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { signUp } from "../actions";
 
 export default function CadastroPage({
@@ -6,6 +9,20 @@ export default function CadastroPage({
 }: {
   searchParams: { error?: string; message?: string };
 }) {
+  const [senhaError, setSenhaError] = useState("");
+
+  async function handleSubmit(formData: FormData) {
+    const password = formData.get("password") as string;
+    const confirmPassword = formData.get("confirm_password") as string;
+
+    if (password !== confirmPassword) {
+      setSenhaError("As senhas não coincidem.");
+      return;
+    }
+    setSenhaError("");
+    await signUp(formData);
+  }
+
   return (
     <div className="animate-slide-up">
       <div className="lg:hidden flex items-center gap-2 mb-8">
@@ -19,7 +36,7 @@ export default function CadastroPage({
       </p>
       <h1 className="font-display text-4xl text-forest mb-2">Cadastro</h1>
       <p className="text-forest-600 mb-8">
-        Poucos dados — para começar a cuidar de você.
+        Preencha os dados para acessar o sistema.
       </p>
 
       {searchParams.error && (
@@ -33,7 +50,7 @@ export default function CadastroPage({
         </div>
       )}
 
-      <form action={signUp} className="space-y-4">
+      <form action={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="nome_completo" className="label">
             Nome completo
@@ -43,7 +60,7 @@ export default function CadastroPage({
             name="nome_completo"
             type="text"
             required
-            placeholder="Como você quer ser chamado(a)"
+            placeholder="Nome completo"
             className="input-field"
           />
         </div>
@@ -88,6 +105,24 @@ export default function CadastroPage({
             placeholder="Mínimo 6 caracteres"
             className="input-field"
           />
+        </div>
+
+        <div>
+          <label htmlFor="confirm_password" className="label">
+            Confirmar senha
+          </label>
+          <input
+            id="confirm_password"
+            name="confirm_password"
+            type="password"
+            required
+            minLength={6}
+            placeholder="Repita a senha"
+            className="input-field"
+          />
+          {senhaError && (
+            <p className="mt-1.5 text-sm text-rust">{senhaError}</p>
+          )}
         </div>
 
         <button type="submit" className="btn-primary w-full mt-6">
