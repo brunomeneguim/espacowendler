@@ -398,7 +398,8 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
 
   // Filtrar por sala e profissional
   const agsFiltrados = agendamentos.filter(a => {
-    const matchSala = filtroSalaId === null || a.sala?.id === filtroSalaId;
+    // appointments without sala appear in all sala tabs
+    const matchSala = filtroSalaId === null || a.sala === null || a.sala?.id === filtroSalaId;
     const matchProf = filtroProf === "todos" || a.profissional?.id === filtroProf;
     return matchSala && matchProf;
   });
@@ -416,11 +417,11 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
 
   function irParaHoje() {
     const hojeDate = new Date();
-    // só navega para hoje se for seg-sáb
-    if (DIAS_SEMANA.includes(hojeDate.getDay())) {
-      setSelectedDay(hojeDate);
-      setViewMode("dia");
-      if (!weekDays.some(d=>isSameDay(d,hojeDate))) router.push("/dashboard");
+    if (!DIAS_SEMANA.includes(hojeDate.getDay())) return;
+    setSelectedDay(hojeDate);
+    // mantém o modo atual (semana ou dia)
+    if (!weekDays.some(d => isSameDay(d, hojeDate))) {
+      router.push("/dashboard");
     }
   }
 
@@ -430,7 +431,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
 
   const isCurrentWeek = weekDays.some(d=>format(d,"yyyy-MM-dd")===hoje);
   const agendadosHoje = agendamentos.filter(a=> {
-    const matchSala = filtroSalaId === null || a.sala?.id === filtroSalaId;
+    const matchSala = filtroSalaId === null || a.sala === null || a.sala?.id === filtroSalaId;
     return matchSala && isSameDay(new Date(a.data_hora_inicio),new Date()) && ["agendado","confirmado"].includes(a.status);
   }).length;
 
