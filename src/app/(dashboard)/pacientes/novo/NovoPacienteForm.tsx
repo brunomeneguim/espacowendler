@@ -87,6 +87,9 @@ export function NovoPacienteForm({ camposConfig }: Props) {
   const [cepLoading, setCepLoading] = useState(false);
   const [endereco, setEndereco] = useState({ estado: "", cidade: "", bairro: "", logradouro: "" });
   const [contatos, setContatos] = useState<ContatoEmergencia[]>([{ nome: "", relacao: "", telefone: "" }]);
+  const [respDataNasc, setRespDataNasc] = useState("");
+  const [respTelefone, setRespTelefone] = useState("(42) ");
+  const [respErro, setRespErro] = useState<string | null>(null);
 
   const isMinor = dataNasc ? calcAge(dataNasc) < 18 : false;
   const isReq = (c: string) => camposConfig.find(x => x.campo === c)?.obrigatorio ?? false;
@@ -148,6 +151,17 @@ export function NovoPacienteForm({ camposConfig }: Props) {
   // ── Submit ──
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    // Validar idade do responsável (deve ter 18+)
+    if (isMinor && respDataNasc) {
+      const idade = calcAge(respDataNasc);
+      if (idade < 18) {
+        setRespErro("O responsável deve ter pelo menos 18 anos. Informe outro responsável.");
+        return;
+      }
+    }
+    setRespErro(null);
+
     const fd = new FormData(e.currentTarget);
     fd.set("foto_url", foto ?? "");
     fd.set("contatos_emergencia", JSON.stringify(contatos));
@@ -252,14 +266,70 @@ export function NovoPacienteForm({ camposConfig }: Props) {
           {isMinor && (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
               <p className="text-sm font-medium text-amber-800">Responsável legal</p>
+
+              {respErro && (
+                <div className="flex items-start gap-2 p-2.5 bg-rust/10 border border-rust/30 rounded-lg text-sm text-rust">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  {respErro}
+                </div>
+              )}
+
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   {req("Nome do responsável", "responsavel_nome")}
                   <input name="responsavel_nome" type="text" className="input-field" required={isMinor} placeholder="Nome completo" />
                 </div>
                 <div>
+                  {req("Relação com o paciente", "responsavel_relacao")}
+                  <select name="responsavel_relacao" className="input-field" required={isMinor} defaultValue="">
+                    <option value="" disabled>Selecione</option>
+                    <option value="mae">Mãe</option>
+                    <option value="pai">Pai</option>
+                    <option value="avo">Avó / Avô</option>
+                    <option value="tio">Tio / Tia</option>
+                    <option value="conjuge">Cônjuge</option>
+                    <option value="irmao">Irmão / Irmã</option>
+                    <option value="tutor_legal">Tutor legal</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                </div>
+                <div>
+                  {req("Telefone do responsável", "responsavel_telefone")}
+                  <input
+                    name="responsavel_telefone"
+                    type="text"
+                    className="input-field"
+                    required={isMinor}
+                    placeholder="(42) 00000-0000"
+                    value={respTelefone}
+                    onChange={e => setRespTelefone(maskPhone(e.target.value))}
+                  />
+                </div>
+                <div>
                   {req("Data de nasc. do responsável", "responsavel_data_nascimento")}
-                  <input name="responsavel_data_nascimento" type="date" className="input-field" required={isMinor} />
+                  <input
+                    name="responsavel_data_nascimento"
+                    type="date"
+                    className={`input-field ${respDataNasc && calcAge(respDataNasc) < 18 ? "border-rust focus:ring-rust/30" : ""}`}
+                    required={isMinor}
+                    value={respDataNasc}
+                    onChange={e => {
+                      setRespDataNasc(e.target.value);
+                      if (e.target.value && calcAge(e.target.value) < 18) {
+                        setRespErro("O responsável deve ter pelo menos 18 anos. Informe outro responsável.");
+                      } else {
+                        setRespErro(null);
+                      }
+                    }}
+                  />
+                  {respDataNasc && calcAge(respDataNasc) < 18 && (
+                    <p className="text-xs text-rust mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> Responsável menor de idade não é permitido.
+                    </p>
+                  )}
+                  {respDataNasc && calcAge(respDataNasc) >= 18 && (
+                    <p className="text-xs text-green-700 mt-1">✓ {calcAge(respDataNasc)} anos — elegível como responsável</p>
+                  )}
                 </div>
                 <div>
                   {req("CPF do responsável", "responsavel_cpf")}
