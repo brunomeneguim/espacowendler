@@ -324,7 +324,7 @@ export function NovoPacienteForm({ camposConfig }: Props) {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               {req("Telefone 1", "telefone_1")}
-              <div className="flex">
+              <div className="flex items-stretch">
                 <DDISelector value={ddi1} onChange={setDdi1} name="ddi_telefone_1_raw" />
                 <input name="telefone_1" type="text" className="input-field rounded-l-none flex-1"
                   required={isReq("telefone_1")} placeholder={ddi1 === "+55" ? "(00) 00000-0000" : "Número"}
