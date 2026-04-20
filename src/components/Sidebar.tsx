@@ -19,26 +19,25 @@ const NAV_ITEMS: Record<
   Array<{ href: string; label: string; icon: React.ElementType }>
 > = {
   admin: [
-    { href: "/dashboard", label: "Visão geral", icon: LayoutDashboard },
-    { href: "/agenda", label: "Agenda", icon: Calendar },
+    { href: "/dashboard", label: "Agenda do dia", icon: Calendar },
+    { href: "/agenda", label: "Todos os agendamentos", icon: LayoutDashboard },
     { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
     { href: "/pacientes", label: "Pacientes", icon: Users },
     { href: "/equipe", label: "Equipe", icon: UserCircle },
   ],
   supervisor: [
-    { href: "/dashboard", label: "Visão geral", icon: LayoutDashboard },
-    { href: "/agenda", label: "Agenda", icon: Calendar },
+    { href: "/dashboard", label: "Agenda do dia", icon: Calendar },
+    { href: "/agenda", label: "Todos os agendamentos", icon: LayoutDashboard },
     { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
     { href: "/pacientes", label: "Pacientes", icon: Users },
   ],
   profissional: [
-    { href: "/dashboard", label: "Visão geral", icon: LayoutDashboard },
-    { href: "/agenda", label: "Minha agenda", icon: Calendar },
+    { href: "/dashboard", label: "Minha agenda", icon: Calendar },
     { href: "/pacientes", label: "Meus pacientes", icon: Users },
   ],
   secretaria: [
-    { href: "/dashboard", label: "Visão geral", icon: LayoutDashboard },
-    { href: "/agenda", label: "Agenda geral", icon: Calendar },
+    { href: "/dashboard", label: "Agenda do dia", icon: Calendar },
+    { href: "/agenda", label: "Todos os agendamentos", icon: LayoutDashboard },
     { href: "/pacientes", label: "Pacientes", icon: Users },
   ],
 };
