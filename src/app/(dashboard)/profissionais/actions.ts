@@ -13,11 +13,14 @@ export async function cadastrarProfissional(formData: FormData) {
   const valorRaw = formData.get("valor_consulta") as string;
   const valor_consulta = valorRaw ? parseFloat(valorRaw) : null;
 
+  const cor = (formData.get("cor") as string) || null;
+
   const { error } = await supabase.from("profissionais").insert({
     profile_id,
     especialidade_id: especialidade_id ? parseInt(especialidade_id) : null,
     registro_profissional,
     valor_consulta,
+    cor,
     ativo: true,
   });
 
@@ -106,6 +109,7 @@ export async function completarPerfilProfissional(
     horario_inicio:     get("horario_inicio"),
     horario_fim:        get("horario_fim"),
     tempo_atendimento:  get("tempo_atendimento") ? parseInt(get("tempo_atendimento")!) : null,
+    cor:                get("cor"),
     observacoes:        get("observacoes"),
     registro_profissional: get("registro_profissional"),
     especialidade_id:   especialidadeId ? parseInt(especialidadeId) : null,

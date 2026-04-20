@@ -6,6 +6,7 @@ import {
   Upload, X, Loader2, User, FileText, Lock, AlertCircle,
 } from "lucide-react";
 import { completarPerfilProfissional } from "../actions";
+import { PROF_CORES } from "@/lib/profCores";
 
 // ── CBOS (principais códigos de saúde) ────────────────────────────
 export const CBOS_LIST = [
@@ -81,9 +82,10 @@ interface Props {
   profReg: ProfReg | null;
   especialidades: Especialidade[];
   camposConfig: CampoConfig[];
+  coresUsadas: string[];
 }
 
-export function CompletarPerfilForm({ profile, profReg, especialidades, camposConfig }: Props) {
+export function CompletarPerfilForm({ profile, profReg, especialidades, camposConfig, coresUsadas }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -93,7 +95,9 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
   const [cpf, setCpf] = useState(profReg?.cpf ?? "");
   const [cnpj, setCnpj] = useState(profReg?.cnpj ?? "");
   const [cbosSelecionado, setCbosSelecionado] = useState(profReg?.cbos_codigo ?? "");
+  const [corSelecionada, setCorSelecionada] = useState((profReg as any)?.cor ?? "");
   const [senhaErro, setSenhaErro] = useState<string | null>(null);
+  const coresDisponiveis = PROF_CORES.filter(c => !coresUsadas.includes(c.id) || c.id === corSelecionada);
 
   const isReq = (c: string) => camposConfig.find(x => x.campo === c)?.obrigatorio ?? false;
 
@@ -241,6 +245,29 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
                 <option value="">— Sem especialidade —</option>
                 {especialidades.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="label">Cor no calendário <span className="text-rust">*</span></label>
+              <input type="hidden" name="cor" value={corSelecionada} />
+              <div className="flex flex-wrap gap-2 mt-1">
+                {coresDisponiveis.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    title={c.label}
+                    onClick={() => setCorSelecionada(c.id)}
+                    className={`w-8 h-8 rounded-full border-4 transition-all ${c.bg} ${corSelecionada === c.id ? "border-forest scale-110 shadow-md" : "border-transparent hover:scale-105"}`}
+                  />
+                ))}
+              </div>
+              {corSelecionada && (
+                <p className="text-xs text-forest-500 mt-1">
+                  Selecionado: <span className="font-medium">{PROF_CORES.find(c => c.id === corSelecionada)?.label}</span>
+                </p>
+              )}
+              {coresDisponiveis.length === 0 && (
+                <p className="text-xs text-rust mt-1">Todas as cores já estão em uso. Contate o administrador.</p>
+              )}
             </div>
             <div>
               <label className="label">Registro profissional <span className="text-forest-400">(opcional)</span></label>

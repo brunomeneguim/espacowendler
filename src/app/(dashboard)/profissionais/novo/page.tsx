@@ -5,6 +5,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { cadastrarProfissional } from "../actions";
 import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
+import { CorProfissionalSelector } from "./CorProfissionalSelector";
 
 export default async function NovoProfissionalPage({
   searchParams,
@@ -16,35 +17,25 @@ export default async function NovoProfissionalPage({
 
   const supabase = createClient();
 
-  const [{ data: profiles }, { data: especialidades }, { data: jaProfissionais }] =
+  const [{ data: profiles }, { data: especialidades }, { data: jaProfissionais }, { data: coresRaw }] =
     await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, nome_completo, email")
-        .eq("ativo", true)
-        .order("nome_completo"),
+      supabase.from("profiles").select("id, nome_completo, email").eq("ativo", true).order("nome_completo"),
       supabase.from("especialidades").select("id, nome").order("nome"),
       supabase.from("profissionais").select("profile_id"),
+      supabase.from("profissionais").select("cor").not("cor", "is", null),
     ]);
 
   const idsOcupados = new Set((jaProfissionais ?? []).map((p) => p.profile_id));
   const profilesDisponiveis = (profiles ?? []).filter((p) => !idsOcupados.has(p.id));
+  const coresUsadas = (coresRaw ?? []).map((r: any) => r.cor).filter(Boolean) as string[];
 
   return (
     <div className="p-6 md:p-10 max-w-3xl">
-      <Link
-        href="/profissionais"
-        className="inline-flex items-center gap-2 text-sm text-forest-600 hover:text-forest mb-4"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Voltar
+      <Link href="/profissionais" className="inline-flex items-center gap-2 text-sm text-forest-600 hover:text-forest mb-4">
+        <ArrowLeft className="w-4 h-4" /> Voltar
       </Link>
 
-      <PageHeader
-        eyebrow="Equipe"
-        title="Cadastrar profissional"
-        description="Vincule um usuário do sistema como profissional atendente"
-      />
+      <PageHeader eyebrow="Equipe" title="Cadastrar profissional" description="Vincule um usuário do sistema como profissional atendente" />
 
       {searchParams.error && (
         <div className="mb-5 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
@@ -57,23 +48,14 @@ export default async function NovoProfissionalPage({
           <label htmlFor="profile_id" className="label">Usuário</label>
           {profilesDisponiveis.length === 0 ? (
             <div className="p-4 bg-peach/10 border border-peach/30 rounded-xl text-sm text-rust">
-              Todos os usuários já estão vinculados a um profissional. Peça para
-              o novo profissional criar uma conta em{" "}
+              Todos os usuários já estão vinculados a um profissional. Peça para o novo profissional criar uma conta em{" "}
               <code className="bg-white px-1.5 py-0.5 rounded">/cadastro</code>.
             </div>
           ) : (
-            <select
-              id="profile_id"
-              name="profile_id"
-              required
-              className="input-field"
-              defaultValue=""
-            >
+            <select id="profile_id" name="profile_id" required className="input-field" defaultValue="">
               <option value="" disabled>Selecione um usuário</option>
               {profilesDisponiveis.map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome_completo} — {p.email}
-                </option>
+                <option key={p.id} value={p.id}>{p.nome_completo} — {p.email}</option>
               ))}
             </select>
           )}
@@ -90,39 +72,26 @@ export default async function NovoProfissionalPage({
         </div>
 
         <div>
+          <label className="label">Cor no calendário <span className="text-rust">*</span></label>
+          <CorProfissionalSelector coresUsadas={coresUsadas} />
+        </div>
+
+        <div>
           <label htmlFor="registro_profissional" className="label">
             Registro profissional <span className="text-forest-400">(opcional)</span>
           </label>
-          <input
-            id="registro_profissional"
-            name="registro_profissional"
-            type="text"
-            className="input-field"
-            placeholder="Ex: CRP 08/12345"
-          />
+          <input id="registro_profissional" name="registro_profissional" type="text" className="input-field" placeholder="Ex: CRP 08/12345" />
         </div>
 
         <div>
           <label htmlFor="valor_consulta" className="label">
             Valor da consulta (R$) <span className="text-forest-400">(opcional)</span>
           </label>
-          <input
-            id="valor_consulta"
-            name="valor_consulta"
-            type="number"
-            step="0.01"
-            min="0"
-            className="input-field"
-            placeholder="200.00"
-          />
+          <input id="valor_consulta" name="valor_consulta" type="number" step="0.01" min="0" className="input-field" placeholder="200.00" />
         </div>
 
         <div className="flex gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={profilesDisponiveis.length === 0}
-            className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <button type="submit" disabled={profilesDisponiveis.length === 0} className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed">
             Cadastrar profissional
           </button>
           <Link href="/profissionais" className="btn-ghost">Cancelar</Link>

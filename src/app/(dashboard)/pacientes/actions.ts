@@ -63,6 +63,13 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
     grau_instrucao:                 get("grau_instrucao"),
     indicacao:                      get("indicacao"),
     observacoes:                    get("observacoes"),
+    tipo_cadastro:                  get("tipo_cadastro") || "individual",
+    parceiro_nome:                  get("parceiro_nome"),
+    parceiro_sexo:                  get("parceiro_sexo"),
+    parceiro_cpf:                   get("parceiro_cpf"),
+    parceiro_data_nascimento:       get("parceiro_data_nascimento"),
+    parceiro_telefone:              get("parceiro_telefone"),
+    parceiro_email:                 get("parceiro_email"),
     ativo:                          true,
   });
 

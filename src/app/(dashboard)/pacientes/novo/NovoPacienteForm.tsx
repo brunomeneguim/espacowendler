@@ -87,6 +87,9 @@ export function NovoPacienteForm({ camposConfig }: Props) {
   const [cepLoading, setCepLoading] = useState(false);
   const [endereco, setEndereco] = useState({ estado: "", cidade: "", bairro: "", logradouro: "" });
   const [contatos, setContatos] = useState<ContatoEmergencia[]>([{ nome: "", relacao: "", telefone: "" }]);
+  const [tipoCadastro, setTipoCadastro] = useState<"individual" | "casal">("individual");
+  const [parceiroDataNasc, setParceiroDataNasc] = useState("");
+  const [parceiroCpf, setParceiroCpf] = useState("");
   const [respDataNasc, setRespDataNasc] = useState("");
   const [respTelefone, setRespTelefone] = useState("(42) ");
   const [respErro, setRespErro] = useState<string | null>(null);
@@ -192,8 +195,23 @@ export function NovoPacienteForm({ camposConfig }: Props) {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* ── Toggle Individual / Casal ── */}
+        <input type="hidden" name="tipo_cadastro" value={tipoCadastro} />
+        <div className="flex gap-1 p-1 bg-sand/20 rounded-xl w-fit">
+          {(["individual", "casal"] as const).map(tipo => (
+            <button
+              key={tipo}
+              type="button"
+              onClick={() => setTipoCadastro(tipo)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${tipoCadastro === tipo ? "bg-white text-forest shadow-sm" : "text-forest-500 hover:text-forest hover:bg-white/50"}`}
+            >
+              {tipo === "individual" ? "👤 Paciente Individual" : "👫 Casal"}
+            </button>
+          ))}
+        </div>
+
         {/* ── Dados Pessoais ── */}
-        <Section icon={User} title="Dados Pessoais">
+        <Section icon={User} title={tipoCadastro === "casal" ? "Dados Pessoais — Paciente 1" : "Dados Pessoais"}>
           {/* Foto */}
           <div className="flex items-start gap-4">
             <div className="relative shrink-0">
@@ -345,6 +363,45 @@ export function NovoPacienteForm({ camposConfig }: Props) {
           </div>
         </Section>
 
+        {/* ── Dados do Parceiro(a) — só para casal ── */}
+        {tipoCadastro === "casal" && (
+          <Section icon={User} title="Dados Pessoais — Parceiro(a)">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="label">Nome completo <span className="text-rust">*</span></label>
+                <input name="parceiro_nome" type="text" className="input-field" required placeholder="Nome completo do(a) parceiro(a)" />
+              </div>
+              <div>
+                <label className="label">Data de nascimento</label>
+                <input name="parceiro_data_nascimento" type="date" className="input-field"
+                  value={parceiroDataNasc} onChange={e => setParceiroDataNasc(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Sexo</label>
+                <select name="parceiro_sexo" className="input-field" defaultValue="">
+                  <option value="" disabled>Selecione</option>
+                  <option value="masculino">Masculino</option>
+                  <option value="feminino">Feminino</option>
+                  <option value="outros">Outros</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">CPF</label>
+                <input name="parceiro_cpf" type="text" className="input-field" placeholder="000.000.000-00"
+                  value={parceiroCpf} onChange={e => setParceiroCpf(maskCpfCnpj(e.target.value))} />
+              </div>
+              <div>
+                <label className="label">Telefone</label>
+                <input name="parceiro_telefone" type="text" className="input-field" placeholder="(42) 00000-0000" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="label">E-mail</label>
+                <input name="parceiro_email" type="email" className="input-field" placeholder="email@exemplo.com" />
+              </div>
+            </div>
+          </Section>
+        )}
+
         {/* ── Endereço ── */}
         <Section icon={MapPin} title="Endereço">
           <div className="grid sm:grid-cols-3 gap-4">
@@ -353,7 +410,13 @@ export function NovoPacienteForm({ camposConfig }: Props) {
               <div className="relative">
                 <input name="cep" type="text" className="input-field pr-8" required={isReq("cep")}
                   placeholder="00000-000" value={cep}
-                  onChange={e => setCep(maskCep(e.target.value))}
+                  onChange={e => {
+                    const val = maskCep(e.target.value);
+                    setCep(val);
+                    if (!val.replace(/\D/g, "")) {
+                      setEndereco({ estado: "", cidade: "", bairro: "", logradouro: "" });
+                    }
+                  }}
                   onBlur={e => fetchCep(e.target.value)} />
                 {cepLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-forest-400" />}
               </div>

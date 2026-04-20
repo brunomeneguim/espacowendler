@@ -11,6 +11,7 @@ import {
   DoorOpen, X, Save, Loader2, Monitor,
 } from "lucide-react";
 import { atualizarStatusAgendamento, atualizarAgendamento } from "../agenda/actions";
+import { PROF_CORES, getCorById } from "@/lib/profCores";
 
 // ── Constantes ───────────────────────────────────────────────────
 const HORA_INICIO = 8;
@@ -32,7 +33,7 @@ interface Agendamento {
   profissional: { id: string; profile: { nome_completo: string } | null } | null;
   sala: { id: number; nome: string } | null;
 }
-interface Profissional { id: string; profile: { nome_completo: string } | null }
+interface Profissional { id: string; cor?: string | null; profile: { nome_completo: string } | null }
 interface Paciente     { id: string; nome_completo: string; telefone?: string }
 interface HorarioDisponivel { profissional_id: string; dia_semana: number; hora_inicio: string; hora_fim: string }
 interface Sala         { id: number; nome: string }
@@ -56,14 +57,8 @@ const STATUS: Record<Status, { label: string; card: string; dot: string; badge: 
   faltou:     { label: "Faltou",     card: "bg-orange-50 border-orange-200 text-orange-900", dot: "bg-orange-400", badge: "bg-orange-100 text-orange-700" },
 };
 
-const BORDA_PROF = [
-  "border-l-blue-500","border-l-violet-500","border-l-teal-500","border-l-rose-500",
-  "border-l-amber-500","border-l-cyan-600","border-l-fuchsia-500","border-l-lime-600",
-];
-const BG_PROF = [
-  "bg-blue-500","bg-violet-500","bg-teal-500","bg-rose-500",
-  "bg-amber-500","bg-cyan-600","bg-fuchsia-500","bg-lime-600",
-];
+const BORDA_PROF = PROF_CORES.map(c => c.border);
+const BG_PROF    = PROF_CORES.map(c => c.bg);
 
 // Seg a Sáb (sem domingo)
 const DIAS_SEMANA = [1, 2, 3, 4, 5, 6];
@@ -393,7 +388,15 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
 
   const canEdit = ["admin","supervisor","secretaria"].includes(userRole);
 
-  const profColorMap = new Map(profissionais.map((p,i)=>[p.id, BORDA_PROF[i%BORDA_PROF.length]]));
+  // Usa a cor cadastrada do profissional, ou fallback por índice
+  const profColorMap = new Map(profissionais.map((p, i) => [
+    p.id,
+    p.cor ? getCorById(p.cor).border : BORDA_PROF[i % BORDA_PROF.length],
+  ]));
+  const profBgMap = new Map(profissionais.map((p, i) => [
+    p.id,
+    p.cor ? getCorById(p.cor).bg : BG_PROF[i % BG_PROF.length],
+  ]));
 
   // Semana seg-sáb (sem domingo)
   const weekDays = Array.from({length:6},(_,i)=>addDays(weekStart,i))
@@ -628,7 +631,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
                       const profIdx=profissionais.findIndex(p=>p.id===ag.profissional?.id);
                       return (
                         <div key={ag.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onClick={()=>canEdit&&setEditingAg(ag)}>
-                          <div className={`w-1.5 h-8 rounded-full ${BG_PROF[profIdx%BG_PROF.length]} shrink-0`} />
+                          <div className={`w-1.5 h-8 rounded-full ${profBgMap.get(ag.profissional?.id ?? "") ?? BG_PROF[0]} shrink-0`} />
                           <div className="w-16 text-center shrink-0">
                             <p className="text-sm font-semibold text-forest">{format(new Date(ag.data_hora_inicio),"HH:mm")}</p>
                             <p className="text-xs text-forest-400">{format(new Date(ag.data_hora_fim),"HH:mm")}</p>
