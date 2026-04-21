@@ -57,6 +57,21 @@ export async function gerenciarHorario(
     const hora_inicio = formData.get("hora_inicio") as string;
     const hora_fim = formData.get("hora_fim") as string;
 
+    // Verifica duplicata
+    const { data: existing } = await supabase
+      .from("horarios_disponiveis")
+      .select("id")
+      .eq("profissional_id", profissionalId)
+      .eq("dia_semana", dia_semana)
+      .eq("hora_inicio", hora_inicio)
+      .maybeSingle();
+
+    if (existing) {
+      return redirect(
+        `/profissionais/${profissionalId}/editar?error=${encodeURIComponent("Este horário já foi adicionado.")}`
+      );
+    }
+
     await supabase.from("horarios_disponiveis").insert({
       profissional_id: profissionalId,
       dia_semana,

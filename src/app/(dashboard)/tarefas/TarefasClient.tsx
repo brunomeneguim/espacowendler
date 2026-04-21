@@ -9,7 +9,7 @@ import {
   Flag, StickyNote, CheckSquare, ChevronDown, ChevronUp,
   Pencil, RepeatIcon, Save,
 } from "lucide-react";
-import { criarTarefa, atualizarTarefa, alternarTarefa, excluirTarefa, criarPostit, excluirPostit } from "./actions";
+import { criarTarefa, atualizarTarefa, alternarTarefa, excluirTarefa, criarPostit, atualizarPostit, excluirPostit } from "./actions";
 
 // ── Tipos ─────────────────────────────────────────────────────────
 interface Tarefa {
@@ -154,17 +154,27 @@ function ModalTarefa({
   );
 }
 
-// ── Modal de novo post-it ─────────────────────────────────────────
-function ModalPostit({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+// ── Modal de novo/editar post-it ──────────────────────────────────
+function ModalPostit({
+  postit, onClose, onSaved,
+}: {
+  postit?: Postit;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [isPending, startTransition] = useTransition();
-  const [cor, setCor] = useState("yellow");
+  const [cor, setCor] = useState(postit?.cor ?? "yellow");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     fd.set("cor", cor);
     startTransition(async () => {
-      await criarPostit(fd);
+      if (postit) {
+        await atualizarPostit(postit.id, fd);
+      } else {
+        await criarPostit(fd);
+      }
       onSaved();
       onClose();
     });
@@ -176,11 +186,14 @@ function ModalPostit({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
         <div className={`rounded-2xl shadow-2xl w-full max-w-sm border ${POSTIT_CORES[cor].bg} ${POSTIT_CORES[cor].border}`}>
           <div className="flex items-center justify-between px-5 py-3 border-b border-black/10">
-            <h2 className="font-medium text-gray-700">Novo post-it</h2>
+            <h2 className="font-medium text-gray-700">{postit ? "Editar lembrete" : "Novo post-it"}</h2>
             <button onClick={onClose} className="p-1 rounded hover:bg-black/10 text-gray-500"><X className="w-4 h-4" /></button>
           </div>
           <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3">
-            <textarea name="conteudo" rows={4} required autoFocus className="w-full bg-transparent text-gray-800 placeholder-gray-400 resize-none outline-none text-sm" placeholder="Escreva um lembrete…" />
+            <textarea name="conteudo" rows={4} required autoFocus
+              className="w-full bg-transparent text-gray-800 placeholder-gray-400 resize-none outline-none text-sm"
+              placeholder="Escreva um lembrete…"
+              defaultValue={postit?.conteudo ?? ""} />
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">Cor:</span>
               {Object.entries(POSTIT_CORES).map(([id, c]) => (
@@ -191,8 +204,8 @@ function ModalPostit({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
             </div>
             <div className="flex gap-2 pt-1">
               <button type="submit" disabled={isPending} className="flex-1 bg-white/60 hover:bg-white border border-black/10 text-gray-700 text-sm rounded-lg px-3 py-1.5 flex items-center justify-center gap-1.5 font-medium transition-colors">
-                {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                Adicionar
+                {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : postit ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                {postit ? "Salvar" : "Adicionar"}
               </button>
               <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancelar</button>
             </div>
@@ -280,17 +293,24 @@ function TarefaItem({ tarefa, onToggle, onDelete, onEdit, pending }: {
 }
 
 // ── Card de post-it ───────────────────────────────────────────────
-function PostitCard({ postit, onDelete, pending }: { postit: Postit; onDelete: () => void; pending: boolean }) {
+function PostitCard({ postit, onEdit, onDelete, pending }: {
+  postit: Postit;
+  onEdit: () => void;
+  onDelete: () => void;
+  pending: boolean;
+}) {
   const c = POSTIT_CORES[postit.cor] ?? POSTIT_CORES.yellow;
   return (
     <div className={`relative rounded-xl border p-4 shadow-sm group transition-all hover:shadow-md ${c.bg} ${c.border} ${pending ? "opacity-50 pointer-events-none" : ""}`}>
-      <button
-        onClick={onDelete}
-        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 text-gray-500 transition-all"
-      >
-        <X className="w-3.5 h-3.5" />
-      </button>
-      <p className="text-sm text-gray-800 whitespace-pre-wrap pr-4">{postit.conteudo}</p>
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+        <button onClick={onEdit} className="p-1 rounded hover:bg-black/10 text-gray-500">
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={onDelete} className="p-1 rounded hover:bg-black/10 text-gray-500">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <p className="text-sm text-gray-800 whitespace-pre-wrap pr-10">{postit.conteudo}</p>
       <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
         {postit.criador && <span>{postit.criador.nome_completo}</span>}
         <span>·</span>
@@ -316,6 +336,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
   const [showModalTarefa, setShowModalTarefa] = useState(false);
   const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
   const [showModalPostit, setShowModalPostit] = useState(false);
+  const [editingPostit, setEditingPostit] = useState<Postit | null>(null);
   const [filtro, setFiltro] = useState<"todas" | "minhas" | "concluidas">("todas");
 
   function refresh() { router.refresh(); }
@@ -366,7 +387,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
           <p className="text-sm text-forest-500 mt-0.5">{pendentes} pendente{pendentes !== 1 ? "s" : ""} · {postits.length} lembrete{postits.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowModalPostit(true)} className="btn-ghost flex items-center gap-1.5 text-sm">
+          <button onClick={() => { setEditingPostit(null); setShowModalPostit(true); }} className="btn-ghost flex items-center gap-1.5 text-sm">
             <StickyNote className="w-4 h-4" /> Post-it
           </button>
           <button onClick={() => { setEditingTarefa(null); setShowModalTarefa(true); }} className="btn-primary flex items-center gap-1.5 text-sm">
@@ -439,7 +460,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
               <StickyNote className="w-4 h-4" /> Lembretes
             </h2>
             <button
-              onClick={() => setShowModalPostit(true)}
+              onClick={() => { setEditingPostit(null); setShowModalPostit(true); }}
               className="w-7 h-7 flex items-center justify-center rounded-lg border border-sand/40 hover:bg-sand/20 text-forest transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -450,7 +471,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
             <div className="text-center py-12 text-forest-400">
               <StickyNote className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-xs">Nenhum post-it ainda.</p>
-              <button onClick={() => setShowModalPostit(true)} className="mt-2 text-xs text-forest hover:underline">
+              <button onClick={() => { setEditingPostit(null); setShowModalPostit(true); }} className="mt-2 text-xs text-forest hover:underline">
                 Adicionar lembrete
               </button>
             </div>
@@ -460,6 +481,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
                 <PostitCard
                   key={p.id}
                   postit={p}
+                  onEdit={() => { setEditingPostit(p); setShowModalPostit(true); }}
                   onDelete={() => handleDeletePostit(p.id)}
                   pending={pendingId === p.id}
                 />
@@ -481,7 +503,8 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
 
       {showModalPostit && (
         <ModalPostit
-          onClose={() => setShowModalPostit(false)}
+          postit={editingPostit ?? undefined}
+          onClose={() => { setShowModalPostit(false); setEditingPostit(null); }}
           onSaved={refresh}
         />
       )}

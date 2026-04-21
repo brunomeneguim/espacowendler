@@ -143,18 +143,8 @@ export default async function EditarProfissionalPage({
           />
         </div>
 
-        <div>
-          <label htmlFor="ativo" className="label">Status</label>
-          <select
-            id="ativo"
-            name="ativo"
-            className="input-field"
-            defaultValue={prof.ativo ? "true" : "false"}
-          >
-            <option value="true">Ativo</option>
-            <option value="false">Inativo</option>
-          </select>
-        </div>
+        {/* Status gerenciado na página Equipe (admin/supervisor) */}
+        <input type="hidden" name="ativo" value={prof.ativo ? "true" : "false"} />
 
         <div className="flex gap-3 pt-2">
           <button type="submit" className="btn-primary flex-1">
@@ -183,9 +173,9 @@ export default async function EditarProfissionalPage({
               const removeAction = gerenciarHorario.bind(null, params.id, "remove");
               return (
                 <div key={h.id} className="flex items-center justify-between p-3 bg-cream rounded-lg">
-                  <div>
-                    <span className="text-sm font-medium text-forest">{dia?.label}</span>
-                    <span className="text-sm text-forest-500 ml-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-forest w-32 shrink-0">{dia?.label}</span>
+                    <span className="text-sm text-forest-500">
                       {h.hora_inicio.slice(0, 5)} – {h.hora_fim.slice(0, 5)}
                     </span>
                   </div>

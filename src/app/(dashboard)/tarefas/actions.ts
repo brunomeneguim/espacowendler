@@ -84,6 +84,16 @@ export async function criarPostit(formData: FormData): Promise<{ error: string |
   return { error: null };
 }
 
+export async function atualizarPostit(id: string, formData: FormData): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const conteudo = formData.get("conteudo") as string;
+  const cor = (formData.get("cor") as string) || "yellow";
+  const { error } = await supabase.from("postits").update({ conteudo, cor }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/tarefas");
+  return { error: null };
+}
+
 export async function excluirPostit(id: string): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.from("postits").delete().eq("id", id);
