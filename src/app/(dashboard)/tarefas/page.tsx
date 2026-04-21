@@ -24,8 +24,8 @@ export default async function TarefasPage() {
 
   return (
     <TarefasClient
-      tarefas={tarefas ?? []}
-      postits={postits ?? []}
+      tarefas={(tarefas ?? []) as any}
+      postits={(postits ?? []) as any}
       profiles={profiles ?? []}
       currentUserId={profile.id}
       currentRole={profile.role}
