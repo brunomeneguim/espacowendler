@@ -70,6 +70,13 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
     parceiro_data_nascimento:       get("parceiro_data_nascimento"),
     parceiro_telefone:              get("parceiro_telefone"),
     parceiro_email:                 get("parceiro_email"),
+    parceiro_mesmo_endereco:        formData.get("parceiro_mesmo_endereco") !== "false",
+    parceiro_cep:                   get("parceiro_cep"),
+    parceiro_estado:                get("parceiro_estado"),
+    parceiro_cidade:                get("parceiro_cidade"),
+    parceiro_bairro:                get("parceiro_bairro"),
+    parceiro_endereco:              get("parceiro_endereco"),
+    parceiro_numero:                get("parceiro_numero"),
     ativo:                          true,
   });
 

@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  Plus, Check, Trash2, X, Loader2, AlertCircle, Clock,
+  Plus, Check, Trash2, X, Loader2, Clock,
   Flag, StickyNote, CheckSquare, ChevronDown, ChevronUp,
+  Pencil, RepeatIcon, Save,
 } from "lucide-react";
-import { criarTarefa, alternarTarefa, excluirTarefa, criarPostit, excluirPostit } from "./actions";
+import { criarTarefa, atualizarTarefa, alternarTarefa, excluirTarefa, criarPostit, excluirPostit } from "./actions";
 
 // ── Tipos ─────────────────────────────────────────────────────────
 interface Tarefa {
@@ -22,6 +23,7 @@ interface Tarefa {
   concluida_em?: string | null;
   criado_por?: string | null;
   atribuido_para?: string | null;
+  repeticao?: string | null;
   criador?: { nome_completo: string } | null;
   responsavel?: { nome_completo: string } | null;
 }
@@ -47,14 +49,28 @@ const POSTIT_CORES: Record<string, { bg: string; border: string; label: string }
   orange:  { bg: "bg-orange-100",  border: "border-orange-300",  label: "Laranja"  },
 };
 
-const PRIORIDADE: Record<string, { label: string; dot: string; text: string }> = {
-  baixa:  { label: "Baixa",  dot: "bg-gray-400",   text: "text-gray-500"  },
-  normal: { label: "Normal", dot: "bg-blue-400",   text: "text-blue-600"  },
-  alta:   { label: "Alta",   dot: "bg-red-500",    text: "text-red-600"   },
+const PRIORIDADE: Record<string, { label: string; dot: string }> = {
+  baixa:  { label: "Baixa",  dot: "bg-gray-400"   },
+  normal: { label: "Normal", dot: "bg-blue-400"   },
+  alta:   { label: "Alta",   dot: "bg-red-500"    },
 };
 
-// ── Modal de nova tarefa ──────────────────────────────────────────
-function ModalTarefa({ profiles, onClose, onSaved }: { profiles: Profile[]; onClose: () => void; onSaved: () => void }) {
+const REPETICAO: Record<string, string> = {
+  nenhuma: "Não repete",
+  diaria:  "Diária",
+  semanal: "Semanal",
+  mensal:  "Mensal",
+};
+
+// ── Modal tarefa (criar/editar) ───────────────────────────────────
+function ModalTarefa({
+  profiles, tarefa, onClose, onSaved,
+}: {
+  profiles: Profile[];
+  tarefa?: Tarefa;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
 
@@ -63,7 +79,9 @@ function ModalTarefa({ profiles, onClose, onSaved }: { profiles: Profile[]; onCl
     const fd = new FormData(e.currentTarget);
     setErro(null);
     startTransition(async () => {
-      const res = await criarTarefa(fd);
+      const res = tarefa
+        ? await atualizarTarefa(tarefa.id, fd)
+        : await criarTarefa(fd);
       if (res.error) { setErro(res.error); }
       else { onSaved(); onClose(); }
     });
@@ -75,23 +93,25 @@ function ModalTarefa({ profiles, onClose, onSaved }: { profiles: Profile[]; onCl
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
           <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30">
-            <h2 className="font-display text-lg text-forest">Nova tarefa</h2>
+            <h2 className="font-display text-lg text-forest">{tarefa ? "Editar tarefa" : "Nova tarefa"}</h2>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-sand/20 text-forest-400"><X className="w-5 h-5" /></button>
           </div>
           <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
             {erro && <div className="p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">{erro}</div>}
             <div>
               <label className="label">Título <span className="text-rust">*</span></label>
-              <input name="titulo" type="text" required className="input-field" placeholder="Descreva a tarefa…" autoFocus />
+              <input name="titulo" type="text" required className="input-field" placeholder="Descreva a tarefa…"
+                defaultValue={tarefa?.titulo} autoFocus />
             </div>
             <div>
               <label className="label">Descrição <span className="text-forest-400">(opcional)</span></label>
-              <textarea name="descricao" rows={2} className="input-field resize-none" placeholder="Detalhes adicionais…" />
+              <textarea name="descricao" rows={2} className="input-field resize-none"
+                placeholder="Detalhes adicionais…" defaultValue={tarefa?.descricao ?? ""} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Prioridade</label>
-                <select name="prioridade" className="input-field" defaultValue="normal">
+                <select name="prioridade" className="input-field" defaultValue={tarefa?.prioridade ?? "normal"}>
                   <option value="baixa">🔵 Baixa</option>
                   <option value="normal">🟡 Normal</option>
                   <option value="alta">🔴 Alta</option>
@@ -99,20 +119,31 @@ function ModalTarefa({ profiles, onClose, onSaved }: { profiles: Profile[]; onCl
               </div>
               <div>
                 <label className="label">Vencimento</label>
-                <input name="data_vencimento" type="date" className="input-field" />
+                <input name="data_vencimento" type="date" className="input-field" defaultValue={tarefa?.data_vencimento ?? ""} />
               </div>
             </div>
-            <div>
-              <label className="label">Atribuir a</label>
-              <select name="atribuido_para" className="input-field" defaultValue="">
-                <option value="">— Sem responsável —</option>
-                {profiles.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
-              </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Repetição</label>
+                <select name="repeticao" className="input-field" defaultValue={tarefa?.repeticao ?? "nenhuma"}>
+                  <option value="nenhuma">Não repete</option>
+                  <option value="diaria">Diária</option>
+                  <option value="semanal">Semanal</option>
+                  <option value="mensal">Mensal</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Atribuir a</label>
+                <select name="atribuido_para" className="input-field" defaultValue={tarefa?.atribuido_para ?? ""}>
+                  <option value="">— Sem responsável —</option>
+                  {profiles.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
+                </select>
+              </div>
             </div>
             <div className="flex gap-3 pt-1">
               <button type="submit" disabled={isPending} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                {isPending ? "Salvando…" : "Criar tarefa"}
+                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : tarefa ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                {isPending ? "Salvando…" : tarefa ? "Salvar alterações" : "Criar tarefa"}
               </button>
               <button type="button" onClick={onClose} className="btn-ghost">Cancelar</button>
             </div>
@@ -173,20 +204,21 @@ function ModalPostit({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 }
 
 // ── Item de tarefa ────────────────────────────────────────────────
-function TarefaItem({ tarefa, onToggle, onDelete, pending }: {
+function TarefaItem({ tarefa, onToggle, onDelete, onEdit, pending }: {
   tarefa: Tarefa;
   onToggle: () => void;
   onDelete: () => void;
+  onEdit: () => void;
   pending: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const pri = PRIORIDADE[tarefa.prioridade] ?? PRIORIDADE.normal;
-  const vencida = tarefa.data_vencimento && !tarefa.concluida && new Date(tarefa.data_vencimento) < new Date();
+  const vencida = tarefa.data_vencimento && !tarefa.concluida && new Date(tarefa.data_vencimento + "T12:00:00") < new Date();
+  const rep = tarefa.repeticao && tarefa.repeticao !== "nenhuma" ? REPETICAO[tarefa.repeticao] : null;
 
   return (
     <div className={`group rounded-xl border transition-all ${tarefa.concluida ? "bg-gray-50 border-gray-200 opacity-60" : "bg-white border-sand/40 hover:border-forest/20"} ${pending ? "opacity-50 pointer-events-none" : ""}`}>
       <div className="flex items-center gap-3 px-4 py-3">
-        {/* Checkbox */}
         <button
           onClick={onToggle}
           className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${tarefa.concluida ? "bg-forest border-forest text-cream" : "border-gray-300 hover:border-forest"}`}
@@ -194,13 +226,17 @@ function TarefaItem({ tarefa, onToggle, onDelete, pending }: {
           {tarefa.concluida && <Check className="w-3 h-3" />}
         </button>
 
-        {/* Conteúdo */}
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpanded(v => !v)}>
           <div className="flex items-center gap-2">
             <span className={`text-sm font-medium truncate ${tarefa.concluida ? "line-through text-gray-400" : "text-forest"}`}>
               {tarefa.titulo}
             </span>
             <span className={`w-2 h-2 rounded-full shrink-0 ${pri.dot}`} title={pri.label} />
+            {rep && (
+              <span className="flex items-center gap-0.5 text-[10px] bg-forest/10 text-forest px-1.5 py-0.5 rounded-full shrink-0">
+                <RepeatIcon className="w-2.5 h-2.5" /> {rep}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 mt-0.5">
             {tarefa.responsavel && (
@@ -216,13 +252,15 @@ function TarefaItem({ tarefa, onToggle, onDelete, pending }: {
           </div>
         </div>
 
-        {/* Ações */}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {tarefa.descricao && (
             <button onClick={() => setExpanded(v => !v)} className="p-1.5 rounded-lg hover:bg-sand/20 text-forest-400">
               {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           )}
+          <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-forest/10 text-forest-400 hover:text-forest">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
           <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -276,6 +314,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [showModalTarefa, setShowModalTarefa] = useState(false);
+  const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
   const [showModalPostit, setShowModalPostit] = useState(false);
   const [filtro, setFiltro] = useState<"todas" | "minhas" | "concluidas">("todas");
 
@@ -327,16 +366,10 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
           <p className="text-sm text-forest-500 mt-0.5">{pendentes} pendente{pendentes !== 1 ? "s" : ""} · {postits.length} lembrete{postits.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowModalPostit(true)}
-            className="btn-ghost flex items-center gap-1.5 text-sm"
-          >
+          <button onClick={() => setShowModalPostit(true)} className="btn-ghost flex items-center gap-1.5 text-sm">
             <StickyNote className="w-4 h-4" /> Post-it
           </button>
-          <button
-            onClick={() => setShowModalTarefa(true)}
-            className="btn-primary flex items-center gap-1.5 text-sm"
-          >
+          <button onClick={() => { setEditingTarefa(null); setShowModalTarefa(true); }} className="btn-primary flex items-center gap-1.5 text-sm">
             <Plus className="w-4 h-4" /> Nova tarefa
           </button>
         </div>
@@ -346,21 +379,30 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
         {/* ── Coluna de Tarefas ── */}
         <div className="lg:col-span-2 space-y-4">
           {/* Filtros */}
-          <div className="flex gap-1 p-1 bg-sand/20 rounded-xl w-fit text-sm">
-            {([
-              ["todas", `Pendentes (${pendentes})`, CheckSquare],
-              ["minhas", `Minhas (${minhas})`, Flag],
-              ["concluidas", "Concluídas", Check],
-            ] as const).map(([id, label, Icon]) => (
-              <button
-                key={id}
-                onClick={() => setFiltro(id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${filtro === id ? "bg-white text-forest shadow-sm font-medium" : "text-forest-500 hover:text-forest hover:bg-white/50"}`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 p-1 bg-sand/20 rounded-xl text-sm flex-1">
+              {([
+                ["todas", `Pendentes (${pendentes})`],
+                ["minhas", `Minhas (${minhas})`],
+                ["concluidas", "Concluídas"],
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setFiltro(id)}
+                  className={`flex-1 px-3 py-1.5 rounded-lg transition-colors ${filtro === id ? "bg-white text-forest shadow-sm font-medium" : "text-forest-500 hover:text-forest hover:bg-white/50"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {/* Botão "+" rápido na área de tarefas */}
+            <button
+              onClick={() => { setEditingTarefa(null); setShowModalTarefa(true); }}
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-sand/40 hover:bg-sand/20 text-forest transition-colors shrink-0"
+              title="Nova tarefa"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Lista */}
@@ -369,7 +411,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
               <CheckSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="text-sm">Nenhuma tarefa {filtro === "concluidas" ? "concluída" : "pendente"}.</p>
               {filtro !== "concluidas" && (
-                <button onClick={() => setShowModalTarefa(true)} className="mt-3 text-sm text-forest hover:underline">
+                <button onClick={() => { setEditingTarefa(null); setShowModalTarefa(true); }} className="mt-3 text-sm text-forest hover:underline">
                   Criar primeira tarefa
                 </button>
               )}
@@ -382,6 +424,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
                   tarefa={t}
                   onToggle={() => handleToggle(t.id, !t.concluida)}
                   onDelete={() => handleDeleteTarefa(t.id)}
+                  onEdit={() => { setEditingTarefa(t); setShowModalTarefa(true); }}
                   pending={pendingId === t.id}
                 />
               ))}
@@ -426,10 +469,12 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
         </div>
       </div>
 
+      {/* Modais */}
       {showModalTarefa && (
         <ModalTarefa
           profiles={profiles}
-          onClose={() => setShowModalTarefa(false)}
+          tarefa={editingTarefa ?? undefined}
+          onClose={() => { setShowModalTarefa(false); setEditingTarefa(null); }}
           onSaved={refresh}
         />
       )}

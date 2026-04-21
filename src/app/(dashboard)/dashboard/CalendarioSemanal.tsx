@@ -221,21 +221,22 @@ interface CardProps {
   ag: Agendamento;
   style: React.CSSProperties;
   bordaProf: string;
+  profHex: string;
   onEdit: () => void;
   onStatus: (s: Status) => void;
   pending: boolean;
   canEdit: boolean;
 }
 
-function AgendamentoCard({ ag, style, bordaProf, onEdit, onStatus, pending, canEdit }: CardProps) {
+function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onStatus, pending, canEdit }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div
-      style={style}
-      className={`absolute rounded border-l-4 ${bordaProf} bg-white border border-gray-200 cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
+      style={{ ...style, backgroundColor: profHex + "28" }}
+      className={`absolute rounded border-l-4 ${bordaProf} border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
       onClick={() => setExpanded(v => !v)}
     >
       <div className="px-1.5 py-0.5 leading-tight flex items-start gap-1">
@@ -317,6 +318,7 @@ interface ColunaProps {
   horariosParaDia: HorarioDisponivel[];
   mostrarHorarios: boolean;
   profColorMap: Map<string,string>;
+  profHexMap: Map<string,string>;
   onEdit: (ag: Agendamento) => void;
   onStatus: (id: string, s: Status) => void;
   pending: boolean;
@@ -324,7 +326,7 @@ interface ColunaProps {
   salaId: number | null;
 }
 
-function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, onEdit, onStatus, pending, canEdit, salaId }: ColunaProps) {
+function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onStatus, pending, canEdit, salaId }: ColunaProps) {
   const colMap = calcularColunas(ags);
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
   const slotsOcupados = new Set(
@@ -362,6 +364,7 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, o
             ag={ag}
             style={{ top:Math.max(0,top), height, left:`${(col/total)*100}%`, width:`calc(${100/total}% - 2px)` }}
             bordaProf={profColorMap.get(ag.profissional?.id ?? "") ?? BORDA_PROF[0]}
+            profHex={profHexMap.get(ag.profissional?.id ?? "") ?? PROF_CORES[0].hex}
             onEdit={() => onEdit(ag)}
             onStatus={s => onStatus(ag.id, s)}
             pending={pending}
@@ -403,6 +406,10 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
   const profBgMap = new Map(profissionais.map((p, i) => [
     p.id,
     p.cor ? getCorById(p.cor).bg : BG_PROF[i % BG_PROF.length],
+  ]));
+  const profHexMap = new Map(profissionais.map((p, i) => [
+    p.id,
+    p.cor ? getCorById(p.cor).hex : PROF_CORES[i % PROF_CORES.length].hex,
   ]));
 
   // Semana seg-sáb (sem domingo)
@@ -564,7 +571,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
                     </div>
                   </div>
                   <div className="relative px-0.5">
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} onEdit={setEditingAg} onStatus={handleStatus} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} />
+                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onStatus={handleStatus} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} />
                   </div>
                 </div>
               );

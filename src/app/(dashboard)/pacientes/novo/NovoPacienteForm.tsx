@@ -90,6 +90,10 @@ export function NovoPacienteForm({ camposConfig }: Props) {
   const [tipoCadastro, setTipoCadastro] = useState<"individual" | "casal">("individual");
   const [parceiroDataNasc, setParceiroDataNasc] = useState("");
   const [parceiroCpf, setParceiroCpf] = useState("");
+  const [mesmoEndereco, setMesmoEndereco] = useState(true);
+  const [parceiroCep, setParceiroCep] = useState("");
+  const [parceiroCepLoading, setParceiroCepLoading] = useState(false);
+  const [parceiroEnd, setParceiroEnd] = useState({ estado: "", cidade: "", bairro: "", logradouro: "" });
   const [respDataNasc, setRespDataNasc] = useState("");
   const [respTelefone, setRespTelefone] = useState("(42) ");
   const [respErro, setRespErro] = useState<string | null>(null);
@@ -170,6 +174,7 @@ export function NovoPacienteForm({ camposConfig }: Props) {
     fd.set("contatos_emergencia", JSON.stringify(contatos));
     fd.set("ddi_telefone_1", ddi1);
     fd.set("ddi_telefone_2", ddi2);
+    fd.set("parceiro_mesmo_endereco", mesmoEndereco ? "true" : "false");
     setErro(null);
     startTransition(async () => {
       const res = await criarPacienteCompleto(fd);
@@ -398,6 +403,72 @@ export function NovoPacienteForm({ camposConfig }: Props) {
                 <label className="label">E-mail</label>
                 <input name="parceiro_email" type="email" className="input-field" placeholder="email@exemplo.com" />
               </div>
+            </div>
+
+            {/* Endereço do parceiro */}
+            <div className="pt-2 border-t border-sand/20">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={mesmoEndereco}
+                  onChange={e => setMesmoEndereco(e.target.checked)}
+                  className="w-4 h-4 accent-forest rounded"
+                />
+                <span className="text-sm text-forest-700">Parceiro(a) mora no mesmo endereço</span>
+              </label>
+
+              {!mesmoEndereco && (
+                <div className="mt-4 grid sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="label">CEP</label>
+                    <div className="relative">
+                      <input name="parceiro_cep" type="text" className="input-field pr-8" placeholder="00000-000"
+                        value={parceiroCep}
+                        onChange={e => {
+                          const v = maskCep(e.target.value);
+                          setParceiroCep(v);
+                          if (!v.replace(/\D/g, "")) setParceiroEnd({ estado: "", cidade: "", bairro: "", logradouro: "" });
+                        }}
+                        onBlur={async e => {
+                          const digits = e.target.value.replace(/\D/g, "");
+                          if (digits.length !== 8) return;
+                          setParceiroCepLoading(true);
+                          try {
+                            const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+                            const d = await res.json();
+                            if (!d.erro) setParceiroEnd({ estado: d.uf, cidade: d.localidade, bairro: d.bairro, logradouro: d.logradouro });
+                          } catch { /* ignore */ } finally { setParceiroCepLoading(false); }
+                        }}
+                      />
+                      {parceiroCepLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-forest-400" />}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Estado</label>
+                    <input name="parceiro_estado" type="text" className="input-field" placeholder="UF" maxLength={2}
+                      value={parceiroEnd.estado} onChange={e => setParceiroEnd(p => ({ ...p, estado: e.target.value.toUpperCase() }))} />
+                  </div>
+                  <div>
+                    <label className="label">Cidade</label>
+                    <input name="parceiro_cidade" type="text" className="input-field" placeholder="Cidade"
+                      value={parceiroEnd.cidade} onChange={e => setParceiroEnd(p => ({ ...p, cidade: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="label">Bairro</label>
+                    <input name="parceiro_bairro" type="text" className="input-field" placeholder="Bairro"
+                      value={parceiroEnd.bairro} onChange={e => setParceiroEnd(p => ({ ...p, bairro: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="label">Endereço</label>
+                    <input name="parceiro_endereco" type="text" className="input-field" placeholder="Rua / Avenida"
+                      value={parceiroEnd.logradouro} onChange={e => setParceiroEnd(p => ({ ...p, logradouro: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="label">Número</label>
+                    <input name="parceiro_numero" type="text" className="input-field" placeholder="Nº" />
+                  </div>
+                </div>
+              )}
             </div>
           </Section>
         )}

@@ -24,8 +24,8 @@ const NAV_ITEMS: Record<
     { href: "/agenda", label: "Todos os agendamentos", icon: LayoutDashboard },
     { href: "/pacientes", label: "Pacientes", icon: Users },
     { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
-    { href: "/equipe", label: "Equipe", icon: UserCircle },
     { href: "/tarefas", label: "Tarefas", icon: CheckSquare },
+    { href: "/equipe", label: "Equipe", icon: UserCircle },
   ],
   supervisor: [
     { href: "/dashboard", label: "Agenda do dia", icon: Calendar },
