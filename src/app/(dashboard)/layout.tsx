@@ -14,7 +14,10 @@ export default async function DashboardLayout({
   // Profissional sem perfil completo → forçar completar cadastro
   if (profile.role === "profissional") {
     const pathname = headers().get("x-pathname") ?? "";
-    if (!pathname.startsWith("/profissionais/completar")) {
+    // Só redireciona se soubermos o pathname e ele não for a própria página de completar.
+    // Se o header não chegou (pathname vazio), não redireciona para evitar loop infinito.
+    const deveVerificar = pathname !== "" && !pathname.startsWith("/profissionais/completar");
+    if (deveVerificar) {
       const supabase = createClient();
       const { data: profReg } = await supabase
         .from("profissionais")
