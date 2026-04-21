@@ -127,9 +127,6 @@ export async function completarPerfilProfissional(
     sexo:               get("sexo"),
     cpf:                get("cpf"),
     cnpj:               get("cnpj"),
-    uf_conselho:        get("uf_conselho"),
-    cbos_codigo:        get("cbos_codigo"),
-    cbos_nome:          get("cbos_nome"),
     horario_inicio:     get("horario_inicio"),
     horario_fim:        get("horario_fim"),
     tempo_atendimento:  get("tempo_atendimento") ? parseInt(get("tempo_atendimento")!) : null,
@@ -163,4 +160,52 @@ export async function completarPerfilProfissional(
   revalidatePath("/profissionais");
   revalidatePath("/dashboard");
   return { error: null };
+}
+
+// ── Cadastrar profissional completo (admin) ─────────────────────────
+
+export async function cadastrarProfissionalCompleto(
+  formData: FormData
+): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const get = (k: string) => (formData.get(k) as string) || null;
+
+  const profile_id = formData.get("profile_id") as string;
+  if (!profile_id) return { error: "Selecione um usuário." };
+
+  // Atualiza nome no profile se preenchido
+  const nome_completo = get("nome_completo");
+  if (nome_completo) {
+    await supabase.from("profiles").update({ nome_completo }).eq("id", profile_id);
+  }
+
+  const especialidadeId = get("especialidade_id");
+  const profData = {
+    profile_id,
+    foto_url:              get("foto_url"),
+    data_nascimento:       get("data_nascimento"),
+    sexo:                  get("sexo"),
+    cpf:                   get("cpf"),
+    cnpj:                  get("cnpj"),
+    horario_inicio:        get("horario_inicio"),
+    horario_fim:           get("horario_fim"),
+    tempo_atendimento:     get("tempo_atendimento") ? parseInt(get("tempo_atendimento")!) : null,
+    cor:                   get("cor"),
+    observacoes:           get("observacoes"),
+    telefone_1:            get("telefone_1"),
+    telefone_2:            get("telefone_2"),
+    registro_profissional: get("registro_profissional"),
+    especialidade_id:      especialidadeId ? parseInt(especialidadeId) : null,
+    valor_consulta:        get("valor_consulta") ? parseFloat(get("valor_consulta")!) : null,
+    data_cadastro:         new Date().toISOString().split("T")[0],
+    perfil_completo:       true,
+    ativo:                 true,
+  };
+
+  const { error } = await supabase.from("profissionais").insert(profData);
+  if (error) return { error: error.message };
+
+  revalidatePath("/profissionais");
+  revalidatePath("/dashboard");
+  redirect("/profissionais");
 }

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { completarPerfilProfissional } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
+import { AddEspecialidadeButton } from "../AddEspecialidadeButton";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
 function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; value: string; onChange: (v: string) => void }) {
@@ -66,39 +67,6 @@ function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; 
   );
 }
 
-// ── CBOS (principais códigos de saúde) ────────────────────────────
-export const CBOS_LIST = [
-  { codigo: "223104", nome: "Biomédico" },
-  { codigo: "223208", nome: "Fisioterapeuta" },
-  { codigo: "223305", nome: "Farmacêutico" },
-  { codigo: "223405", nome: "Enfermeiro" },
-  { codigo: "223505", nome: "Psicólogo clínico" },
-  { codigo: "223510", nome: "Psicólogo educacional" },
-  { codigo: "223515", nome: "Psicólogo organizacional" },
-  { codigo: "223520", nome: "Psicólogo do esporte" },
-  { codigo: "223525", nome: "Neuropsicólogo" },
-  { codigo: "223604", nome: "Terapeuta ocupacional" },
-  { codigo: "223705", nome: "Nutricionista" },
-  { codigo: "223810", nome: "Fonoaudiólogo" },
-  { codigo: "223905", nome: "Assistente social" },
-  { codigo: "225120", nome: "Médico clínico" },
-  { codigo: "225125", nome: "Médico de família e comunidade" },
-  { codigo: "225130", nome: "Médico ginecologista-obstetra" },
-  { codigo: "225142", nome: "Médico pediatra" },
-  { codigo: "225150", nome: "Médico psiquiatra" },
-  { codigo: "225155", nome: "Médico neurologista" },
-  { codigo: "225170", nome: "Médico ortopedista" },
-  { codigo: "225195", nome: "Médico cardiologista" },
-  { codigo: "226305", nome: "Odontólogo (clínico geral)" },
-  { codigo: "226310", nome: "Odontólogo (ortodontista)" },
-  { codigo: "322205", nome: "Técnico de enfermagem" },
-  { codigo: "322230", nome: "Técnico em saúde bucal" },
-  { codigo: "324105", nome: "Técnico em radiologia" },
-  { codigo: "519935", nome: "Cuidador de idosos" },
-];
-
-const UF_LIST = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
-  "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
 
 // ── Masks ──────────────────────────────────────────────────────────
 function maskPhone(v: string) {
@@ -134,8 +102,7 @@ interface CampoConfig { campo: string; obrigatorio: boolean }
 interface Especialidade { id: number; nome: string }
 interface ProfReg {
   foto_url?: string | null; data_nascimento?: string | null; sexo?: string | null;
-  cpf?: string | null; cnpj?: string | null; uf_conselho?: string | null;
-  cbos_codigo?: string | null; cbos_nome?: string | null;
+  cpf?: string | null; cnpj?: string | null;
   horario_inicio?: string | null; horario_fim?: string | null;
   tempo_atendimento?: number | null; observacoes?: string | null;
   registro_profissional?: string | null; especialidade_id?: number | null;
@@ -159,8 +126,9 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
   const [cnpj, setCnpj] = useState(profReg?.cnpj ?? "");
   const [tel1, setTel1] = useState((profReg as any)?.telefone_1 ?? "(42) ");
   const [tel2, setTel2] = useState((profReg as any)?.telefone_2 ?? "(42) ");
-  const [cbosSelecionado, setCbosSelecionado] = useState(profReg?.cbos_codigo ?? "");
   const [corSelecionada, setCorSelecionada] = useState((profReg as any)?.cor ?? "");
+  const [especialidadesList, setEspecialidadesList] = useState(especialidades);
+  const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState(String(profReg?.especialidade_id ?? ""));
   const [senhaErro, setSenhaErro] = useState<string | null>(null);
   const coresDisponiveis = PROF_CORES.filter(c => !coresUsadas.includes(c.id) || c.id === corSelecionada);
 
@@ -197,10 +165,6 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
     }
     setSenhaErro(null);
     setErro(null);
-
-    // CBOS nome
-    const cbosItem = CBOS_LIST.find(c => c.codigo === cbosSelecionado);
-    if (cbosItem) { fd.set("cbos_codigo", cbosItem.codigo); fd.set("cbos_nome", cbosItem.nome); }
 
     startTransition(async () => {
       const res = await completarPerfilProfissional(fd);
@@ -283,33 +247,24 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
                 value={cnpj} onChange={e => setCnpj(maskCnpj(e.target.value))} />
             </div>
             <div>
-              {req("UF do Conselho", "uf_conselho")}
-              <select name="uf_conselho" className="input-field" required={isReq("uf_conselho")} defaultValue={profReg?.uf_conselho ?? ""}>
-                <option value="" disabled>Selecione o estado</option>
-                {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
-              </select>
-            </div>
-            <div>
-              {req("CBOS", "cbos")}
-              <select
-                name="cbos_codigo"
-                className="input-field"
-                required={isReq("cbos")}
-                value={cbosSelecionado}
-                onChange={e => setCbosSelecionado(e.target.value)}
-              >
-                <option value="" disabled>Selecione o CBOS</option>
-                {CBOS_LIST.map(c => (
-                  <option key={c.codigo} value={c.codigo}>{c.codigo} — {c.nome}</option>
-                ))}
-              </select>
-            </div>
-            <div>
               <label className="label">Especialidade</label>
-              <select name="especialidade_id" className="input-field" defaultValue={profReg?.especialidade_id ?? ""}>
-                <option value="">— Sem especialidade —</option>
-                {especialidades.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  name="especialidade_id"
+                  className="input-field flex-1"
+                  value={especialidadeSelecionada}
+                  onChange={e => setEspecialidadeSelecionada(e.target.value)}
+                >
+                  <option value="">— Sem especialidade —</option>
+                  {especialidadesList.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                </select>
+                <AddEspecialidadeButton
+                  onAdded={esp => {
+                    setEspecialidadesList(prev => [...prev, esp]);
+                    setEspecialidadeSelecionada(String(esp.id));
+                  }}
+                />
+              </div>
             </div>
             <div>
               <label className="label">Cor no calendário <span className="text-rust">*</span></label>
@@ -337,7 +292,7 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
             </div>
             <div>
               {req("Tempo de atendimento (min)", "tempo_atendimento")}
-              <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field" required={isReq("tempo_atendimento")} placeholder="50" defaultValue={profReg?.tempo_atendimento ?? ""} />
+              <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field" required={isReq("tempo_atendimento")} placeholder="60" defaultValue={profReg?.tempo_atendimento ?? 60} />
             </div>
           </div>
 
