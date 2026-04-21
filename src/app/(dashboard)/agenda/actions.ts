@@ -283,3 +283,19 @@ export async function deletarAgendamentoClient(id: string): Promise<{ error: str
   revalidatePath("/dashboard");
   return { error: null };
 }
+
+export async function deletarAgendamentosPaciente(pacienteNome: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  // Busca o id do paciente pelo nome
+  const { data: pac } = await supabase
+    .from("pacientes")
+    .select("id")
+    .eq("nome_completo", pacienteNome)
+    .maybeSingle();
+  if (!pac) return { error: "Paciente não encontrado." };
+  const { error } = await supabase.from("agendamentos").delete().eq("paciente_id", pac.id);
+  if (error) return { error: error.message };
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  return { error: null };
+}

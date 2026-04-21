@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Search, Pencil, Calendar, Plus } from "lucide-react";
+import { Search, Pencil, Calendar, Plus, Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { deletarAgendamentoClient, deletarAgendamentosPaciente } from "./actions";
 
 const STATUS_BADGE: Record<string, string> = {
   confirmado: "bg-forest text-cream",
@@ -35,9 +36,98 @@ interface Props {
   canEdit: boolean;
 }
 
-export function AgendaClient({ agendamentos, profissionais, canEdit }: Props) {
+interface ModalProps {
+  agendamento: Agendamento;
+  onClose: () => void;
+  onDeleted: (id: string, todos: boolean, pacienteNome: string) => void;
+}
+
+function ModalExcluir({ agendamento, onClose, onDeleted }: ModalProps) {
+  const [isPending, startTransition] = useTransition();
+  const [todosDoP, setTodosDoP] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const pacienteNome = agendamento.paciente?.nome_completo ?? "";
+
+  function handleConfirm() {
+    startTransition(async () => {
+      setErro(null);
+      if (todosDoP && pacienteNome) {
+        const res = await deletarAgendamentosPaciente(pacienteNome);
+        if (res.error) { setErro(res.error); return; }
+        onDeleted(agendamento.id, true, pacienteNome);
+      } else {
+        const res = await deletarAgendamentoClient(agendamento.id);
+        if (res.error) { setErro(res.error); return; }
+        onDeleted(agendamento.id, false, pacienteNome);
+      }
+      onClose();
+    });
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-rust/10 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-rust" />
+            </div>
+            <div>
+              <p className="font-display text-lg text-forest">Excluir agendamento</p>
+              <p className="text-sm text-forest-600 mt-1">
+                {format(new Date(agendamento.data_hora_inicio), "d 'de' MMMM, HH:mm", { locale: ptBR })} —{" "}
+                <strong>{pacienteNome || "—"}</strong>
+              </p>
+            </div>
+          </div>
+
+          {pacienteNome && (
+            <label className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl cursor-pointer">
+              <input
+                type="checkbox"
+                checked={todosDoP}
+                onChange={e => setTodosDoP(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-rust shrink-0"
+              />
+              <span className="text-sm text-amber-800">
+                Excluir <strong>todos</strong> os agendamentos de <strong>{pacienteNome}</strong>
+              </span>
+            </label>
+          )}
+
+          {erro && <p className="text-sm text-rust">{erro}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleConfirm}
+              disabled={isPending}
+              className="flex-1 bg-rust text-cream px-4 py-2 rounded-xl text-sm font-medium hover:bg-rust/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              {isPending ? "Excluindo…" : todosDoP ? "Excluir todos" : "Sim, excluir"}
+            </button>
+            <button onClick={onClose} disabled={isPending} className="btn-ghost flex-1">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export function AgendaClient({ agendamentos: initial, profissionais, canEdit }: Props) {
+  const [agendamentos, setAgendamentos] = useState(initial);
   const [busca, setBusca] = useState("");
   const [filtroProf, setFiltroProf] = useState("todos");
+  const [excluindo, setExcluindo] = useState<Agendamento | null>(null);
+
+  function handleDeleted(id: string, todos: boolean, pacienteNome: string) {
+    if (todos) {
+      setAgendamentos(prev => prev.filter(a => a.paciente?.nome_completo !== pacienteNome));
+    } else {
+      setAgendamentos(prev => prev.filter(a => a.id !== id));
+    }
+  }
 
   const filtrados = useMemo(() => {
     return agendamentos.filter(a => {
@@ -59,6 +149,14 @@ export function AgendaClient({ agendamentos, profissionais, canEdit }: Props) {
 
   return (
     <div>
+      {excluindo && (
+        <ModalExcluir
+          agendamento={excluindo}
+          onClose={() => setExcluindo(null)}
+          onDeleted={handleDeleted}
+        />
+      )}
+
       {/* Filtros */}
       <div className="flex flex-wrap gap-3 mb-6">
         <div className="relative flex-1 min-w-[200px]">
@@ -128,13 +226,22 @@ export function AgendaClient({ agendamentos, profissionais, canEdit }: Props) {
                         {STATUS_LABEL[a.status] ?? a.status}
                       </span>
                       {canEdit && (
-                        <Link
-                          href={`/agenda/${a.id}/editar`}
-                          className="shrink-0 p-2 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors"
-                          title="Editar agendamento"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Link>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Link
+                            href={`/agenda/${a.id}/editar`}
+                            className="p-2 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors"
+                            title="Editar agendamento"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Link>
+                          <button
+                            onClick={() => setExcluindo(a)}
+                            className="p-2 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors"
+                            title="Excluir agendamento"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       )}
                     </li>
                   ))}
