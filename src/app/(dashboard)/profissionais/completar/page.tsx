@@ -11,7 +11,7 @@ export default async function CompletarPerfilPage() {
     await Promise.all([
       supabase
         .from("profissionais")
-        .select("id, foto_url, data_nascimento, sexo, cpf, cnpj, uf_conselho, cbos_codigo, cbos_nome, horario_inicio, horario_fim, tempo_atendimento, observacoes, registro_profissional, especialidade_id, perfil_completo, cor")
+        .select("id, foto_url, data_nascimento, sexo, cpf, cnpj, horario_inicio, horario_fim, tempo_atendimento, observacoes, registro_profissional, especialidade_id, perfil_completo, cor, valor_consulta")
         .eq("profile_id", profile.id)
         .maybeSingle(),
       supabase.from("especialidades").select("id, nome").order("nome"),

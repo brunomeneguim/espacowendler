@@ -8,6 +8,7 @@ import {
 import { completarPerfilProfissional } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
 import { AddEspecialidadeButton } from "../AddEspecialidadeButton";
+import { ValorConsultaInput } from "../[id]/editar/ValorConsultaInput";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
 function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; value: string; onChange: (v: string) => void }) {
@@ -106,6 +107,7 @@ interface ProfReg {
   horario_inicio?: string | null; horario_fim?: string | null;
   tempo_atendimento?: number | null; observacoes?: string | null;
   registro_profissional?: string | null; especialidade_id?: number | null;
+  valor_consulta?: number | null;
 }
 interface Props {
   profile: { id: string; nome_completo: string; email: string };
@@ -277,6 +279,10 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
             <div>
               <label className="label">Registro profissional</label>
               <input name="registro_profissional" type="text" className="input-field" placeholder="Ex: CRP 08/12345" defaultValue={profReg?.registro_profissional ?? ""} />
+            </div>
+            <div>
+              <label className="label">Valor da consulta</label>
+              <ValorConsultaInput defaultValue={profReg?.valor_consulta ?? undefined} />
             </div>
           </div>
 
