@@ -6,6 +6,7 @@ import { cadastrarProfissional } from "../actions";
 import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { CorProfissionalSelector } from "./CorProfissionalSelector";
+import { ValorConsultaInput } from "../[id]/editar/ValorConsultaInput";
 
 export default async function NovoProfissionalPage({
   searchParams,
@@ -45,7 +46,7 @@ export default async function NovoProfissionalPage({
 
       <form action={cadastrarProfissional} className="card space-y-5">
         <div>
-          <label htmlFor="profile_id" className="label">Usuário</label>
+          <label htmlFor="profile_id" className="label">Usuário <span className="text-rust">*</span></label>
           {profilesDisponiveis.length === 0 ? (
             <div className="p-4 bg-peach/10 border border-peach/30 rounded-xl text-sm text-rust">
               Todos os usuários já estão vinculados a um profissional. Peça para o novo profissional criar uma conta em{" "}
@@ -55,7 +56,7 @@ export default async function NovoProfissionalPage({
             <select id="profile_id" name="profile_id" required className="input-field" defaultValue="">
               <option value="" disabled>Selecione um usuário</option>
               {profilesDisponiveis.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.nome_completo} — {p.email}</option>
+                <option key={p.id} value={p.id}>{p.nome_completo}</option>
               ))}
             </select>
           )}
@@ -77,17 +78,13 @@ export default async function NovoProfissionalPage({
         </div>
 
         <div>
-          <label htmlFor="registro_profissional" className="label">
-            Registro profissional <span className="text-forest-400">(opcional)</span>
-          </label>
+          <label htmlFor="registro_profissional" className="label">Registro profissional</label>
           <input id="registro_profissional" name="registro_profissional" type="text" className="input-field" placeholder="Ex: CRP 08/12345" />
         </div>
 
         <div>
-          <label htmlFor="valor_consulta" className="label">
-            Valor da consulta (R$) <span className="text-forest-400">(opcional)</span>
-          </label>
-          <input id="valor_consulta" name="valor_consulta" type="number" step="0.01" min="0" className="input-field" placeholder="200.00" />
+          <label className="label">Valor da consulta</label>
+          <ValorConsultaInput />
         </div>
 
         <div className="flex gap-3 pt-2">

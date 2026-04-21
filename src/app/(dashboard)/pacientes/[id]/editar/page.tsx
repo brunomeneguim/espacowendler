@@ -54,7 +54,7 @@ export default async function EditarPacientePage({
 
       <form action={action} className="card space-y-5">
         <div>
-          <label htmlFor="nome_completo" className="label">Nome completo</label>
+          <label htmlFor="nome_completo" className="label">Nome completo <span className="text-rust">*</span></label>
           <input
             id="nome_completo"
             name="nome_completo"
@@ -68,7 +68,7 @@ export default async function EditarPacientePage({
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label htmlFor="telefone" className="label">
-              Telefone <span className="text-forest-400">(opcional)</span>
+              Telefone
             </label>
             <input
               id="telefone"
@@ -81,7 +81,7 @@ export default async function EditarPacientePage({
           </div>
           <div>
             <label htmlFor="email" className="label">
-              Email <span className="text-forest-400">(opcional)</span>
+              Email
             </label>
             <input
               id="email"
@@ -96,7 +96,7 @@ export default async function EditarPacientePage({
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label htmlFor="cpf" className="label">
-              CPF <span className="text-forest-400">(opcional)</span>
+              CPF
             </label>
             <input
               id="cpf"
@@ -109,7 +109,7 @@ export default async function EditarPacientePage({
           </div>
           <div>
             <label htmlFor="data_nascimento" className="label">
-              Data de nascimento <span className="text-forest-400">(opcional)</span>
+              Data de nascimento
             </label>
             <input
               id="data_nascimento"
@@ -123,7 +123,7 @@ export default async function EditarPacientePage({
 
         <div>
           <label htmlFor="observacoes" className="label">
-            Observações <span className="text-forest-400">(opcional)</span>
+            Observações
           </label>
           <textarea
             id="observacoes"

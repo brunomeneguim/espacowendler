@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { editarProfissionalCompleto } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
+import { ValorConsultaInput } from "./ValorConsultaInput";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
 function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; value: string; onChange: (v: string) => void }) {
@@ -213,7 +214,7 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
                 value={cpf} onChange={e => setCpf(maskCpf(e.target.value))} />
             </div>
             <div>
-              <label className="label">CNPJ <span className="text-forest-400">(opcional)</span></label>
+              <label className="label">CNPJ</label>
               <input name="cnpj" type="text" className="input-field" placeholder="00.000.000/0000-00"
                 value={cnpj} onChange={e => setCnpj(maskCnpj(e.target.value))} />
             </div>
@@ -229,12 +230,12 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
               <CorDropdown coresUsadas={coresUsadas} value={corSelecionada} onChange={setCorSelecionada} />
             </div>
             <div>
-              <label className="label">Registro profissional <span className="text-forest-400">(opcional)</span></label>
+              <label className="label">Registro profissional</label>
               <input name="registro_profissional" type="text" className="input-field" placeholder="Ex: CRP 08/12345" defaultValue={prof.registro_profissional ?? ""} />
             </div>
             <div>
-              <label className="label">Valor da consulta <span className="text-forest-400">(R$)</span></label>
-              <input name="valor_consulta" type="number" step="0.01" min="0" className="input-field" defaultValue={(prof as any).valor_consulta ?? ""} placeholder="0,00" />
+              <label className="label">Valor da consulta</label>
+              <ValorConsultaInput defaultValue={(prof as any).valor_consulta} />
             </div>
           </div>
 
@@ -246,7 +247,7 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
                 value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
             </div>
             <div>
-              <label className="label">Telefone 2 <span className="text-forest-400">(opcional)</span></label>
+              <label className="label">Telefone 2</label>
               <input name="telefone_2" type="text" className="input-field" placeholder="(42) 00000-0000"
                 value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
             </div>
@@ -269,7 +270,7 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
           </div>
 
           <div>
-            <label className="label">Observações <span className="text-forest-400">(opcional)</span></label>
+            <label className="label">Observações</label>
             <textarea name="observacoes" rows={3} className="input-field resize-none" placeholder="Informações relevantes…" defaultValue={prof.observacoes ?? ""} />
           </div>
         </Section>

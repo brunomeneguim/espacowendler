@@ -210,9 +210,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
 
       {/* Observações */}
       <div>
-        <label htmlFor="observacoes" className="label">
-          Observações <span className="text-forest-400">(opcional)</span>
-        </label>
+        <label htmlFor="observacoes" className="label">Observações</label>
         <textarea id="observacoes" name="observacoes" rows={3} className="input-field resize-none"
           placeholder="Algo importante sobre este atendimento?" />
       </div>

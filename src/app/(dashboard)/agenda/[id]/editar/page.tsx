@@ -131,7 +131,7 @@ export default async function EditarAgendamentoPage({
 
         <div>
           <label htmlFor="observacoes" className="label">
-            Observações <span className="text-forest-400">(opcional)</span>
+            Observações
           </label>
           <textarea id="observacoes" name="observacoes" rows={3} className="input-field resize-none" defaultValue={ag.observacoes ?? ""} />
         </div>

@@ -244,7 +244,7 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
             </div>
             <div className="space-y-2">
               <p className="text-xs text-forest-500">
-                Foto do profissional {isReq("foto") ? <span className="text-rust">*</span> : <span className="text-forest-400">(opcional)</span>}
+                Foto do profissional {isReq("foto") && <span className="text-rust">*</span>}
               </p>
               <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 text-xs border border-sand/40 px-3 py-1.5 rounded-lg hover:bg-sand/20 text-forest transition-colors">
                 <Upload className="w-3.5 h-3.5" /> Selecionar foto
@@ -320,7 +320,7 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
               />
             </div>
             <div>
-              <label className="label">Registro profissional <span className="text-forest-400">(opcional)</span></label>
+              <label className="label">Registro profissional</label>
               <input name="registro_profissional" type="text" className="input-field" placeholder="Ex: CRP 08/12345" defaultValue={profReg?.registro_profissional ?? ""} />
             </div>
           </div>
@@ -348,7 +348,7 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
                 value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
             </div>
             <div>
-              <label className="label">Telefone 2 <span className="text-forest-400">(opcional)</span></label>
+              <label className="label">Telefone 2</label>
               <input name="telefone_2" type="text" className="input-field" placeholder="(42) 00000-0000"
                 value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
             </div>
@@ -364,11 +364,10 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
         <Section icon={Lock} title="Usuário">
           <div className="space-y-4">
             <div>
-              <label className="label">E-mail (login)</label>
-              <input type="email" className="input-field opacity-60 cursor-not-allowed" value={profile.email} disabled readOnly />
-              <p className="text-xs text-forest-400 mt-1">O e-mail não pode ser alterado.</p>
+              <label className="label">Nome</label>
+              <input type="text" className="input-field opacity-60 cursor-not-allowed" value={profile.nome_completo} disabled readOnly />
             </div>
-            <p className="text-sm text-forest-500">Altere sua senha abaixo (opcional). Se não quiser alterar, deixe em branco.</p>
+            <p className="text-sm text-forest-500">Altere sua senha abaixo se desejar. Se não quiser alterar, deixe em branco.</p>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">Nova senha</label>
