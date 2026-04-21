@@ -132,7 +132,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
           <div className="flex items-center gap-2">
             <RepeatIcon className={`w-4 h-4 ${repetir ? "text-forest" : "text-forest-400"}`} />
             <span className={`text-sm font-medium ${repetir ? "text-forest" : "text-forest-500"}`}>
-              Repetir agendamento
+              Repetir Agendamento
             </span>
             {repetir && (
               <span className="text-xs bg-forest/10 text-forest px-2 py-0.5 rounded-full">Ativo</span>
@@ -171,20 +171,14 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
               {recorrencia === "mensal" && (
                 <div className="mt-3 space-y-2">
                   <label className="text-xs font-medium text-forest-500 uppercase tracking-wider">Critério mensal</label>
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <div
-                      onClick={() => setMensalTipo("dia_semana")}
-                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_semana" ? "border-forest" : "border-sand/60"}`}
-                    >
+                  <label className="flex items-center gap-2.5 cursor-pointer" onClick={() => setMensalTipo("dia_semana")}>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_semana" ? "border-forest" : "border-sand/60"}`}>
                       {mensal_tipo === "dia_semana" && <div className="w-2 h-2 rounded-full bg-forest" />}
                     </div>
                     <span className="text-sm text-forest-700">Considerar dia da semana</span>
                   </label>
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <div
-                      onClick={() => setMensalTipo("dia_mes")}
-                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_mes" ? "border-forest" : "border-sand/60"}`}
-                    >
+                  <label className="flex items-center gap-2.5 cursor-pointer" onClick={() => setMensalTipo("dia_mes")}>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_mes" ? "border-forest" : "border-sand/60"}`}>
                       {mensal_tipo === "dia_mes" && <div className="w-2 h-2 rounded-full bg-forest" />}
                     </div>
                     <span className="text-sm text-forest-700">Considerar dia do mês</span>

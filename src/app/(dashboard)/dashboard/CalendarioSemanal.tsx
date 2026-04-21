@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format, addDays, addWeeks, subWeeks, isSameDay, startOfWeek } from "date-fns";
@@ -227,17 +227,22 @@ interface CardProps {
   onEdit: () => void;
   onDelete: () => void;
   onStatus: (s: Status) => void;
+  onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
 }
 
-function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, pending, canEdit }: CardProps) {
+function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, onResizeStart, pending, canEdit }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
   const [expanded, setExpanded] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const durationMin = Math.round((new Date(ag.data_hora_fim).getTime() - new Date(ag.data_hora_inicio).getTime()) / 60000);
 
   return (
     <div
+      ref={cardRef}
       style={{ ...style, backgroundColor: profHex + "28" }}
       className={`absolute rounded border-l-4 ${bordaProf} border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
       onClick={() => setExpanded(v => !v)}
@@ -296,6 +301,21 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
           )}
         </div>
       )}
+
+      {/* Handle de resize */}
+      {canEdit && (
+        <div
+          className="absolute bottom-0 left-0 right-0 h-2.5 cursor-s-resize flex items-center justify-center group/resize"
+          onMouseDown={e => {
+            e.stopPropagation();
+            e.preventDefault();
+            if (cardRef.current) onResizeStart(ag.id, e.clientY, durationMin, cardRef.current);
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="w-6 h-0.5 rounded-full bg-gray-400/50 group-hover/resize:bg-gray-600/70 transition-colors" />
+        </div>
+      )}
     </div>
   );
 }
@@ -330,12 +350,13 @@ interface ColunaProps {
   onEdit: (ag: Agendamento) => void;
   onDelete: (id: string) => void;
   onStatus: (id: string, s: Status) => void;
+  onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
   salaId: number | null;
 }
 
-function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, pending, canEdit, salaId }: ColunaProps) {
+function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, onResizeStart, pending, canEdit, salaId }: ColunaProps) {
   const colMap = calcularColunas(ags);
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
   const slotsOcupados = new Set(
@@ -377,6 +398,7 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
             onEdit={() => onEdit(ag)}
             onDelete={() => onDelete(ag.id)}
             onStatus={s => onStatus(ag.id, s)}
+            onResizeStart={onResizeStart}
             pending={pending}
             canEdit={canEdit}
           />
@@ -407,6 +429,67 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
   const [isPending, startTransition] = useTransition();
 
   const canEdit = ["admin","supervisor","secretaria"].includes(userRole);
+
+  // ── Drag to resize ──────────────────────────────────────────────
+  const dragRef = useRef<{
+    agId: string;
+    startY: number;
+    startDurationMin: number;
+    el: HTMLDivElement;
+    ag: Agendamento;
+  } | null>(null);
+
+  const handleResizeStart = useCallback((agId: string, startY: number, durationMin: number, el: HTMLDivElement) => {
+    const ag = agendamentos.find(a => a.id === agId);
+    if (!ag) return;
+    dragRef.current = { agId, startY, startDurationMin: durationMin, el, ag };
+    document.body.style.cursor = "s-resize";
+    document.body.style.userSelect = "none";
+  }, [agendamentos]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragRef.current) return;
+    const { startY, startDurationMin, el } = dragRef.current;
+    const deltaY = e.clientY - startY;
+    // 1px = 1 minute (PX_POR_HORA=60, 60min)
+    const rawMin = startDurationMin + deltaY;
+    // snap to 5 min, minimum 15 min
+    const snappedMin = Math.max(15, Math.round(rawMin / 5) * 5);
+    const newHeight = Math.max(22, (snappedMin / 60) * PX_POR_HORA - 2);
+    el.style.height = `${newHeight}px`;
+  }, []);
+
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (!dragRef.current) return;
+    const { agId, startY, startDurationMin, ag } = dragRef.current;
+    dragRef.current = null;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+
+    const deltaY = e.clientY - startY;
+    const rawMin = startDurationMin + deltaY;
+    const snappedMin = Math.max(15, Math.round(rawMin / 5) * 5);
+    if (snappedMin === startDurationMin) return;
+
+    const tzOffset = new Date().getTimezoneOffset();
+    const inicio = new Date(ag.data_hora_inicio);
+    const data = format(inicio, "yyyy-MM-dd");
+    const hora = format(inicio, "HH:mm");
+    startTransition(async () => {
+      await atualizarAgendamento(
+        agId,
+        ag.profissional?.id ?? "",
+        ag.paciente?.id ?? "",
+        ag.sala?.id ? String(ag.sala.id) : null,
+        data,
+        hora,
+        snappedMin,
+        ag.status,
+        ag.observacoes ?? null,
+        tzOffset,
+      );
+    });
+  }, [startTransition]);
 
   // Usa a cor cadastrada do profissional, ou fallback por índice
   const profColorMap = new Map(profissionais.map((p, i) => [
@@ -561,7 +644,12 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
       </div>
 
       {/* Grid */}
-      <div className="rounded-xl border border-sand/30 bg-white overflow-auto">
+      <div
+        className="rounded-xl border border-sand/30 bg-white overflow-auto"
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
         {viewMode==="semana" ? (
           <div className="flex min-w-[600px]">
             <div className="w-14 shrink-0 border-r border-gray-100">
@@ -586,7 +674,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
                     </div>
                   </div>
                   <div className="relative px-0.5">
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} />
+                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} />
                   </div>
                 </div>
               );
@@ -628,6 +716,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
                   onEdit={setEditingAg}
                   onDelete={handleDelete}
                   onStatus={handleStatus}
+                  onResizeStart={handleResizeStart}
                   pending={isPending}
                   canEdit={canEdit}
                   salaId={filtroSalaId}
