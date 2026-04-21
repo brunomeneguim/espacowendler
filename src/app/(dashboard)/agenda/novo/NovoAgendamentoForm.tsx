@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RepeatIcon, Loader2 } from "lucide-react";
@@ -27,6 +27,9 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
   const [recorrencia, setRecorrencia] = useState("semanal");
   const [meses, setMeses] = useState("3");
   const [submitError, setSubmitError] = useState(error ?? "");
+  const [tzOffset, setTzOffset] = useState(0);
+
+  useEffect(() => { setTzOffset(new Date().getTimezoneOffset()); }, []);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -43,6 +46,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
 
   return (
     <form onSubmit={handleSubmit} className="card space-y-5">
+      <input type="hidden" name="tz_offset" value={tzOffset} />
       {submitError && (
         <div className="p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
           {decodeURIComponent(submitError)}
@@ -193,7 +197,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {isPending ? "Agendando…" : repetir ? "Agendar sessões" : "Agendar"}
         </button>
-        <Link href="/agenda" className="btn-ghost">Cancelar</Link>
+        <Link href="/dashboard" className="btn-ghost">Cancelar</Link>
       </div>
     </form>
   );

@@ -57,10 +57,12 @@ const PRIORIDADE: Record<string, { label: string; dot: string }> = {
 
 const REPETICAO: Record<string, string> = {
   nenhuma: "Não repete",
-  diaria:  "Diária",
-  semanal: "Semanal",
-  mensal:  "Mensal",
+  diaria:  "Diariamente",
+  semanal: "Semanalmente",
+  mensal:  "Mensalmente",
 };
+
+const PRIORIDADE_ORDEM: Record<string, number> = { alta: 0, normal: 1, baixa: 2 };
 
 // ── Modal tarefa (criar/editar) ───────────────────────────────────
 function ModalTarefa({
@@ -73,6 +75,7 @@ function ModalTarefa({
 }) {
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
+  const hoje = new Date().toISOString().split("T")[0];
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -119,7 +122,7 @@ function ModalTarefa({
               </div>
               <div>
                 <label className="label">Vencimento</label>
-                <input name="data_vencimento" type="date" className="input-field" defaultValue={tarefa?.data_vencimento ?? ""} />
+                <input name="data_vencimento" type="date" className="input-field" defaultValue={tarefa?.data_vencimento ?? hoje} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -127,14 +130,14 @@ function ModalTarefa({
                 <label className="label">Repetição</label>
                 <select name="repeticao" className="input-field" defaultValue={tarefa?.repeticao ?? "nenhuma"}>
                   <option value="nenhuma">Não repete</option>
-                  <option value="diaria">Diária</option>
-                  <option value="semanal">Semanal</option>
-                  <option value="mensal">Mensal</option>
+                  <option value="diaria">Diariamente</option>
+                  <option value="semanal">Semanalmente</option>
+                  <option value="mensal">Mensalmente</option>
                 </select>
               </div>
               <div>
                 <label className="label">Atribuir a</label>
-                <select name="atribuido_para" className="input-field" defaultValue={tarefa?.atribuido_para ?? ""}>
+                <select name="atribuido_para" className="input-field" defaultValue={tarefa?.atribuido_para ?? profiles[0]?.id ?? ""}>
                   <option value="">— Sem responsável —</option>
                   {profiles.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
                 </select>
@@ -368,11 +371,13 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
     });
   }
 
-  const tarefasFiltradas = tarefas.filter(t => {
-    if (filtro === "minhas") return (t.atribuido_para === currentUserId || t.criado_por === currentUserId) && !t.concluida;
-    if (filtro === "concluidas") return t.concluida;
-    return !t.concluida;
-  });
+  const tarefasFiltradas = tarefas
+    .filter(t => {
+      if (filtro === "minhas") return (t.atribuido_para === currentUserId || t.criado_por === currentUserId) && !t.concluida;
+      if (filtro === "concluidas") return t.concluida;
+      return !t.concluida;
+    })
+    .sort((a, b) => (PRIORIDADE_ORDEM[a.prioridade] ?? 1) - (PRIORIDADE_ORDEM[b.prioridade] ?? 1));
 
   const pendentes = tarefas.filter(t => !t.concluida).length;
   const minhas = tarefas.filter(t => !t.concluida && (t.atribuido_para === currentUserId || t.criado_por === currentUserId)).length;

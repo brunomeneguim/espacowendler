@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ValorConsultaInput } from "./ValorConsultaInput";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
@@ -129,18 +130,8 @@ export default async function EditarProfissionalPage({
         </div>
 
         <div>
-          <label htmlFor="valor_consulta" className="label">
-            Valor da consulta <span className="text-forest-400">(R$)</span>
-          </label>
-          <input
-            id="valor_consulta"
-            name="valor_consulta"
-            type="number"
-            step="0.01"
-            min="0"
-            className="input-field"
-            defaultValue={prof.valor_consulta ?? ""}
-          />
+          <label className="label">Valor da consulta <span className="text-forest-400">(R$)</span></label>
+          <ValorConsultaInput defaultValue={prof.valor_consulta} />
         </div>
 
         {/* Status gerenciado na página Equipe (admin/supervisor) */}

@@ -8,9 +8,9 @@ import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
-  DoorOpen, X, Save, Loader2, Monitor,
+  DoorOpen, X, Save, Loader2, Monitor, Trash2,
 } from "lucide-react";
-import { atualizarStatusAgendamento, atualizarAgendamento } from "../agenda/actions";
+import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient } from "../agenda/actions";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
 
 // ── Constantes ───────────────────────────────────────────────────
@@ -107,6 +107,7 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
 
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string|null>(null);
+  const tzOffset = typeof window !== "undefined" ? new Date().getTimezoneOffset() : 0;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -120,9 +121,10 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
         fd.get("sala_id") as string || null,
         fd.get("data") as string,
         fd.get("hora") as string,
-        parseInt(fd.get("duracao") as string || "50"),
+        parseInt(fd.get("duracao") as string || "60"),
         fd.get("status") as string,
         fd.get("observacoes") as string || null,
+        tzOffset,
       );
       if (res.error) { setErro(res.error); }
       else { onSaved(); onClose(); }
@@ -223,12 +225,13 @@ interface CardProps {
   bordaProf: string;
   profHex: string;
   onEdit: () => void;
+  onDelete: () => void;
   onStatus: (s: Status) => void;
   pending: boolean;
   canEdit: boolean;
 }
 
-function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onStatus, pending, canEdit }: CardProps) {
+function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, pending, canEdit }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
   const [expanded, setExpanded] = useState(false);
@@ -286,6 +289,11 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onStatus, pend
               <Pencil className="w-3 h-3" /> Editar
             </button>
           )}
+          {canEdit && (
+            <button onClick={onDelete} className="text-xs bg-red-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <Trash2 className="w-3 h-3" /> Excluir
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -320,13 +328,14 @@ interface ColunaProps {
   profColorMap: Map<string,string>;
   profHexMap: Map<string,string>;
   onEdit: (ag: Agendamento) => void;
+  onDelete: (id: string) => void;
   onStatus: (id: string, s: Status) => void;
   pending: boolean;
   canEdit: boolean;
   salaId: number | null;
 }
 
-function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onStatus, pending, canEdit, salaId }: ColunaProps) {
+function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, pending, canEdit, salaId }: ColunaProps) {
   const colMap = calcularColunas(ags);
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
   const slotsOcupados = new Set(
@@ -366,6 +375,7 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
             bordaProf={profColorMap.get(ag.profissional?.id ?? "") ?? BORDA_PROF[0]}
             profHex={profHexMap.get(ag.profissional?.id ?? "") ?? PROF_CORES[0].hex}
             onEdit={() => onEdit(ag)}
+            onDelete={() => onDelete(ag.id)}
             onStatus={s => onStatus(ag.id, s)}
             pending={pending}
             canEdit={canEdit}
@@ -450,6 +460,11 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
 
   function handleStatus(id: string, novoStatus: Status) {
     startTransition(async () => { await atualizarStatusAgendamento(id, novoStatus); });
+  }
+
+  function handleDelete(id: string) {
+    if (!confirm("Excluir este agendamento? Esta ação não pode ser desfeita.")) return;
+    startTransition(async () => { await deletarAgendamentoClient(id); });
   }
 
   const isCurrentWeek = weekDays.some(d=>format(d,"yyyy-MM-dd")===hoje);
@@ -571,7 +586,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
                     </div>
                   </div>
                   <div className="relative px-0.5">
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onStatus={handleStatus} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} />
+                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} />
                   </div>
                 </div>
               );
@@ -611,6 +626,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
                   profColorMap={profColorMap}
                   profHexMap={profHexMap}
                   onEdit={setEditingAg}
+                  onDelete={handleDelete}
                   onStatus={handleStatus}
                   pending={isPending}
                   canEdit={canEdit}

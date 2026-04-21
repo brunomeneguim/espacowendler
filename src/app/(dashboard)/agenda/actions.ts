@@ -16,7 +16,7 @@ async function verificarConflito(
     .from("agendamentos")
     .select("id, data_hora_inicio, data_hora_fim, sala:salas(nome)")
     .eq("profissional_id", profissional_id)
-    .not("status", "in", '("cancelado","faltou")')
+    .not("status", "in", "(cancelado,faltou)")
     .lt("data_hora_inicio", fim.toISOString())
     .gt("data_hora_fim", inicio.toISOString());
 
@@ -62,7 +62,10 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
   const { data: { user } } = await supabase.auth.getUser();
 
+  // tzOffset: minutos à frente de UTC (ex: UTC-3 = 180). Enviado pelo cliente para corrigir fuso.
+  const tzOffset = parseInt((formData.get("tz_offset") as string) || "0");
   const inicio = new Date(`${data}T${hora}:00`);
+  inicio.setMinutes(inicio.getMinutes() + tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
 
   // Verificar conflito do agendamento principal
@@ -159,10 +162,12 @@ export async function atualizarAgendamento(
   hora: string,
   duracao: number,
   status: string,
-  observacoes: string | null
+  observacoes: string | null,
+  tzOffset: number = 0
 ): Promise<{ error: string | null }> {
   const supabase = createClient();
   const inicio = new Date(`${data}T${hora}:00`);
+  inicio.setMinutes(inicio.getMinutes() + tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
 
   // Verificar conflito (excluindo o próprio agendamento)
@@ -192,4 +197,13 @@ export async function excluirAgendamento(id: string) {
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   redirect("/agenda");
+}
+
+export async function deletarAgendamentoClient(id: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from("agendamentos").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  return { error: null };
 }

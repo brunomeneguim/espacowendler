@@ -61,11 +61,11 @@ export function DDISelector({ value, onChange, name }: Props) {
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1 py-3 px-3 min-w-[80px] border border-sand/40 rounded-l-lg bg-white hover:bg-sand/10 transition-colors text-sm font-medium text-forest border-r-0 shrink-0"
+        className="flex items-center gap-1.5 py-3 px-3 w-[90px] border border-sand/40 rounded-l-lg bg-white hover:bg-sand/10 transition-colors text-sm font-medium text-forest border-r-0 shrink-0 h-full"
         title={`${selected.flag} ${selected.country} (${selected.code})`}
       >
         <span className="text-lg leading-none">{selected.flag}</span>
-        <span className="hidden sm:inline text-xs text-forest-500">{selected.code}</span>
+        <span className="text-xs text-forest-500">{selected.code}</span>
         <ChevronDown className={`w-3 h-3 text-forest-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 

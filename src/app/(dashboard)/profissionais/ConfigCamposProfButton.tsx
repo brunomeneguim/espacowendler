@@ -7,14 +7,13 @@ import { salvarConfigCamposProf } from "./actions";
 interface CampoConfig { campo: string; obrigatorio: boolean }
 
 const CAMPOS_LABELS: Record<string, string> = {
-  foto:               "Foto do profissional",
-  cnpj:               "CNPJ",
-  uf_conselho:        "UF do Conselho",
-  cbos:               "CBOS",
-  horario_inicio:     "Horário inicial de atendimento",
-  horario_fim:        "Horário final de atendimento",
-  tempo_atendimento:  "Tempo de atendimento",
-  observacoes:        "Observações",
+  foto:                  "Foto do profissional",
+  cnpj:                  "CNPJ",
+  registro_profissional: "Registro profissional",
+  horario_inicio:        "Horário inicial de atendimento",
+  horario_fim:           "Horário final de atendimento",
+  tempo_atendimento:     "Tempo de atendimento",
+  observacoes:           "Observações",
 };
 
 const SEMPRE_OBRIGATORIOS = new Set(["nome_completo", "data_nascimento", "cpf", "sexo"]);
