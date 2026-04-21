@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { Search, Pencil, Users, Plus, Phone, Mail, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { excluirPaciente, excluirPacienteConfirmado } from "./actions";
@@ -25,7 +25,7 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
   const [count, setCount] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
 
-  useState(() => {
+  useEffect(() => {
     startTransition(async () => {
       const res = await excluirPaciente(paciente.id);
       if (res.temConsultas) {
@@ -35,7 +35,7 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
         setStep("confirm");
       }
     });
-  });
+  }, []);
 
   function handleConfirm() {
     startTransition(async () => {

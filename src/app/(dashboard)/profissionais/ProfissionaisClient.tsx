@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { Search, Pencil, Stethoscope, Plus, User, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { excluirProfissional, excluirProfissionalConfirmado } from "./actions";
@@ -26,13 +26,13 @@ function ModalExcluir({ prof, onClose }: { prof: Profissional; onClose: () => vo
   const [count, setCount] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
 
-  useState(() => {
+  useEffect(() => {
     startTransition(async () => {
       const res = await excluirProfissional(prof.id);
       setCount(res.count);
       setStep(res.temConsultas ? "confirmWithConsultas" : "confirm");
     });
-  });
+  }, []);
 
   function handleConfirm() {
     startTransition(async () => {
