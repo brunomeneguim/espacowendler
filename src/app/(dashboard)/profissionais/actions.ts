@@ -111,6 +111,8 @@ export async function completarPerfilProfissional(
     tempo_atendimento:  get("tempo_atendimento") ? parseInt(get("tempo_atendimento")!) : null,
     cor:                get("cor"),
     observacoes:        get("observacoes"),
+    telefone_1:         get("telefone_1"),
+    telefone_2:         get("telefone_2"),
     registro_profissional: get("registro_profissional"),
     especialidade_id:   especialidadeId ? parseInt(especialidadeId) : null,
     data_cadastro:      new Date().toISOString().split("T")[0],

@@ -368,6 +368,56 @@ export function NovoPacienteForm({ camposConfig }: Props) {
           </div>
         </Section>
 
+        {/* ── Endereço ── */}
+        <Section icon={MapPin} title="Endereço">
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div>
+              {req("CEP", "cep")}
+              <div className="relative">
+                <input name="cep" type="text" className="input-field pr-8" required={isReq("cep")}
+                  placeholder="00000-000" value={cep}
+                  onChange={e => {
+                    const val = maskCep(e.target.value);
+                    setCep(val);
+                    if (!val.replace(/\D/g, "")) {
+                      setEndereco({ estado: "", cidade: "", bairro: "", logradouro: "" });
+                    }
+                  }}
+                  onBlur={e => fetchCep(e.target.value)} />
+                {cepLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-forest-400" />}
+              </div>
+            </div>
+            <div>
+              {req("Estado", "estado")}
+              <input name="estado" type="text" className="input-field" required={isReq("estado")}
+                placeholder="UF" value={endereco.estado} maxLength={2}
+                onChange={e => setEndereco(p => ({ ...p, estado: e.target.value.toUpperCase() }))} />
+            </div>
+            <div>
+              {req("Cidade", "cidade")}
+              <input name="cidade" type="text" className="input-field" required={isReq("cidade")}
+                placeholder="Cidade" value={endereco.cidade}
+                onChange={e => setEndereco(p => ({ ...p, cidade: e.target.value }))} />
+            </div>
+            <div>
+              {req("Bairro", "bairro")}
+              <input name="bairro" type="text" className="input-field" required={isReq("bairro")}
+                placeholder="Bairro" value={endereco.bairro}
+                onChange={e => setEndereco(p => ({ ...p, bairro: e.target.value }))} />
+            </div>
+            <div>
+              {req("Endereço", "endereco")}
+              <input name="endereco" type="text" className="input-field" required={isReq("endereco")}
+                placeholder="Rua / Avenida" value={endereco.logradouro}
+                onChange={e => setEndereco(p => ({ ...p, logradouro: e.target.value }))} />
+            </div>
+            <div>
+              {req("Número", "numero")}
+              <input name="numero" type="text" className="input-field" required={isReq("numero")} placeholder="Nº" />
+            </div>
+          </div>
+        </Section>
+
         {/* ── Dados do Parceiro(a) — só para casal ── */}
         {tipoCadastro === "casal" && (
           <Section icon={User} title="Dados Pessoais — Parceiro(a)">
@@ -472,56 +522,6 @@ export function NovoPacienteForm({ camposConfig }: Props) {
             </div>
           </Section>
         )}
-
-        {/* ── Endereço ── */}
-        <Section icon={MapPin} title="Endereço">
-          <div className="grid sm:grid-cols-3 gap-4">
-            <div>
-              {req("CEP", "cep")}
-              <div className="relative">
-                <input name="cep" type="text" className="input-field pr-8" required={isReq("cep")}
-                  placeholder="00000-000" value={cep}
-                  onChange={e => {
-                    const val = maskCep(e.target.value);
-                    setCep(val);
-                    if (!val.replace(/\D/g, "")) {
-                      setEndereco({ estado: "", cidade: "", bairro: "", logradouro: "" });
-                    }
-                  }}
-                  onBlur={e => fetchCep(e.target.value)} />
-                {cepLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-forest-400" />}
-              </div>
-            </div>
-            <div>
-              {req("Estado", "estado")}
-              <input name="estado" type="text" className="input-field" required={isReq("estado")}
-                placeholder="UF" value={endereco.estado} maxLength={2}
-                onChange={e => setEndereco(p => ({ ...p, estado: e.target.value.toUpperCase() }))} />
-            </div>
-            <div>
-              {req("Cidade", "cidade")}
-              <input name="cidade" type="text" className="input-field" required={isReq("cidade")}
-                placeholder="Cidade" value={endereco.cidade}
-                onChange={e => setEndereco(p => ({ ...p, cidade: e.target.value }))} />
-            </div>
-            <div>
-              {req("Bairro", "bairro")}
-              <input name="bairro" type="text" className="input-field" required={isReq("bairro")}
-                placeholder="Bairro" value={endereco.bairro}
-                onChange={e => setEndereco(p => ({ ...p, bairro: e.target.value }))} />
-            </div>
-            <div>
-              {req("Endereço", "endereco")}
-              <input name="endereco" type="text" className="input-field" required={isReq("endereco")}
-                placeholder="Rua / Avenida" value={endereco.logradouro}
-                onChange={e => setEndereco(p => ({ ...p, logradouro: e.target.value }))} />
-            </div>
-            <div>
-              {req("Número", "numero")}
-              <input name="numero" type="text" className="input-field" required={isReq("numero")} placeholder="Nº" />
-            </div>
-          </div>
-        </Section>
 
         {/* ── Contato ── */}
         <Section icon={Phone} title="Contato">

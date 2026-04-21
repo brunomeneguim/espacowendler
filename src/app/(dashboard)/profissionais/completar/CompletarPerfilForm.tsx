@@ -101,6 +101,11 @@ const UF_LIST = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT
   "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
 
 // ── Masks ──────────────────────────────────────────────────────────
+function maskPhone(v: string) {
+  v = v.replace(/\D/g, "").substring(0, 11);
+  if (v.length <= 10) return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+  return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+}
 function maskCpf(v: string) {
   v = v.replace(/\D/g, "").substring(0, 11);
   return v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
@@ -152,6 +157,8 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
   const [foto, setFoto] = useState<string | null>(profReg?.foto_url ?? null);
   const [cpf, setCpf] = useState(profReg?.cpf ?? "");
   const [cnpj, setCnpj] = useState(profReg?.cnpj ?? "");
+  const [tel1, setTel1] = useState((profReg as any)?.telefone_1 ?? "(42) ");
+  const [tel2, setTel2] = useState((profReg as any)?.telefone_2 ?? "(42) ");
   const [cbosSelecionado, setCbosSelecionado] = useState(profReg?.cbos_codigo ?? "");
   const [corSelecionada, setCorSelecionada] = useState((profReg as any)?.cor ?? "");
   const [senhaErro, setSenhaErro] = useState<string | null>(null);
@@ -331,6 +338,19 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
             <div>
               {req("Tempo de atendimento (min)", "tempo_atendimento")}
               <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field" required={isReq("tempo_atendimento")} placeholder="50" defaultValue={profReg?.tempo_atendimento ?? ""} />
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Telefone 1</label>
+              <input name="telefone_1" type="text" className="input-field" placeholder="(42) 00000-0000"
+                value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
+            </div>
+            <div>
+              <label className="label">Telefone 2 <span className="text-forest-400">(opcional)</span></label>
+              <input name="telefone_2" type="text" className="input-field" placeholder="(42) 00000-0000"
+                value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
             </div>
           </div>
 
