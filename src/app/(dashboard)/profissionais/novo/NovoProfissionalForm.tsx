@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Upload, X, Loader2, User, FileText, AlertCircle, ChevronDown, Check,
 } from "lucide-react";
-import { cadastrarProfissionalCompleto } from "../actions";
+import { cadastrarProfissionalCompleto, buscarDadosProfissionalPorProfile } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
 import { ValorConsultaInput } from "../[id]/editar/ValorConsultaInput";
 import { AddEspecialidadeButton } from "../AddEspecialidadeButton";
@@ -111,13 +111,52 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [foto, setFoto] = useState<string | null>(null);
+  const [nomeCompleto, setNomeCompleto] = useState("");
   const [cpf, setCpf] = useState("");
   const [cnpj, setCnpj] = useState("");
-  const [tel1, setTel1] = useState("(42) ");
-  const [tel2, setTel2] = useState("(42) ");
+  const [tel1, setTel1] = useState("");
+  const [tel2, setTel2] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
+  const [sexo, setSexo] = useState("");
+  const [registroProfissional, setRegistroProfissional] = useState("");
+  const [horarioInicio, setHorarioInicio] = useState("08:00");
+  const [horarioFim, setHorarioFim] = useState("18:00");
+  const [tempoAtendimento, setTempoAtendimento] = useState("60");
+  const [observacoes, setObservacoes] = useState("");
+  const [valorConsulta, setValorConsulta] = useState("");
   const [corSelecionada, setCorSelecionada] = useState("");
   const [especialidades, setEspecialidades] = useState(initialEspecialidades);
   const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState("");
+  const [loadingPerfil, setLoadingPerfil] = useState(false);
+
+  async function handleProfileChange(profileId: string) {
+    if (!profileId) return;
+    setLoadingPerfil(true);
+    try {
+      const res = await buscarDadosProfissionalPorProfile(profileId);
+      if (res.data) {
+        const d = res.data;
+        if (d.nome_completo) setNomeCompleto(d.nome_completo);
+        if (d.cpf) setCpf(maskCpf(d.cpf));
+        if (d.cnpj) setCnpj(maskCnpj(d.cnpj));
+        if (d.telefone_1) setTel1(maskPhone(d.telefone_1));
+        if (d.telefone_2) setTel2(maskPhone(d.telefone_2));
+        if (d.data_nascimento) setDataNascimento(d.data_nascimento);
+        if (d.sexo) setSexo(d.sexo);
+        if (d.registro_profissional) setRegistroProfissional(d.registro_profissional);
+        if (d.horario_inicio) setHorarioInicio(d.horario_inicio.slice(0, 5));
+        if (d.horario_fim) setHorarioFim(d.horario_fim.slice(0, 5));
+        if (d.tempo_atendimento) setTempoAtendimento(String(d.tempo_atendimento));
+        if (d.observacoes) setObservacoes(d.observacoes);
+        if (d.foto_url) setFoto(d.foto_url);
+        if (d.cor) setCorSelecionada(d.cor);
+        if (d.especialidade_id) setEspecialidadeSelecionada(String(d.especialidade_id));
+        if (d.valor_consulta) setValorConsulta(String(d.valor_consulta));
+      }
+    } finally {
+      setLoadingPerfil(false);
+    }
+  }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
@@ -167,12 +206,25 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
                 <code className="bg-white px-1.5 py-0.5 rounded">/cadastro</code>.
               </div>
             ) : (
-              <select name="profile_id" required className="input-field" defaultValue="">
-                <option value="" disabled>Selecione um usuário</option>
-                {profiles.map(p => (
-                  <option key={p.id} value={p.id}>{p.nome_completo}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  name="profile_id"
+                  required
+                  className="input-field"
+                  defaultValue=""
+                  onChange={e => handleProfileChange(e.target.value)}
+                >
+                  <option value="" disabled>Selecione um usuário</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.nome_completo}</option>
+                  ))}
+                </select>
+                {loadingPerfil && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="w-4 h-4 animate-spin text-forest-400" />
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </Section>
@@ -208,15 +260,18 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="label">Nome completo</label>
-              <input name="nome_completo" type="text" className="input-field" placeholder="Nome completo do profissional" />
+              <input name="nome_completo" type="text" className="input-field" placeholder="Nome completo do profissional"
+                value={nomeCompleto} onChange={e => setNomeCompleto(e.target.value)} />
             </div>
             <div>
               <label className="label">Data de nascimento <span className="text-rust">*</span></label>
-              <input name="data_nascimento" type="date" className="input-field" required />
+              <input name="data_nascimento" type="date" className="input-field" required
+                value={dataNascimento} onChange={e => setDataNascimento(e.target.value)} />
             </div>
             <div>
               <label className="label">Sexo <span className="text-rust">*</span></label>
-              <select name="sexo" className="input-field" required defaultValue="">
+              <select name="sexo" className="input-field" required
+                value={sexo} onChange={e => setSexo(e.target.value)}>
                 <option value="" disabled>Selecione</option>
                 <option value="masculino">Masculino</option>
                 <option value="feminino">Feminino</option>
@@ -263,11 +318,12 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
             </div>
             <div>
               <label className="label">Registro profissional</label>
-              <input name="registro_profissional" type="text" className="input-field" placeholder="Ex: CRP 08/12345" />
+              <input name="registro_profissional" type="text" className="input-field" placeholder="Ex: CRP 08/12345"
+                value={registroProfissional} onChange={e => setRegistroProfissional(e.target.value)} />
             </div>
             <div>
               <label className="label">Valor da consulta</label>
-              <ValorConsultaInput />
+              <ValorConsultaInput key={valorConsulta} defaultValue={valorConsulta ? parseFloat(valorConsulta) : undefined} />
             </div>
           </div>
 
@@ -275,15 +331,18 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
           <div className="grid sm:grid-cols-3 gap-4">
             <div>
               <label className="label">Horário inicial de atendimento <span className="text-rust">*</span></label>
-              <input name="horario_inicio" type="time" className="input-field" required defaultValue="08:00" />
+              <input name="horario_inicio" type="time" className="input-field" required
+                value={horarioInicio} onChange={e => setHorarioInicio(e.target.value)} />
             </div>
             <div>
               <label className="label">Horário final de atendimento <span className="text-rust">*</span></label>
-              <input name="horario_fim" type="time" className="input-field" required defaultValue="18:00" />
+              <input name="horario_fim" type="time" className="input-field" required
+                value={horarioFim} onChange={e => setHorarioFim(e.target.value)} />
             </div>
             <div>
               <label className="label">Tempo de atendimento (min)</label>
-              <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field" placeholder="60" defaultValue={60} />
+              <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field" placeholder="60"
+                value={tempoAtendimento} onChange={e => setTempoAtendimento(e.target.value)} />
             </div>
           </div>
 
@@ -302,7 +361,8 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
 
           <div>
             <label className="label">Observações</label>
-            <textarea name="observacoes" rows={3} className="input-field resize-none" placeholder="Informações relevantes…" />
+            <textarea name="observacoes" rows={3} className="input-field resize-none" placeholder="Informações relevantes…"
+              value={observacoes} onChange={e => setObservacoes(e.target.value)} />
           </div>
         </Section>
 

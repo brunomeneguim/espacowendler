@@ -14,7 +14,7 @@ export default async function NovoProfissionalPage() {
 
   const [{ data: profiles }, { data: especialidades }, { data: jaProfissionais }, { data: coresRaw }] =
     await Promise.all([
-      supabase.from("profiles").select("id, nome_completo, email").eq("ativo", true).order("nome_completo"),
+      supabase.from("profiles").select("id, nome_completo, email, role").eq("ativo", true).order("nome_completo"),
       supabase.from("especialidades").select("id, nome").order("nome"),
       supabase.from("profissionais").select("profile_id"),
       supabase.from("profissionais").select("cor").not("cor", "is", null),

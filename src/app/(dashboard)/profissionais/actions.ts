@@ -162,6 +162,31 @@ export async function completarPerfilProfissional(
   return { error: null };
 }
 
+// ── Buscar dados do profissional pelo profile_id (para pre-preencher form) ──
+
+export async function buscarDadosProfissionalPorProfile(
+  profile_id: string
+): Promise<{ error: string | null; data: Record<string, any> | null }> {
+  const supabase = createClient();
+
+  const { data: prof } = await supabase
+    .from("profissionais")
+    .select("*")
+    .eq("profile_id", profile_id)
+    .maybeSingle();
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("nome_completo, email")
+    .eq("id", profile_id)
+    .single();
+
+  return {
+    error: null,
+    data: { ...profile, ...prof },
+  };
+}
+
 // ── Cadastrar profissional completo (admin) ─────────────────────────
 
 export async function cadastrarProfissionalCompleto(
