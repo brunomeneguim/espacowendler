@@ -21,7 +21,7 @@ export async function cadastrarPaciente(formData: FormData) {
   redirect("/pacientes");
 }
 
-export async function criarPacienteCompleto(formData: FormData): Promise<{ error: string | null }> {
+export async function criarPacienteCompleto(formData: FormData): Promise<{ error: string | null; id: string | null }> {
   const supabase = createClient();
 
   const get = (k: string) => (formData.get(k) as string) || null;
@@ -80,7 +80,7 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
     ativo:                          true,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: error.message, id: null };
 
   // Buscar o id do paciente recém-criado
   const { data: novo } = await supabase.from("pacientes")
