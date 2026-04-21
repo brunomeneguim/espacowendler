@@ -609,6 +609,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
                   horariosParaDia={horariosParaDia(selectedDay)}
                   mostrarHorarios={filtroProf!=="todos"}
                   profColorMap={profColorMap}
+                  profHexMap={profHexMap}
                   onEdit={setEditingAg}
                   onStatus={handleStatus}
                   pending={isPending}
