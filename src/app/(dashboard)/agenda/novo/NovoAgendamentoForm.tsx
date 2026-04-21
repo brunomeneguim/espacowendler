@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RepeatIcon, Loader2 } from "lucide-react";
+import { RepeatIcon, Loader2, UserPlus } from "lucide-react";
 import { criarAgendamento } from "../actions";
 
 interface Prof  { id: string; nome: string; especialidade?: string }
@@ -17,14 +17,16 @@ interface Props {
   defaultData: string;
   defaultHora: string;
   defaultSalaId: string;
+  defaultPacienteId?: string;
   error?: string;
 }
 
-export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHora, defaultSalaId, error }: Props) {
+export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHora, defaultSalaId, defaultPacienteId, error }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [repetir, setRepetir] = useState(false);
-  const [recorrencia, setRecorrencia] = useState("semanal");
+  const [recorrencia, setRecorrencia] = useState<"semanal" | "quinzenal" | "mensal">("semanal");
+  const [mensal_tipo, setMensalTipo] = useState<"dia_semana" | "dia_mes">("dia_semana");
   const [meses, setMeses] = useState("3");
   const [submitError, setSubmitError] = useState(error ?? "");
   const [tzOffset, setTzOffset] = useState(0);
@@ -36,6 +38,9 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
     const fd = new FormData(e.currentTarget);
     if (!repetir) {
       fd.set("recorrencia", "nenhuma");
+    }
+    if (recorrencia === "mensal") {
+      fd.set("mensal_tipo", mensal_tipo);
     }
     setSubmitError("");
     startTransition(async () => {
@@ -59,9 +64,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
         <select id="profissional_id" name="profissional_id" required className="input-field" defaultValue="">
           <option value="" disabled>Selecione um profissional</option>
           {profs.map(p => (
-            <option key={p.id} value={p.id}>
-              {p.nome}{p.especialidade ? ` — ${p.especialidade}` : ""}
-            </option>
+            <option key={p.id} value={p.id}>{p.nome}</option>
           ))}
         </select>
         {profs.length === 0 && <p className="text-xs text-rust mt-1">Nenhum profissional ativo encontrado.</p>}
@@ -73,17 +76,24 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
         {pacs.length === 0 ? (
           <div className="p-4 bg-peach/10 border border-peach/30 rounded-xl text-sm text-rust">
             Nenhum paciente cadastrado.{" "}
-            <Link href="/pacientes/novo" className="font-medium underline">Cadastrar paciente</Link>
+            <Link href="/pacientes/novo?from=agenda" className="font-medium underline">Cadastrar paciente</Link>
           </div>
         ) : (
-          <select id="paciente_id" name="paciente_id" required className="input-field" defaultValue="">
-            <option value="" disabled>Selecione um paciente</option>
-            {pacs.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.nome_completo}{p.telefone ? ` — ${p.telefone}` : ""}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-stretch gap-2">
+            <select id="paciente_id" name="paciente_id" required className="input-field flex-1" defaultValue={defaultPacienteId ?? ""}>
+              <option value="" disabled>Selecione um paciente</option>
+              {pacs.map(p => (
+                <option key={p.id} value={p.id}>{p.nome_completo}</option>
+              ))}
+            </select>
+            <Link
+              href="/pacientes/novo?from=agenda"
+              className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg border border-sand/40 hover:bg-forest/5 text-forest-500 hover:text-forest transition-colors"
+              title="Cadastrar novo paciente"
+            >
+              <UserPlus className="w-4 h-4" />
+            </Link>
+          </div>
         )}
       </div>
 
@@ -113,11 +123,11 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       </div>
 
       {/* Repetição */}
-      <div className="rounded-xl border border-sand/40 overflow-hidden">
+      <div className="rounded-xl border border-sand/40">
         <button
           type="button"
           onClick={() => setRepetir(v => !v)}
-          className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${repetir ? "bg-forest/5" : "hover:bg-sand/10"}`}
+          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${repetir ? "bg-forest/5 rounded-b-none" : "hover:bg-sand/10"}`}
         >
           <div className="flex items-center gap-2">
             <RepeatIcon className={`w-4 h-4 ${repetir ? "text-forest" : "text-forest-400"}`} />
@@ -128,15 +138,16 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
               <span className="text-xs bg-forest/10 text-forest px-2 py-0.5 rounded-full">Ativo</span>
             )}
           </div>
-          <div className={`w-10 h-5 rounded-full transition-colors relative ${repetir ? "bg-forest" : "bg-gray-200"}`}>
-            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${repetir ? "translate-x-5" : "translate-x-0.5"}`} />
+          <div className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${repetir ? "bg-forest" : "bg-gray-200"}`}>
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${repetir ? "translate-x-5" : "translate-x-0"}`} />
           </div>
         </button>
 
         {repetir && (
-          <div className="px-4 pb-4 pt-3 border-t border-sand/30 grid sm:grid-cols-2 gap-4 bg-forest/[0.02]">
+          <div className="px-4 pb-4 pt-3 border-t border-sand/30 grid sm:grid-cols-2 gap-4 bg-forest/[0.02] rounded-b-xl">
             <input type="hidden" name="recorrencia" value={recorrencia} />
             <input type="hidden" name="meses_recorrencia" value={meses} />
+            <input type="hidden" name="mensal_tipo" value={mensal_tipo} />
             <div>
               <label className="label">Frequência</label>
               <div className="flex rounded-xl border border-sand/40 overflow-hidden text-sm">
@@ -155,11 +166,31 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-forest-400 mt-1.5">
-                {recorrencia === "semanal"   && "Toda semana no mesmo dia e horário"}
-                {recorrencia === "quinzenal" && "A cada duas semanas"}
-                {recorrencia === "mensal"    && "Uma vez por mês no mesmo dia"}
-              </p>
+
+              {/* Sub-opções mensais */}
+              {recorrencia === "mensal" && (
+                <div className="mt-3 space-y-2">
+                  <label className="text-xs font-medium text-forest-500 uppercase tracking-wider">Critério mensal</label>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <div
+                      onClick={() => setMensalTipo("dia_semana")}
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_semana" ? "border-forest" : "border-sand/60"}`}
+                    >
+                      {mensal_tipo === "dia_semana" && <div className="w-2 h-2 rounded-full bg-forest" />}
+                    </div>
+                    <span className="text-sm text-forest-700">Considerar dia da semana</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <div
+                      onClick={() => setMensalTipo("dia_mes")}
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_mes" ? "border-forest" : "border-sand/60"}`}
+                    >
+                      {mensal_tipo === "dia_mes" && <div className="w-2 h-2 rounded-full bg-forest" />}
+                    </div>
+                    <span className="text-sm text-forest-700">Considerar dia do mês</span>
+                  </label>
+                </div>
+              )}
             </div>
             <div>
               <label className="label">Repetir por</label>
@@ -195,7 +226,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       <div className="flex gap-3 pt-2">
         <button type="submit" disabled={isPending || pacs.length === 0} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50">
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-          {isPending ? "Agendando…" : repetir ? "Agendar sessões" : "Agendar"}
+          {isPending ? "Agendando…" : repetir ? "Agendar sessões" : "Agendar sessão"}
         </button>
         <Link href="/dashboard" className="btn-ghost">Cancelar</Link>
       </div>

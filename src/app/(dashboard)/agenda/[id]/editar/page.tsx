@@ -79,9 +79,7 @@ export default async function EditarAgendamentoPage({
           <label htmlFor="profissional_id" className="label">Profissional</label>
           <select id="profissional_id" name="profissional_id" required className="input-field" defaultValue={ag.profissional_id}>
             {(profs ?? []).map((p: any) => (
-              <option key={p.id} value={p.id}>
-                {p.profile?.nome_completo}{p.especialidade?.nome ? ` — ${p.especialidade.nome}` : ""}
-              </option>
+              <option key={p.id} value={p.id}>{p.profile?.nome_completo}</option>
             ))}
           </select>
         </div>
@@ -90,9 +88,7 @@ export default async function EditarAgendamentoPage({
           <label htmlFor="paciente_id" className="label">Paciente</label>
           <select id="paciente_id" name="paciente_id" required className="input-field" defaultValue={ag.paciente_id}>
             {(pacs ?? []).map((p: any) => (
-              <option key={p.id} value={p.id}>
-                {p.nome_completo}{p.telefone ? ` — ${p.telefone}` : ""}
-              </option>
+              <option key={p.id} value={p.id}>{p.nome_completo}</option>
             ))}
           </select>
         </div>

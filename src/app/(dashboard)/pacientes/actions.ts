@@ -81,7 +81,38 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
   });
 
   if (error) return { error: error.message };
+
+  // Buscar o id do paciente recém-criado
+  const { data: novo } = await supabase.from("pacientes")
+    .select("id")
+    .eq("nome_completo", formData.get("nome_completo") as string)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
   revalidatePath("/pacientes");
+  return { error: null, id: novo?.id ?? null };
+}
+
+export async function excluirPaciente(id: string): Promise<{ error: string | null; temConsultas: boolean; count: number }> {
+  const supabase = createClient();
+  const { data: consultas } = await supabase
+    .from("agendamentos")
+    .select("id")
+    .eq("paciente_id", id)
+    .not("status", "in", "(cancelado,faltou)");
+  const count = consultas?.length ?? 0;
+  return { error: null, temConsultas: count > 0, count };
+}
+
+export async function excluirPacienteConfirmado(id: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  await supabase.from("agendamentos").delete().eq("paciente_id", id);
+  const { error } = await supabase.from("pacientes").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/pacientes");
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
   return { error: null };
 }
 

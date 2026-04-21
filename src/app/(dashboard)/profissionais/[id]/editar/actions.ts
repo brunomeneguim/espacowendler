@@ -12,30 +12,60 @@ export async function editarProfissional(profissionalId: string, profileId: stri
   const registro_profissional = (formData.get("registro_profissional") as string) || null;
   const valor_consulta = formData.get("valor_consulta") as string;
   const ativo = formData.get("ativo") === "true";
-  const bio = (formData.get("bio") as string) || null;
 
   const [r1, r2] = await Promise.all([
-    supabase
-      .from("profiles")
-      .update({ nome_completo })
-      .eq("id", profileId),
-    supabase
-      .from("profissionais")
-      .update({
-        especialidade_id: especialidade_id ? parseInt(especialidade_id) : null,
-        registro_profissional,
-        valor_consulta: valor_consulta ? parseFloat(valor_consulta) : null,
-        ativo,
-      })
-      .eq("id", profissionalId),
+    supabase.from("profiles").update({ nome_completo }).eq("id", profileId),
+    supabase.from("profissionais").update({
+      especialidade_id: especialidade_id ? parseInt(especialidade_id) : null,
+      registro_profissional,
+      valor_consulta: valor_consulta ? parseFloat(valor_consulta) : null,
+      ativo,
+    }).eq("id", profissionalId),
   ]);
 
   if (r1.error || r2.error) {
     const msg = r1.error?.message ?? r2.error?.message ?? "Erro ao salvar";
-    return redirect(
-      `/profissionais/${profissionalId}/editar?error=${encodeURIComponent(msg)}`
-    );
+    return redirect(`/profissionais/${profissionalId}/editar?error=${encodeURIComponent(msg)}`);
   }
+
+  revalidatePath("/profissionais");
+  revalidatePath("/dashboard");
+  redirect("/profissionais");
+}
+
+export async function editarProfissionalCompleto(
+  profissionalId: string,
+  profileId: string,
+  formData: FormData
+): Promise<{ error: string | null }> {
+  const supabase = createClient();
+
+  const get = (k: string) => (formData.get(k) as string) || null;
+
+  const nome_completo = formData.get("nome_completo") as string;
+  await supabase.from("profiles").update({ nome_completo }).eq("id", profileId);
+
+  const especialidadeId = get("especialidade_id");
+  const profData = {
+    foto_url:              get("foto_url"),
+    data_nascimento:       get("data_nascimento"),
+    sexo:                  get("sexo"),
+    cpf:                   get("cpf"),
+    cnpj:                  get("cnpj"),
+    horario_inicio:        get("horario_inicio"),
+    horario_fim:           get("horario_fim"),
+    tempo_atendimento:     get("tempo_atendimento") ? parseInt(get("tempo_atendimento")!) : null,
+    cor:                   get("cor"),
+    observacoes:           get("observacoes"),
+    registro_profissional: get("registro_profissional"),
+    telefone_1:            get("telefone_1"),
+    telefone_2:            get("telefone_2"),
+    especialidade_id:      especialidadeId ? parseInt(especialidadeId) : null,
+    valor_consulta:        get("valor_consulta") ? parseFloat(get("valor_consulta")!) : null,
+  };
+
+  const { error } = await supabase.from("profissionais").update(profData).eq("id", profissionalId);
+  if (error) return { error: error.message };
 
   revalidatePath("/profissionais");
   revalidatePath("/dashboard");
@@ -57,7 +87,6 @@ export async function gerenciarHorario(
     const hora_inicio = formData.get("hora_inicio") as string;
     const hora_fim = formData.get("hora_fim") as string;
 
-    // Verifica duplicata
     const { data: existing } = await supabase
       .from("horarios_disponiveis")
       .select("id")

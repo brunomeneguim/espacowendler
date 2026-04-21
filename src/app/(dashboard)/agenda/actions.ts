@@ -3,36 +3,51 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { randomUUID } from "crypto";
 
 // ── Verificar conflito de profissional ────────────────────────────
 async function verificarConflito(
   supabase: ReturnType<typeof createClient>,
   profissional_id: string,
+  paciente_id: string,
+  sala_id: number | null,
   inicio: Date,
   fim: Date,
   excluir_id?: string
 ): Promise<string | null> {
-  let query = supabase
+  let q = supabase
     .from("agendamentos")
-    .select("id, data_hora_inicio, data_hora_fim, sala:salas(nome)")
-    .eq("profissional_id", profissional_id)
+    .select("id, data_hora_inicio, profissional_id, paciente_id, sala_id")
     .not("status", "in", "(cancelado,faltou)")
     .lt("data_hora_inicio", fim.toISOString())
     .gt("data_hora_fim", inicio.toISOString());
 
-  if (excluir_id) query = query.neq("id", excluir_id);
+  if (excluir_id) q = q.neq("id", excluir_id);
 
-  const { data } = await query.limit(1);
-  if (data && data.length > 0) {
-    const conflito = data[0] as any;
-    const h = new Date(conflito.data_hora_inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    return `Profissional já possui agendamento às ${h}. Escolha outro horário ou profissional.`;
+  const { data: conflitos } = await q;
+  if (!conflitos || conflitos.length === 0) return null;
+
+  for (const c of conflitos as any[]) {
+    const h = new Date(c.data_hora_inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+    // Mesmo profissional + mesmo paciente
+    if (c.profissional_id === profissional_id && c.paciente_id === paciente_id) {
+      return `Este profissional já tem uma consulta com este paciente às ${h}. Não é possível agendar dois atendimentos simultâneos.`;
+    }
+    // Mesmo profissional em qualquer sala
+    if (c.profissional_id === profissional_id) {
+      return `Este profissional já possui um agendamento às ${h}. Escolha outro horário ou profissional.`;
+    }
+    // Mesma sala com profissional diferente
+    if (sala_id && c.sala_id === sala_id) {
+      return `Esta sala já está ocupada às ${h}. Escolha outra sala ou outro horário.`;
+    }
   }
   return null;
 }
 
 // ── Gerar datas recorrentes ───────────────────────────────────────
-function gerarDatas(inicio: Date, recorrencia: string, meses: number): Date[] {
+function gerarDatas(inicio: Date, recorrencia: string, meses: number, mensal_tipo: string): Date[] {
   const datas: Date[] = [];
   const total = recorrencia === "semanal" ? meses * 4 : recorrencia === "quinzenal" ? meses * 2 : meses;
 
@@ -40,7 +55,27 @@ function gerarDatas(inicio: Date, recorrencia: string, meses: number): Date[] {
     const nova = new Date(inicio);
     if (recorrencia === "semanal")   nova.setDate(inicio.getDate() + i * 7);
     if (recorrencia === "quinzenal") nova.setDate(inicio.getDate() + i * 14);
-    if (recorrencia === "mensal")    nova.setMonth(inicio.getMonth() + i);
+    if (recorrencia === "mensal") {
+      if (mensal_tipo === "dia_semana") {
+        // Mesmo dia da semana, mesma semana do mês
+        const diaSemana = inicio.getDay();
+        const semana = Math.ceil(inicio.getDate() / 7);
+        const target = new Date(inicio);
+        target.setDate(1);
+        target.setMonth(inicio.getMonth() + i);
+        let count = 0;
+        while (count < semana) {
+          if (target.getDay() === diaSemana) count++;
+          if (count < semana) target.setDate(target.getDate() + 1);
+        }
+        target.setHours(inicio.getHours(), inicio.getMinutes(), 0, 0);
+        datas.push(target);
+        continue;
+      } else {
+        // Mesmo dia do mês
+        nova.setMonth(inicio.getMonth() + i);
+      }
+    }
     datas.push(nova);
   }
   return datas;
@@ -59,20 +94,24 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
   const observacoes     = (formData.get("observacoes") as string) || null;
   const recorrencia     = (formData.get("recorrencia") as string) || "nenhuma";
   const meses           = parseInt((formData.get("meses_recorrencia") as string) || "3", 10);
+  const mensal_tipo     = (formData.get("mensal_tipo") as string) || "dia_mes";
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // tzOffset: minutos à frente de UTC (ex: UTC-3 = 180). Enviado pelo cliente para corrigir fuso.
   const tzOffset = parseInt((formData.get("tz_offset") as string) || "0");
   const inicio = new Date(`${data}T${hora}:00`);
   inicio.setMinutes(inicio.getMinutes() + tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
 
-  // Verificar conflito do agendamento principal
-  const conflito = await verificarConflito(supabase, profissional_id, inicio, fim);
-  if (conflito) return redirect(`/agenda/novo?error=${encodeURIComponent(conflito)}`);
-
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
+
+  // Verificar conflito do agendamento principal
+  const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim);
+  if (conflito) return { error: conflito };
+
+  // Grupo para recorrências
+  const grupo_id = recorrencia !== "nenhuma" ? randomUUID() : null;
+
   const base = {
     profissional_id,
     paciente_id,
@@ -80,24 +119,23 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
     status: "agendado",
     observacoes,
     created_by: user?.id,
+    recorrencia_grupo_id: grupo_id,
   };
 
-  // Inserir agendamento principal
   const { error } = await supabase.from("agendamentos").insert({
     ...base,
     data_hora_inicio: inicio.toISOString(),
     data_hora_fim:    fim.toISOString(),
   });
-  if (error) return redirect(`/agenda/novo?error=${encodeURIComponent(error.message)}`);
+  if (error) return { error: error.message };
 
   // Inserir recorrências
   if (recorrencia !== "nenhuma") {
-    const datas = gerarDatas(inicio, recorrencia, meses);
+    const datas = gerarDatas(inicio, recorrencia, meses, mensal_tipo);
     for (const d of datas) {
       const fimRec = new Date(d.getTime() + duracao * 60_000);
-      // Pular se houver conflito na data recorrente
-      const c = await verificarConflito(supabase, profissional_id, d, fimRec);
-      if (c) continue; // pula sem cancelar o resto
+      const c = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, d, fimRec);
+      if (c) continue;
       await supabase.from("agendamentos").insert({
         ...base,
         data_hora_inicio: d.toISOString(),
@@ -133,19 +171,38 @@ export async function editarAgendamento(id: string, formData: FormData) {
   const duracao         = parseInt((formData.get("duracao") as string) || "60", 10);
   const status          = formData.get("status") as string;
   const observacoes     = (formData.get("observacoes") as string) || null;
+  const editarGrupo     = formData.get("editar_grupo") === "true";
 
   const inicio = new Date(`${data}T${hora}:00`);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
+  const salaIdNum = sala_id ? parseInt(sala_id) : null;
 
-  const { error } = await supabase.from("agendamentos").update({
+  const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim, id);
+  if (conflito) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(conflito)}`);
+
+  const updateData = {
     profissional_id,
     paciente_id,
-    sala_id: sala_id ? parseInt(sala_id) : null,
+    sala_id: salaIdNum,
     data_hora_inicio: inicio.toISOString(),
     data_hora_fim:    fim.toISOString(),
     status,
     observacoes,
-  }).eq("id", id);
+  };
+
+  if (editarGrupo) {
+    // Buscar grupo_id do agendamento atual
+    const { data: ag } = await supabase.from("agendamentos").select("recorrencia_grupo_id, data_hora_inicio").eq("id", id).single();
+    if (ag?.recorrencia_grupo_id) {
+      // Atualizar apenas os agendamentos futuros do grupo (incluindo este)
+      await supabase.from("agendamentos")
+        .update({ profissional_id, paciente_id, sala_id: salaIdNum, status, observacoes })
+        .eq("recorrencia_grupo_id", ag.recorrencia_grupo_id)
+        .gte("data_hora_inicio", ag.data_hora_inicio);
+    }
+  }
+
+  const { error } = await supabase.from("agendamentos").update(updateData).eq("id", id);
 
   if (error) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/agenda");
@@ -169,15 +226,15 @@ export async function atualizarAgendamento(
   const inicio = new Date(`${data}T${hora}:00`);
   inicio.setMinutes(inicio.getMinutes() + tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
+  const salaIdNum = sala_id ? parseInt(sala_id) : null;
 
-  // Verificar conflito (excluindo o próprio agendamento)
-  const conflito = await verificarConflito(supabase, profissional_id, inicio, fim, id);
+  const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim, id);
   if (conflito) return { error: conflito };
 
   const { error } = await supabase.from("agendamentos").update({
     profissional_id,
     paciente_id,
-    sala_id: sala_id ? parseInt(sala_id) : null,
+    sala_id: salaIdNum,
     data_hora_inicio: inicio.toISOString(),
     data_hora_fim:    fim.toISOString(),
     status,
@@ -197,6 +254,25 @@ export async function excluirAgendamento(id: string) {
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   redirect("/agenda");
+}
+
+export async function excluirGrupoAgendamento(id: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  // Buscar o grupo
+  const { data: ag } = await supabase.from("agendamentos").select("recorrencia_grupo_id, data_hora_inicio").eq("id", id).single();
+  if (ag?.recorrencia_grupo_id) {
+    // Excluir este e todos os futuros do grupo
+    await supabase.from("agendamentos")
+      .delete()
+      .eq("recorrencia_grupo_id", ag.recorrencia_grupo_id)
+      .gte("data_hora_inicio", ag.data_hora_inicio);
+  } else {
+    // Sem grupo, excluir apenas este
+    await supabase.from("agendamentos").delete().eq("id", id);
+  }
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  return { error: null };
 }
 
 export async function deletarAgendamentoClient(id: string): Promise<{ error: string | null }> {

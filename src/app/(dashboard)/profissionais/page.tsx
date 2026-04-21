@@ -39,7 +39,7 @@ export default async function ProfissionaisPage() {
             <ConfigEspecialidadesButton especialidades={especialidades ?? []} />
             <Link href="/profissionais/novo" className="btn-primary">
               <Plus className="w-4 h-4" />
-              Cadastrar profissional
+              Cadastrar Profissional
             </Link>
           </div>
         )}

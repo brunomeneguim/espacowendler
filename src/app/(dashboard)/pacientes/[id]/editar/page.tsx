@@ -134,18 +134,7 @@ export default async function EditarPacientePage({
           />
         </div>
 
-        <div>
-          <label htmlFor="ativo" className="label">Status</label>
-          <select
-            id="ativo"
-            name="ativo"
-            className="input-field"
-            defaultValue={pac.ativo ? "true" : "false"}
-          >
-            <option value="true">Ativo</option>
-            <option value="false">Inativo</option>
-          </select>
-        </div>
+        <input type="hidden" name="ativo" value={pac.ativo ? "true" : "false"} />
 
         <div className="flex gap-3 pt-2">
           <button type="submit" className="btn-primary flex-1">

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ValorConsultaInput } from "./ValorConsultaInput";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { editarProfissional, gerenciarHorario } from "./actions";
+import { EditarPerfilProfissionalForm } from "./EditarPerfilProfissionalForm";
 
 const DIAS_SEMANA = [
   { value: 1, label: "Segunda-feira" },
@@ -29,11 +29,11 @@ export default async function EditarProfissionalPage({
 
   const supabase = createClient();
 
-  const [{ data: prof }, { data: especialidades }, { data: horarios }] = await Promise.all([
+  const [{ data: prof }, { data: especialidades }, { data: horarios }, { data: todasCores }] = await Promise.all([
     supabase
       .from("profissionais")
       .select(
-        "id, profile_id, especialidade_id, registro_profissional, valor_consulta, ativo, profile:profiles(id, nome_completo, email)"
+        "id, profile_id, especialidade_id, registro_profissional, valor_consulta, ativo, cor, foto_url, data_nascimento, sexo, cpf, cnpj, horario_inicio, horario_fim, tempo_atendimento, observacoes, telefone_1, telefone_2, profile:profiles(id, nome_completo, email)"
       )
       .eq("id", params.id)
       .single(),
@@ -44,11 +44,12 @@ export default async function EditarProfissionalPage({
       .eq("profissional_id", params.id)
       .order("dia_semana")
       .order("hora_inicio"),
+    supabase.from("profissionais").select("cor").eq("ativo", true).neq("id", params.id),
   ]);
 
   if (!prof) notFound();
 
-  const editAction = editarProfissional.bind(null, params.id, (prof.profile as any)?.id ?? prof.profile_id);
+  const coresUsadas = (todasCores ?? []).map((p: any) => p.cor).filter(Boolean) as string[];
   const addHorarioAction = gerenciarHorario.bind(null, params.id, "add");
 
   return (
@@ -73,88 +74,26 @@ export default async function EditarProfissionalPage({
         </div>
       )}
 
-      {/* ── Dados cadastrais ── */}
-      <form action={editAction} className="card space-y-5 mb-6">
-        <h2 className="font-display text-lg text-forest">Dados cadastrais</h2>
-
-        <div>
-          <label htmlFor="nome_completo" className="label">Nome completo</label>
-          <input
-            id="nome_completo"
-            name="nome_completo"
-            type="text"
-            required
-            className="input-field"
-            defaultValue={(prof.profile as any)?.nome_completo ?? ""}
-          />
-        </div>
-
-        <div>
-          <label className="label">Email</label>
-          <input
-            type="email"
-            disabled
-            className="input-field opacity-50 cursor-not-allowed"
-            value={(prof.profile as any)?.email ?? ""}
-          />
-          <p className="text-xs text-forest-400 mt-1">O email não pode ser alterado aqui.</p>
-        </div>
-
-        <div>
-          <label htmlFor="especialidade_id" className="label">Especialidade</label>
-          <select
-            id="especialidade_id"
-            name="especialidade_id"
-            className="input-field"
-            defaultValue={prof.especialidade_id ?? ""}
-          >
-            <option value="">Sem especialidade</option>
-            {(especialidades ?? []).map((e: any) => (
-              <option key={e.id} value={e.id}>{e.nome}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="registro_profissional" className="label">
-            Registro profissional <span className="text-forest-400">(opcional)</span>
-          </label>
-          <input
-            id="registro_profissional"
-            name="registro_profissional"
-            type="text"
-            className="input-field"
-            defaultValue={prof.registro_profissional ?? ""}
-            placeholder="Ex: CRP 08/12345"
-          />
-        </div>
-
-        <div>
-          <label className="label">Valor da consulta <span className="text-forest-400">(R$)</span></label>
-          <ValorConsultaInput defaultValue={prof.valor_consulta} />
-        </div>
-
-        {/* Status gerenciado na página Equipe (admin/supervisor) */}
-        <input type="hidden" name="ativo" value={prof.ativo ? "true" : "false"} />
-
-        <div className="flex gap-3 pt-2">
-          <button type="submit" className="btn-primary flex-1">
-            Salvar alterações
-          </button>
-          <Link href="/profissionais" className="btn-ghost">
-            Cancelar
-          </Link>
-        </div>
-      </form>
+      {/* ── Formulário completo (mesmo que tela de cadastro) ── */}
+      <EditarPerfilProfissionalForm
+        profissionalId={params.id}
+        profileId={(prof.profile as any)?.id ?? prof.profile_id}
+        profile={{
+          nome_completo: (prof.profile as any)?.nome_completo ?? "",
+          email: (prof.profile as any)?.email ?? "",
+        }}
+        prof={prof as any}
+        especialidades={especialidades ?? []}
+        coresUsadas={coresUsadas}
+      />
 
       {/* ── Horários disponíveis ── */}
-      <div className="card space-y-4">
+      <div className="card space-y-4 mt-6">
         <h2 className="font-display text-lg text-forest">Horários de atendimento</h2>
         <p className="text-sm text-forest-600">
           Define quando este profissional está disponível para receber agendamentos.
         </p>
 
-        {/* Lista atual */}
         {(horarios ?? []).length === 0 ? (
           <p className="text-sm text-forest-400">Nenhum horário cadastrado.</p>
         ) : (
@@ -185,7 +124,6 @@ export default async function EditarProfissionalPage({
           </div>
         )}
 
-        {/* Adicionar horário */}
         <form action={addHorarioAction} className="border-t border-sand/30 pt-4 space-y-3">
           <p className="text-sm font-medium text-forest">Adicionar horário</p>
           <div className="grid sm:grid-cols-3 gap-3">
@@ -199,23 +137,11 @@ export default async function EditarProfissionalPage({
             </div>
             <div>
               <label className="label">Início</label>
-              <input
-                name="hora_inicio"
-                type="time"
-                required
-                className="input-field"
-                defaultValue="08:00"
-              />
+              <input name="hora_inicio" type="time" required className="input-field" defaultValue="08:00" />
             </div>
             <div>
               <label className="label">Fim</label>
-              <input
-                name="hora_fim"
-                type="time"
-                required
-                className="input-field"
-                defaultValue="12:00"
-              />
+              <input name="hora_fim" type="time" required className="input-field" defaultValue="12:00" />
             </div>
           </div>
           <button type="submit" className="btn-primary text-sm">

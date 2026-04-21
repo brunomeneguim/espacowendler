@@ -61,9 +61,9 @@ function Section({ icon: Icon, title, children }: { icon: React.ElementType; tit
 }
 
 // ── Componente principal ──────────────────────────────────────────
-interface Props { camposConfig: CampoConfig[] }
+interface Props { camposConfig: CampoConfig[]; fromAgenda?: boolean }
 
-export function NovoPacienteForm({ camposConfig }: Props) {
+export function NovoPacienteForm({ camposConfig, fromAgenda }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -179,6 +179,7 @@ export function NovoPacienteForm({ camposConfig }: Props) {
     startTransition(async () => {
       const res = await criarPacienteCompleto(fd);
       if (res.error) setErro(res.error);
+      else if (fromAgenda && res.id) router.push(`/agenda/novo?paciente_id=${res.id}`);
       else router.push("/pacientes");
     });
   }

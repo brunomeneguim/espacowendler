@@ -58,6 +58,30 @@ export async function removerEspecialidade(
   return { error: null };
 }
 
+// ── Excluir profissional ────────────────────────────────────────────
+
+export async function excluirProfissional(id: string): Promise<{ error: string | null; temConsultas: boolean; count: number }> {
+  const supabase = createClient();
+  const { data: consultas } = await supabase
+    .from("agendamentos")
+    .select("id")
+    .eq("profissional_id", id)
+    .not("status", "in", "(cancelado,faltou)");
+  const count = consultas?.length ?? 0;
+  return { error: null, temConsultas: count > 0, count };
+}
+
+export async function excluirProfissionalConfirmado(id: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  await supabase.from("agendamentos").delete().eq("profissional_id", id);
+  const { error } = await supabase.from("profissionais").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/profissionais");
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 // ── Config campos ───────────────────────────────────────────────────
 
 export async function salvarConfigCamposProf(

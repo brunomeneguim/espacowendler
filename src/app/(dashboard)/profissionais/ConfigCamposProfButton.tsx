@@ -27,7 +27,11 @@ export function ConfigCamposProfButton({ initialConfigs }: Props) {
   const [saved, setSaved] = useState(false);
 
   function toggle(campo: string, value: boolean) {
-    setConfigs(p => p.map(c => c.campo === campo ? { ...c, obrigatorio: value } : c));
+    setConfigs(p => {
+      const exists = p.some(c => c.campo === campo);
+      if (exists) return p.map(c => c.campo === campo ? { ...c, obrigatorio: value } : c);
+      return [...p, { campo, obrigatorio: value }];
+    });
     setSaved(false);
   }
 
@@ -78,7 +82,7 @@ export function ConfigCamposProfButton({ initialConfigs }: Props) {
                 <p className="text-xs font-medium text-forest-500 uppercase tracking-wider">Sempre obrigatórios</p>
                 {[...SEMPRE_OBRIGATORIOS].map(campo => (
                   <div key={campo} className="flex items-center justify-between py-1">
-                    <span className="text-sm text-forest-700 capitalize">{campo.replace(/_/g, " ")}</span>
+                    <span className="text-sm text-forest-700 capitalize">{campo === "cpf" ? "CPF" : campo.replace(/_/g, " ")}</span>
                     <span className="text-xs bg-forest/10 text-forest px-2 py-0.5 rounded-full">Fixo</span>
                   </div>
                 ))}

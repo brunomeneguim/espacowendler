@@ -37,7 +37,7 @@ export default async function PacientesPage() {
           {canEdit && (
             <Link href="/pacientes/novo" className="btn-primary">
               <Plus className="w-4 h-4" />
-              Novo paciente
+              Novo Paciente
             </Link>
           )}
         </div>
