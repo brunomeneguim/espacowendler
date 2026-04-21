@@ -10,6 +10,7 @@ import {
   LogOut,
   Leaf,
   Stethoscope,
+  CheckSquare,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
 import { signOut } from "@/app/(auth)/actions";
@@ -24,21 +25,25 @@ const NAV_ITEMS: Record<
     { href: "/pacientes", label: "Pacientes", icon: Users },
     { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
     { href: "/equipe", label: "Equipe", icon: UserCircle },
+    { href: "/tarefas", label: "Tarefas", icon: CheckSquare },
   ],
   supervisor: [
     { href: "/dashboard", label: "Agenda do dia", icon: Calendar },
     { href: "/agenda", label: "Todos os agendamentos", icon: LayoutDashboard },
     { href: "/pacientes", label: "Pacientes", icon: Users },
     { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
+    { href: "/tarefas", label: "Tarefas", icon: CheckSquare },
   ],
   profissional: [
     { href: "/dashboard", label: "Minha agenda", icon: Calendar },
     { href: "/pacientes", label: "Meus pacientes", icon: Users },
+    { href: "/tarefas", label: "Tarefas", icon: CheckSquare },
   ],
   secretaria: [
     { href: "/dashboard", label: "Agenda do dia", icon: Calendar },
     { href: "/agenda", label: "Todos os agendamentos", icon: LayoutDashboard },
     { href: "/pacientes", label: "Pacientes", icon: Users },
+    { href: "/tarefas", label: "Tarefas", icon: CheckSquare },
   ],
 };
 

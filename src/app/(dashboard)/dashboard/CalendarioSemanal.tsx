@@ -14,7 +14,7 @@ import { atualizarStatusAgendamento, atualizarAgendamento } from "../agenda/acti
 import { PROF_CORES, getCorById } from "@/lib/profCores";
 
 // ── Constantes ───────────────────────────────────────────────────
-const HORA_INICIO = 8;
+const HORA_INICIO = 7;
 const HORA_FIM    = 22;
 const PX_POR_HORA = 60;
 const TOTAL_HORAS = HORA_FIM - HORA_INICIO;
@@ -235,24 +235,31 @@ function AgendamentoCard({ ag, style, bordaProf, onEdit, onStatus, pending, canE
   return (
     <div
       style={style}
-      className={`absolute rounded border-l-4 ${bordaProf} ${cfg.card} border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
+      className={`absolute rounded border-l-4 ${bordaProf} bg-white border border-gray-200 cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
       onClick={() => setExpanded(v => !v)}
     >
-      <div className="px-1.5 py-0.5 leading-tight">
-        <p className="text-xs font-semibold truncate">
-          {format(new Date(ag.data_hora_inicio), "HH:mm")} {ag.paciente?.nome_completo ?? "—"}
-        </p>
-        <p className="text-[10px] opacity-60 truncate">
-          {ag.profissional?.profile?.nome_completo}{ag.sala ? ` · ${ag.sala.nome}` : ""}
-        </p>
+      <div className="px-1.5 py-0.5 leading-tight flex items-start gap-1">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold truncate text-gray-800">
+            {format(new Date(ag.data_hora_inicio), "HH:mm")} {ag.paciente?.nome_completo ?? "—"}
+          </p>
+          <p className="text-[10px] text-gray-400 truncate">
+            {ag.profissional?.profile?.nome_completo}{ag.sala ? ` · ${ag.sala.nome}` : ""}
+          </p>
+        </div>
+        <span className={`w-2 h-2 rounded-full shrink-0 mt-1 ${cfg.dot}`} title={cfg.label} />
       </div>
 
       {expanded && (
         <div
-          className={`px-1.5 pb-2 pt-1 flex flex-wrap gap-1 ${cfg.card} rounded-b border border-t-0 ${bordaProf.replace("border-l-","border-l-4 border-l-")} shadow-lg`}
+          className="px-1.5 pb-2 pt-1 flex flex-wrap gap-1 bg-white rounded-b border border-t-0 border-gray-200 shadow-lg"
           style={{ position: "absolute", top: "100%", left: "-1px", right: "-1px", zIndex: 40 }}
           onClick={e => e.stopPropagation()}
         >
+          <div className="w-full flex items-center gap-1 mb-1">
+            <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+            <span className={`text-xs font-medium ${cfg.badge.split(" ")[1]}`}>{cfg.label}</span>
+          </div>
           {ativo && ag.status === "agendado" && (
             <button onClick={() => onStatus("confirmado")} className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
               <Check className="w-3 h-3" /> Confirmar
@@ -658,7 +665,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap gap-2">
           {Object.entries(STATUS).map(([key,cfg])=>(
-            <span key={key} className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border ${cfg.card}`}>
+            <span key={key} className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border border-gray-200 bg-white text-gray-600">
               <span className={`w-2 h-2 rounded-full ${cfg.dot}`} /> {cfg.label}
             </span>
           ))}
