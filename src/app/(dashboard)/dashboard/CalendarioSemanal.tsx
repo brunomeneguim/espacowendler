@@ -304,7 +304,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
               </button>
             </>
           )}
-          {(ag.status === "faltou" || ag.status === "cancelado") && (
+          {(ag.status === "faltou" || ag.status === "cancelado" || ag.status === "confirmado") && (
             <button onClick={() => onStatus("agendado")} className="text-xs bg-gray-100 text-gray-700 border border-gray-300 px-1.5 py-0.5 rounded flex items-center gap-0.5">
               <RotateCcw className="w-3 h-3" /> Desfazer
             </button>
@@ -562,7 +562,12 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
   }
 
   function handleStatus(id: string, novoStatus: Status) {
-    startTransition(async () => { await atualizarStatusAgendamento(id, novoStatus); });
+    startTransition(async () => {
+      await atualizarStatusAgendamento(id, novoStatus);
+      if (novoStatus === "realizado") {
+        router.push("/agenda");
+      }
+    });
   }
 
   function handleDelete(id: string) {
