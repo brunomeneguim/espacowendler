@@ -574,7 +574,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
     startTransition(async () => {
       await atualizarStatusAgendamento(id, novoStatus);
       if (novoStatus === "realizado") {
-        router.push("/agenda");
+        router.push("/dashboard");
       }
     });
   }
