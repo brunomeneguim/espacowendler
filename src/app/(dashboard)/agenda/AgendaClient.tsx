@@ -16,7 +16,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 const STATUS_LABEL: Record<string, string> = {
   agendado: "Agendado", confirmado: "Confirmado", realizado: "Realizado",
-  cancelado: "Falta Justificada", faltou: "Falta Cobrada",
+  finalizado: "Finalizado", cancelado: "Falta Justificada", faltou: "Falta Cobrada",
 };
 
 interface Agendamento {

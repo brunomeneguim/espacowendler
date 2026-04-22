@@ -20,7 +20,7 @@ const PX_POR_HORA = 60;
 const TOTAL_HORAS = HORA_FIM - HORA_INICIO;
 
 // ── Tipos ────────────────────────────────────────────────────────
-type Status = "agendado" | "confirmado" | "realizado" | "cancelado" | "faltou";
+type Status = "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou";
 type ViewMode = "semana" | "dia";
 
 interface Agendamento {
@@ -53,6 +53,7 @@ const STATUS: Record<Status, { label: string; card: string; dot: string; badge: 
   agendado:   { label: "Agendado",   card: "bg-blue-50 border-blue-200 text-blue-900",       dot: "bg-blue-400",   badge: "bg-blue-100 text-blue-700"    },
   confirmado: { label: "Confirmado", card: "bg-green-50 border-green-200 text-green-900",    dot: "bg-green-500",  badge: "bg-green-100 text-green-700"  },
   realizado:  { label: "Realizado",  card: "bg-teal-50 border-teal-200 text-teal-900",       dot: "bg-teal-500",   badge: "bg-teal-100 text-teal-700"    },
+  finalizado: { label: "Finalizado", card: "bg-gray-50 border-gray-200 text-gray-800",        dot: "bg-white border border-gray-300",   badge: "bg-gray-100 text-gray-600"    },
   cancelado:  { label: "Falta Justificada", card: "bg-red-50 border-red-200 text-red-800",          dot: "bg-red-400",    badge: "bg-red-100 text-red-600"      },
   faltou:     { label: "Falta Cobrada",    card: "bg-orange-50 border-orange-200 text-orange-900", dot: "bg-orange-400", badge: "bg-orange-100 text-orange-700" },
 };
@@ -249,7 +250,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
   const [expanded, setExpanded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const bgColor = ag.status === "faltou" ? "#dc2626" : ag.status === "cancelado" ? "#ffffff" : profHex;
+  const bgColor = ag.status === "faltou" ? "#dc2626" : (ag.status === "cancelado" || ag.status === "finalizado") ? "#ffffff" : profHex;
   const textColor = isColorDark(bgColor) ? "#ffffff" : "#1a1a1a";
   const textMuted = isColorDark(bgColor) ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.5)";
 
@@ -297,7 +298,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
               </button>
             )}
             {ativo && ag.status === "confirmado" && (
-              <button onClick={() => onStatus("realizado")} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors">
+              <button onClick={() => onStatus("finalizado")} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors">
                 <Check className="w-4 h-4 shrink-0" /> Finalizar sessão
               </button>
             )}
@@ -573,7 +574,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
   function handleStatus(id: string, novoStatus: Status) {
     startTransition(async () => {
       await atualizarStatusAgendamento(id, novoStatus);
-      if (novoStatus === "realizado") {
+      if (novoStatus === "finalizado") {
         router.push("/dashboard");
       }
     });
