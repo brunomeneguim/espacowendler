@@ -14,6 +14,8 @@ const CAMPOS_LABELS: Record<string, string> = {
   rg:                             "RG",
   emite_nfse:                     "Emissão de NFS-e",
   responsavel_nome:               "Nome do responsável",
+  responsavel_relacao:            "Relação do responsável",
+  responsavel_telefone:           "Telefone do responsável",
   responsavel_data_nascimento:    "Data de nasc. do responsável",
   responsavel_cpf:                "CPF do responsável",
   foto:                           "Foto",
@@ -34,16 +36,30 @@ const CAMPOS_LABELS: Record<string, string> = {
   grau_instrucao:                 "Grau de instrução",
   indicacao:                      "Como nos conheceu",
   observacoes:                    "Observações",
+  // Casal
+  parceiro_nome:                  "Nome do(a) parceiro(a)",
+  parceiro_data_nascimento:       "Data de nasc. do(a) parceiro(a)",
+  parceiro_sexo:                  "Sexo do(a) parceiro(a)",
+  parceiro_cpf:                   "CPF do(a) parceiro(a)",
+  parceiro_telefone:              "Telefone do(a) parceiro(a)",
+  parceiro_email:                 "E-mail do(a) parceiro(a)",
+  parceiro_cep:                   "CEP do(a) parceiro(a)",
+  parceiro_estado:                "Estado do(a) parceiro(a)",
+  parceiro_cidade:                "Cidade do(a) parceiro(a)",
+  parceiro_bairro:                "Bairro do(a) parceiro(a)",
+  parceiro_endereco:              "Endereço do(a) parceiro(a)",
+  parceiro_numero:                "Número do(a) parceiro(a)",
 };
 
 // Campos que NUNCA podem ser opcionais (obrigatórios por regra de negócio)
 const SEMPRE_OBRIGATORIOS = new Set(["nome_completo", "data_nascimento", "cpf_cnpj", "sexo"]);
 
 const GRUPOS = [
-  { label: "Dados Pessoais", campos: ["foto","rg","emite_nfse","responsavel_nome","responsavel_data_nascimento","responsavel_cpf"] },
+  { label: "Dados Pessoais", campos: ["foto","rg","emite_nfse","responsavel_nome","responsavel_relacao","responsavel_telefone","responsavel_data_nascimento","responsavel_cpf"] },
   { label: "Endereço",       campos: ["cep","estado","cidade","bairro","endereco","numero"] },
   { label: "Contato",        campos: ["telefone_1","telefone_2","email","instagram","contato_emergencia_nome","contato_emergencia_telefone"] },
   { label: "Dados Complementares", campos: ["estado_civil","profissao","grau_instrucao","indicacao","observacoes"] },
+  { label: "Cadastro Casal — Parceiro(a)", campos: ["parceiro_nome","parceiro_data_nascimento","parceiro_sexo","parceiro_cpf","parceiro_telefone","parceiro_email","parceiro_cep","parceiro_estado","parceiro_cidade","parceiro_bairro","parceiro_endereco","parceiro_numero"] },
 ];
 
 interface Props { initialConfigs: CampoConfig[] }

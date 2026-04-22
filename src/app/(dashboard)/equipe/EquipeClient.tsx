@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useTransition, useEffect } from "react";
-import { Search, Trash2, Loader2, AlertTriangle } from "lucide-react";
-import { editarPerfil, excluirMembro } from "./actions";
+import { useState, useMemo, useTransition, useRef } from "react";
+import { Search, Trash2, Loader2, AlertTriangle, Pencil, UserPlus } from "lucide-react";
+import { editarPerfil, excluirMembro, criarUsuario, editarUsuarioCompleto } from "./actions";
 
 const ROLES = [
   { value: "admin",        label: "Administrador" },
@@ -25,6 +25,7 @@ interface Profile {
   role: string;
   ativo: boolean;
   created_at: string;
+  telefone?: string | null;
 }
 
 interface Props {
@@ -81,10 +82,169 @@ function ModalExcluir({ profile, onClose }: { profile: Profile; onClose: () => v
   );
 }
 
+function ModalNovoUsuario({ onClose }: { onClose: () => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const password = fd.get("password") as string;
+    const confirm = fd.get("confirm_password") as string;
+    if (password !== confirm) {
+      setErro("As senhas não coincidem.");
+      return;
+    }
+    setErro(null);
+    startTransition(async () => {
+      const res = await criarUsuario(fd);
+      if (res.error) setErro(res.error);
+      else onClose();
+    });
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5">
+          <div>
+            <p className="font-display text-lg text-forest">Novo Usuário</p>
+            <p className="text-sm text-forest-500 mt-1">Preencha os dados para criar o acesso.</p>
+          </div>
+
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="label">Nome completo *</label>
+              <input name="nome_completo" required className="input-field" placeholder="Nome completo" />
+            </div>
+            <div>
+              <label className="label">Email *</label>
+              <input name="email" type="email" required className="input-field" placeholder="email@exemplo.com" />
+            </div>
+            <div>
+              <label className="label">Telefone</label>
+              <input name="telefone" type="tel" className="input-field" placeholder="(00) 00000-0000" />
+            </div>
+            <div>
+              <label className="label">Papel</label>
+              <select name="role" defaultValue="secretaria" className="input-field">
+                {ROLES.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Senha *</label>
+              <input name="password" type="password" required minLength={6} className="input-field" placeholder="Mínimo 6 caracteres" />
+            </div>
+            <div>
+              <label className="label">Confirmar Senha *</label>
+              <input name="confirm_password" type="password" required minLength={6} className="input-field" placeholder="Repita a senha" />
+            </div>
+
+            {erro && <p className="text-sm text-rust">{erro}</p>}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="submit"
+                disabled={isPending}
+                className="btn-primary flex items-center gap-2 flex-1 justify-center"
+              >
+                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                {isPending ? "Criando…" : "Criar usuário"}
+              </button>
+              <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ModalEditarUsuario({ profile, onClose }: { profile: Profile; onClose: () => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setErro(null);
+    startTransition(async () => {
+      const res = await editarUsuarioCompleto(profile.id, fd);
+      if (res.error) setErro(res.error);
+      else onClose();
+    });
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5">
+          <div>
+            <p className="font-display text-lg text-forest">Editar Usuário</p>
+            <p className="text-sm text-forest-500 mt-1">Altere os dados do membro da equipe.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="label">Nome completo *</label>
+              <input name="nome_completo" required defaultValue={profile.nome_completo} className="input-field" />
+            </div>
+            <div>
+              <label className="label">Email *</label>
+              <input name="email" type="email" required defaultValue={profile.email} className="input-field" />
+            </div>
+            <div>
+              <label className="label">Telefone</label>
+              <input name="telefone" type="tel" defaultValue={profile.telefone ?? ""} className="input-field" placeholder="(00) 00000-0000" />
+            </div>
+            <div>
+              <label className="label">Papel</label>
+              <select name="role" defaultValue={profile.role} className="input-field">
+                {ROLES.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Status</label>
+              <select name="ativo" defaultValue={profile.ativo ? "true" : "false"} className="input-field">
+                <option value="true">Ativo</option>
+                <option value="false">Inativo</option>
+              </select>
+            </div>
+
+            {erro && <p className="text-sm text-rust">{erro}</p>}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="submit"
+                disabled={isPending}
+                className="btn-primary flex items-center gap-2 flex-1 justify-center"
+              >
+                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
+                {isPending ? "Salvando…" : "Salvar alterações"}
+              </button>
+              <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props) {
   const [busca, setBusca] = useState("");
   const [excluindo, setExcluindo] = useState<Profile | null>(null);
+  const [novoUsuario, setNovoUsuario] = useState(false);
+  const [editando, setEditando] = useState<Profile | null>(null);
   const canManage = currentUserRole === "admin" || currentUserRole === "supervisor";
+  const isAdmin = currentUserRole === "admin";
 
   const filtrados = useMemo(() =>
     profiles.filter(p =>
@@ -99,16 +259,29 @@ export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props
   return (
     <div>
       {excluindo && <ModalExcluir profile={excluindo} onClose={() => setExcluindo(null)} />}
+      {novoUsuario && <ModalNovoUsuario onClose={() => setNovoUsuario(false)} />}
+      {editando && <ModalEditarUsuario profile={editando} onClose={() => setEditando(null)} />}
 
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-forest-400" />
-        <input
-          type="text"
-          placeholder="Buscar membro por nome ou e-mail…"
-          value={busca}
-          onChange={e => setBusca(e.target.value)}
-          className="input-field pl-9 h-9 text-sm"
-        />
+      <div className="flex items-center gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-forest-400" />
+          <input
+            type="text"
+            placeholder="Buscar membro por nome ou e-mail…"
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            className="input-field pl-9 h-9 text-sm"
+          />
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => setNovoUsuario(true)}
+            className="btn-primary flex items-center gap-2 shrink-0"
+          >
+            <UserPlus className="w-4 h-4" />
+            Novo Usuário
+          </button>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -176,6 +349,15 @@ export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props
                       Salvar
                     </button>
                   </form>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setEditando(p)}
+                      className="p-1.5 rounded-lg hover:bg-forest/10 text-forest-400 hover:text-forest transition-colors"
+                      title="Editar usuário completo"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     onClick={() => setExcluindo(p)}
                     className="p-1.5 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors"

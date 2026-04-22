@@ -37,7 +37,7 @@ interface Postit {
   criador?: { nome_completo: string } | null;
 }
 
-interface Profile { id: string; nome_completo: string }
+interface Profile { id: string; nome_completo: string; role?: string }
 
 // ── Cores dos post-its ────────────────────────────────────────────
 const POSTIT_CORES: Record<string, { bg: string; border: string; label: string }> = {
@@ -66,16 +66,22 @@ const PRIORIDADE_ORDEM: Record<string, number> = { alta: 0, normal: 1, baixa: 2 
 
 // ── Modal tarefa (criar/editar) ───────────────────────────────────
 function ModalTarefa({
-  profiles, tarefa, onClose, onSaved,
+  profiles, tarefa, onClose, onSaved, currentRole,
 }: {
   profiles: Profile[];
   tarefa?: Tarefa;
   onClose: () => void;
   onSaved: () => void;
+  currentRole: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const hoje = new Date().toISOString().split("T")[0];
+
+  // Filtrar destinatários conforme a role de quem cria/edita
+  const profilesAtribuir = currentRole === "secretaria"
+    ? profiles.filter(p => p.role !== "secretaria")
+    : profiles.filter(p => p.role === "secretaria");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -137,9 +143,9 @@ function ModalTarefa({
               </div>
               <div>
                 <label className="label">Atribuir a</label>
-                <select name="atribuido_para" className="input-field" defaultValue={tarefa?.atribuido_para ?? profiles[0]?.id ?? ""}>
+                <select name="atribuido_para" className="input-field" defaultValue={tarefa?.atribuido_para ?? ""}>
                   <option value="">— Sem responsável —</option>
-                  {profiles.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
+                  {profilesAtribuir.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
                 </select>
               </div>
             </div>
@@ -220,12 +226,14 @@ function ModalPostit({
 }
 
 // ── Item de tarefa ────────────────────────────────────────────────
-function TarefaItem({ tarefa, onToggle, onDelete, onEdit, pending }: {
+function TarefaItem({ tarefa, onToggle, onDelete, onEdit, pending, canEdit, canDelete }: {
   tarefa: Tarefa;
   onToggle: () => void;
   onDelete: () => void;
   onEdit: () => void;
   pending: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const pri = PRIORIDADE[tarefa.prioridade] ?? PRIORIDADE.normal;
@@ -274,12 +282,16 @@ function TarefaItem({ tarefa, onToggle, onDelete, onEdit, pending }: {
               {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           )}
-          <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-forest/10 text-forest-400 hover:text-forest">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          {canEdit && (
+            <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-forest/10 text-forest-400 hover:text-forest">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -444,7 +456,12 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
             </div>
           ) : (
             <div className="space-y-2">
-              {tarefasFiltradas.map(t => (
+              {tarefasFiltradas.map(t => {
+                const isOwner = t.criado_por === currentUserId;
+                const isSecretaria = currentRole === "secretaria";
+                const canEdit = !isSecretaria || isOwner;
+                const canDelete = !isSecretaria || isOwner;
+                return (
                 <TarefaItem
                   key={t.id}
                   tarefa={t}
@@ -452,7 +469,11 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
                   onDelete={() => handleDeleteTarefa(t.id)}
                   onEdit={() => { setEditingTarefa(t); setShowModalTarefa(true); }}
                   pending={pendingId === t.id}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
                 />
+                );
+              })}
               ))}
             </div>
           )}
@@ -503,6 +524,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
           tarefa={editingTarefa ?? undefined}
           onClose={() => { setShowModalTarefa(false); setEditingTarefa(null); }}
           onSaved={refresh}
+          currentRole={currentRole}
         />
       )}
 

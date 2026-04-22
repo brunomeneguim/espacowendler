@@ -8,7 +8,7 @@ import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
-  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search,
+  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Phone,
 } from "lucide-react";
 import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient } from "../agenda/actions";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
@@ -37,11 +37,13 @@ interface Profissional { id: string; cor?: string | null; profile: { nome_comple
 interface Paciente     { id: string; nome_completo: string; telefone?: string }
 interface HorarioDisponivel { profissional_id: string; dia_semana: number; hora_inicio: string; hora_fim: string }
 interface Sala         { id: number; nome: string }
+interface Aniversariante { id: string; nome_completo: string; telefone?: string | null; data_nascimento: string }
 
 interface Props {
   agendamentos: Agendamento[];
   profissionais: Profissional[];
   pacientes: Paciente[];
+  aniversariantes: Aniversariante[];
   horariosDisponiveis: HorarioDisponivel[];
   salas: Sala[];
   weekStartStr: string;
@@ -459,7 +461,7 @@ const STATUS_BADGE_LISTA: Record<string, string> = {
 };
 
 // ── Componente principal ──────────────────────────────────────────
-export function CalendarioSemanal({ agendamentos, profissionais, pacientes, horariosDisponiveis, salas, weekStartStr, userRole }: Props) {
+export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole }: Props) {
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
@@ -481,6 +483,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
   const [editingAg, setEditingAg] = useState<Agendamento|null>(null);
   const [expandedId, setExpandedId] = useState<string|null>(null);
   const [isPending, startTransition] = useTransition();
+  const [showAniversariantes, setShowAniversariantes] = useState(false);
 
   const canEdit = ["admin","supervisor","secretaria"].includes(userRole);
 
@@ -620,6 +623,25 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
 
   const salaAtual = salas.find(s => s.id === filtroSalaId);
 
+  // ── Aniversariantes ───────────────────────────────────────────────
+  const mesAtual = new Date().getMonth(); // 0-11
+  const diaAtual = new Date().getDate();
+  const aniversariantesMes = aniversariantes
+    .filter(a => {
+      if (!a.data_nascimento) return false;
+      const nasc = new Date(a.data_nascimento + "T12:00:00");
+      return nasc.getMonth() === mesAtual;
+    })
+    .sort((a, b) => {
+      const da = new Date(a.data_nascimento + "T12:00:00").getDate();
+      const db = new Date(b.data_nascimento + "T12:00:00").getDate();
+      return da - db;
+    });
+  const aniversariantesHoje = aniversariantesMes.filter(a => {
+    const nasc = new Date(a.data_nascimento + "T12:00:00");
+    return nasc.getDate() === diaAtual;
+  });
+
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
@@ -643,6 +665,64 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
           </div>
         </div>
       </div>
+
+      {/* ── Painel Aniversariantes ─────────────────────────────── */}
+      {showAniversariantes && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowAniversariantes(false)} />
+          <div className="fixed right-4 top-16 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-sand/30 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 bg-peach/20 border-b border-sand/20">
+              <div className="flex items-center gap-2">
+                <Cake className="w-4 h-4 text-rust" />
+                <span className="text-sm font-semibold text-forest">Aniversariantes de {new Date().toLocaleDateString("pt-BR",{month:"long"})}</span>
+                {aniversariantesMes.length > 0 && (
+                  <span className="text-xs bg-rust text-white px-1.5 py-0.5 rounded-full font-medium">{aniversariantesMes.length}</span>
+                )}
+              </div>
+              <button onClick={() => setShowAniversariantes(false)} className="p-1 rounded-lg hover:bg-forest/10 text-forest-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="max-h-80 overflow-y-auto">
+              {aniversariantesMes.length === 0 ? (
+                <p className="text-sm text-forest-400 text-center py-8">Nenhum aniversariante este mês.</p>
+              ) : (
+                <div className="divide-y divide-sand/20">
+                  {aniversariantesMes.map(a => {
+                    const nasc = new Date(a.data_nascimento + "T12:00:00");
+                    const dia = nasc.getDate();
+                    const isHoje = dia === diaAtual;
+                    const digits = (a.telefone ?? "").replace(/\D/g, "");
+                    return (
+                      <div key={a.id} className={`flex items-center gap-3 px-4 py-2.5 ${isHoje ? "bg-peach/10" : ""}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${isHoje ? "bg-rust text-white" : "bg-sand/30 text-forest"}`}>
+                          {dia}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${isHoje ? "text-rust" : "text-forest"}`}>
+                            {a.nome_completo}
+                            {isHoje && <span className="ml-1 text-[10px] bg-rust/10 text-rust px-1 py-0.5 rounded-full">hoje 🎂</span>}
+                          </p>
+                          {digits && (
+                            <a
+                              href={`https://wa.me/55${digits}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-forest-500 hover:text-forest transition-colors"
+                            >
+                              <Phone className="w-3 h-3" /> {a.telefone}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Tabs de sala */}
       <div className="flex gap-1 p-1 bg-sand/20 rounded-xl w-fit">
@@ -686,6 +766,21 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
               router.push(`/dashboard?semana=${format(ws, "yyyy-MM-dd")}`);
             }}
           />
+        </div>
+        {/* Aniversariantes */}
+        <div className="relative">
+          <button
+            onClick={() => setShowAniversariantes(v => !v)}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-sand/40 hover:bg-sand/20 text-forest transition-colors"
+            title="Aniversariantes do mês"
+          >
+            <Cake className="w-4 h-4" />
+          </button>
+          {aniversariantesHoje.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-rust text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+              {aniversariantesHoje.length}
+            </span>
+          )}
         </div>
         <div className="flex-1" />
         <div className="flex rounded-lg border border-sand/40 overflow-hidden text-sm">

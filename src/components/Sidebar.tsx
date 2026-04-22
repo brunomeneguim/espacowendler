@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Calendar, Users, UserCircle, LogOut, Leaf,
   Stethoscope, CheckSquare, Settings2, Check,
-  ChevronUp, ChevronDown, X, Pencil,
+  ChevronUp, ChevronDown, X, Pencil, GripVertical,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
 import { signOut } from "@/app/(auth)/actions";
@@ -48,6 +48,7 @@ export function Sidebar({
 
   // ── Edit mode (admin only) ────────────────────────────────────
   const [editMode, setEditMode] = useState(false);
+  const [configAberto, setConfigAberto] = useState(false);
   const [editItems, setEditItems] = useState<MenuItem[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -211,16 +212,40 @@ export function Sidebar({
           <p className="text-sm font-medium truncate">{nome}</p>
         </div>
 
-        {/* Admin: edit menu button */}
-        {isAdmin && !editMode && (
+        {/* Configurações collapsible */}
+        <div className="mb-1">
           <button
-            onClick={enterEditMode}
-            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm text-cream/50 hover:text-cream hover:bg-cream/5 transition-colors mb-1"
+            onClick={() => setConfigAberto(o => !o)}
+            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
           >
-            <Pencil className="w-4 h-4" strokeWidth={1.5} />
-            Editar menu
+            <Settings2 className="w-4 h-4" strokeWidth={1.5} />
+            <span className="flex-1 text-left">Configurações</span>
+            {configAberto
+              ? <ChevronUp className="w-3.5 h-3.5 text-cream/50" />
+              : <ChevronDown className="w-3.5 h-3.5 text-cream/50" />}
           </button>
-        )}
+
+          {configAberto && (
+            <div className="mt-0.5 ml-4 space-y-0.5">
+              <Link
+                href="/configuracoes/conta"
+                className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
+              >
+                Gerenciar Conta
+              </Link>
+
+              {isAdmin && !editMode && (
+                <button
+                  onClick={() => { setConfigAberto(false); enterEditMode(); }}
+                  className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
+                >
+                  <GripVertical className="w-4 h-4" strokeWidth={1.5} />
+                  Reorganizar
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         <form action={signOut}>
           <button

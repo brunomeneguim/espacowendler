@@ -17,20 +17,39 @@ export default async function TarefasPage() {
       .order("criado_em", { ascending: false }),
     supabase
       .from("profiles")
-      .select("id, nome_completo")
+      .select("id, nome_completo, role")
       .eq("ativo", true)
       .order("nome_completo"),
   ]);
 
   // Reset automático de tarefas recorrentes concluídas no período anterior
+  // Usa o dia de criação como âncora: diária = novo dia, semanal = nova semana (mesmo dia da semana),
+  // mensal = mesmo dia do mês seguinte.
   const agora = new Date();
   const idsParaResetar: string[] = (tarefasRaw ?? [])
     .filter((t: any) => {
       if (!t.concluida || !t.repeticao || t.repeticao === "nenhuma" || !t.concluida_em) return false;
       const concluidaEm = new Date(t.concluida_em);
-      if (t.repeticao === "diaria") return agora.toDateString() !== concluidaEm.toDateString();
-      if (t.repeticao === "semanal") return agora.getTime() - concluidaEm.getTime() >= 7 * 86400000;
-      if (t.repeticao === "mensal") return agora.getMonth() !== concluidaEm.getMonth() || agora.getFullYear() !== concluidaEm.getFullYear();
+      const criadoEm = new Date(t.criado_em);
+
+      if (t.repeticao === "diaria") {
+        // Reseta se o dia atual for diferente do dia em que foi concluída
+        return agora.toDateString() !== concluidaEm.toDateString();
+      }
+      if (t.repeticao === "semanal") {
+        // Reseta se passou pelo menos 7 dias desde a conclusão
+        // e o dia da semana atual é igual ao dia da semana de criação
+        const diasDesdeConclucao = Math.floor((agora.getTime() - concluidaEm.getTime()) / 86400000);
+        return diasDesdeConclucao >= 7 && agora.getDay() === criadoEm.getDay();
+      }
+      if (t.repeticao === "mensal") {
+        // Reseta quando o dia do mês atual for igual ao dia do mês de criação
+        // e for um mês/ano posterior ao da conclusão
+        const mesAtualMaior =
+          agora.getFullYear() > concluidaEm.getFullYear() ||
+          (agora.getFullYear() === concluidaEm.getFullYear() && agora.getMonth() > concluidaEm.getMonth());
+        return mesAtualMaior && agora.getDate() >= criadoEm.getDate();
+      }
       return false;
     })
     .map((t: any) => t.id);

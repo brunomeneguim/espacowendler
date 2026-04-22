@@ -13,10 +13,12 @@ const CAMPOS_LABELS: Record<string, string> = {
   horario_inicio:        "Horário inicial de atendimento",
   horario_fim:           "Horário final de atendimento",
   tempo_atendimento:     "Tempo de atendimento",
+  telefone_1:            "Telefone 1",
+  telefone_2:            "Telefone 2",
   observacoes:           "Observações",
 };
 
-const SEMPRE_OBRIGATORIOS = new Set(["nome_completo", "data_nascimento", "cpf", "sexo"]);
+const SEMPRE_OBRIGATORIOS = new Set(["nome_completo", "data_nascimento", "cpf", "sexo", "especialidade_id"]);
 
 interface Props { initialConfigs: CampoConfig[] }
 

@@ -9,7 +9,7 @@ export default async function EquipePage() {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, nome_completo, email, role, ativo, created_at")
+    .select("id, nome_completo, email, role, ativo, created_at, telefone")
     .order("created_at", { ascending: false });
 
   return (
