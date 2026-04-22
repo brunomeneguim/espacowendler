@@ -271,6 +271,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
             {ag.profissional?.profile?.nome_completo}
           </p>
         </div>
+        <span className={`w-2 h-2 rounded-full shrink-0 mt-1 ${cfg.dot}`} title={cfg.label} />
       </div>
 
       {expanded && (
