@@ -14,7 +14,7 @@ export default async function NovoAgendamentoPage({
   const [{ data: profsRaw }, { data: pacs }, { data: salas }] = await Promise.all([
     supabase
       .from("profissionais")
-      .select("id, profile:profiles(nome_completo, role), especialidade:especialidades(nome)")
+      .select("id, horario_inicio, profile:profiles(nome_completo, role), especialidade:especialidades(nome)")
       .eq("ativo", true)
       .order("id"),
     supabase
@@ -35,6 +35,7 @@ export default async function NovoAgendamentoPage({
       id: p.id,
       nome: p.profile?.nome_completo ?? p.id,
       especialidade: p.especialidade?.nome ?? undefined,
+      horario_inicio: p.horario_inicio ? (p.horario_inicio as string).slice(0, 5) : undefined,
     }));
 
   const hoje = new Date().toISOString().split("T")[0];
