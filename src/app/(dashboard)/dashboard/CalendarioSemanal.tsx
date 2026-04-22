@@ -243,7 +243,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
   return (
     <div
       ref={cardRef}
-      style={{ ...style, backgroundColor: profHex + "40", borderLeftColor: profHex }}
+      style={{ ...style, backgroundColor: profHex, borderLeftColor: profHex }}
       className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
       onClick={() => setExpanded(v => !v)}
     >
