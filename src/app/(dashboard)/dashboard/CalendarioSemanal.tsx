@@ -242,15 +242,16 @@ interface CardProps {
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
+  expanded: boolean;
+  onExpand: () => void;
 }
 
-function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, onResizeStart, pending, canEdit }: CardProps) {
+function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, onResizeStart, pending, canEdit, expanded, onExpand }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
-  const [expanded, setExpanded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const bgColor = ag.status === "faltou" ? "#dc2626" : (ag.status === "cancelado" || ag.status === "finalizado") ? "#ffffff" : profHex;
+  const bgColor = ag.status === "faltou" ? "#dc2626" : ag.status === "cancelado" ? "#ffffff" : profHex;
   const textColor = isColorDark(bgColor) ? "#ffffff" : "#1a1a1a";
   const textMuted = isColorDark(bgColor) ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.5)";
 
@@ -261,7 +262,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
       ref={cardRef}
       style={{ ...style, backgroundColor: bgColor, borderLeftColor: profHex }}
       className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
-      onClick={() => setExpanded(v => !v)}
+      onClick={onExpand}
     >
       <div className="px-1.5 py-0.5 leading-tight flex items-start gap-1">
         <div className="flex-1 min-w-0">
@@ -384,9 +385,11 @@ interface ColunaProps {
   pending: boolean;
   canEdit: boolean;
   salaId: number | null;
+  expandedId: string | null;
+  onExpand: (id: string | null) => void;
 }
 
-function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, onResizeStart, pending, canEdit, salaId }: ColunaProps) {
+function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, onResizeStart, pending, canEdit, salaId, expandedId, onExpand }: ColunaProps) {
   const colMap = calcularColunas(ags);
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
   const slotsOcupados = new Set(
@@ -431,6 +434,8 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
             onResizeStart={onResizeStart}
             pending={pending}
             canEdit={canEdit}
+            expanded={expandedId === ag.id}
+            onExpand={() => onExpand(expandedId === ag.id ? null : ag.id)}
           />
         );
       })}
@@ -456,6 +461,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
     return wd.find(d=>isSameDay(d,hoje)) ?? weekStart;
   });
   const [editingAg, setEditingAg] = useState<Agendamento|null>(null);
+  const [expandedId, setExpandedId] = useState<string|null>(null);
   const [isPending, startTransition] = useTransition();
 
   const canEdit = ["admin","supervisor","secretaria"].includes(userRole);
@@ -709,7 +715,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
                     </div>
                   </div>
                   <div className="relative px-0.5">
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} />
+                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} />
                   </div>
                 </div>
               );
@@ -755,6 +761,8 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
                   pending={isPending}
                   canEdit={canEdit}
                   salaId={filtroSalaId}
+                  expandedId={expandedId}
+                  onExpand={setExpandedId}
                 />
               </div>
             </div>
