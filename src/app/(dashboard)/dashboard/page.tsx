@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { format, startOfWeek, addDays, parseISO } from "date-fns";
 import { CalendarioSemanal } from "./CalendarioSemanal";
+import { ListaEncaixe } from "./ListaEncaixe";
 
 export default async function DashboardPage({
   searchParams,
@@ -35,6 +36,7 @@ export default async function DashboardPage({
     { data: horarios },
     { data: salas },
     { data: pacientes },
+    { data: encaixes },
   ] = await Promise.all([
     supabase
       .from("agendamentos")
@@ -62,10 +64,19 @@ export default async function DashboardPage({
       .select("id, nome_completo, telefone")
       .eq("ativo", true)
       .order("nome_completo"),
+    supabase
+      .from("lista_encaixe")
+      .select("id, paciente_nome, telefone, observacoes, profissional_id, created_at, profissional:profissionais(profile:profiles(nome_completo))")
+      .eq("ativo", true)
+      .order("created_at"),
   ]);
 
   return (
     <div className="p-4 md:p-6 max-w-full">
+      <ListaEncaixe
+        encaixes={(encaixes as any) ?? []}
+        profissionais={(profissionais as any) ?? []}
+      />
       <CalendarioSemanal
         agendamentos={(agendamentos as any) ?? []}
         profissionais={(profissionais as any) ?? []}

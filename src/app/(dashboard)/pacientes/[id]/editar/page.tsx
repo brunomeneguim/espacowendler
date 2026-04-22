@@ -4,15 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { ArrowLeft } from "lucide-react";
-import { editarPaciente } from "./actions";
-import { format } from "date-fns";
+import { EditarPacienteForm } from "./EditarPacienteForm";
 
 export default async function EditarPacientePage({
   params,
-  searchParams,
 }: {
   params: { id: string };
-  searchParams: { error?: string };
 }) {
   const profile = await getCurrentProfile();
   if (!["admin", "supervisor", "secretaria"].includes(profile.role)) {
@@ -20,18 +17,16 @@ export default async function EditarPacientePage({
   }
 
   const supabase = createClient();
-  const { data: pac } = await supabase
-    .from("pacientes")
-    .select("*")
-    .eq("id", params.id)
-    .single();
+
+  const [{ data: pac }, { data: camposConfig }] = await Promise.all([
+    supabase.from("pacientes").select("*").eq("id", params.id).single(),
+    supabase.from("configuracoes_campos_paciente").select("campo, obrigatorio"),
+  ]);
 
   if (!pac) notFound();
 
-  const action = editarPaciente.bind(null, params.id);
-
   return (
-    <div className="p-6 md:p-10 max-w-3xl">
+    <div className="p-6 md:p-10 max-w-4xl">
       <Link
         href="/pacientes"
         className="inline-flex items-center gap-2 text-sm text-forest-600 hover:text-forest mb-4"
@@ -46,105 +41,10 @@ export default async function EditarPacientePage({
         description="Altere os dados do paciente"
       />
 
-      {searchParams.error && (
-        <div className="mb-5 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          {decodeURIComponent(searchParams.error)}
-        </div>
-      )}
-
-      <form action={action} className="card space-y-5">
-        <div>
-          <label htmlFor="nome_completo" className="label">Nome completo <span className="text-rust">*</span></label>
-          <input
-            id="nome_completo"
-            name="nome_completo"
-            type="text"
-            required
-            className="input-field"
-            defaultValue={pac.nome_completo}
-          />
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="telefone" className="label">
-              Telefone
-            </label>
-            <input
-              id="telefone"
-              name="telefone"
-              type="tel"
-              className="input-field"
-              defaultValue={pac.telefone ?? ""}
-              placeholder="(00) 00000-0000"
-            />
-          </div>
-          <div>
-            <label htmlFor="email" className="label">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              className="input-field"
-              defaultValue={pac.email ?? ""}
-            />
-          </div>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="cpf" className="label">
-              CPF
-            </label>
-            <input
-              id="cpf"
-              name="cpf"
-              type="text"
-              className="input-field"
-              defaultValue={pac.cpf ?? ""}
-              placeholder="000.000.000-00"
-            />
-          </div>
-          <div>
-            <label htmlFor="data_nascimento" className="label">
-              Data de nascimento
-            </label>
-            <input
-              id="data_nascimento"
-              name="data_nascimento"
-              type="date"
-              className="input-field"
-              defaultValue={pac.data_nascimento ?? ""}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="observacoes" className="label">
-            Observações
-          </label>
-          <textarea
-            id="observacoes"
-            name="observacoes"
-            rows={3}
-            className="input-field resize-none"
-            defaultValue={pac.observacoes ?? ""}
-          />
-        </div>
-
-        <input type="hidden" name="ativo" value={pac.ativo ? "true" : "false"} />
-
-        <div className="flex gap-3 pt-2">
-          <button type="submit" className="btn-primary flex-1">
-            Salvar alterações
-          </button>
-          <Link href="/pacientes" className="btn-ghost">
-            Cancelar
-          </Link>
-        </div>
-      </form>
+      <EditarPacienteForm
+        paciente={pac}
+        camposConfig={camposConfig ?? []}
+      />
     </div>
   );
 }

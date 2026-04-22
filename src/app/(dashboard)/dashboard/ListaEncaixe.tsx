@@ -1,0 +1,241 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { UserPlus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Phone, FileText, User } from "lucide-react";
+import { adicionarEncaixe, removerEncaixe } from "./listaEncaixeActions";
+
+interface Encaixe {
+  id: string;
+  paciente_nome: string;
+  telefone: string | null;
+  observacoes: string | null;
+  profissional_id: string | null;
+  created_at: string;
+  profissional?: { profile: { nome_completo: string } | null } | null;
+}
+
+interface Profissional {
+  id: string;
+  profile: { nome_completo: string } | null;
+}
+
+interface Props {
+  encaixes: Encaixe[];
+  profissionais: Profissional[];
+}
+
+function maskPhone(v: string) {
+  v = v.replace(/\D/g, "").substring(0, 11);
+  if (v.length <= 10) return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+  return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+}
+
+export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props) {
+  const [isPending, startTransition] = useTransition();
+  const [encaixes, setEncaixes] = useState(initialEncaixes);
+  const [aberto, setAberto] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+
+  const filtrados = encaixes.filter(e => {
+    const q = busca.toLowerCase();
+    return (
+      e.paciente_nome.toLowerCase().includes(q) ||
+      (e.telefone ?? "").includes(q)
+    );
+  });
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setErro(null);
+    startTransition(async () => {
+      const res = await adicionarEncaixe(fd);
+      if (res.error) { setErro(res.error); return; }
+      // optimistic: re-fetch via revalidate happens in background
+      const profId = fd.get("profissional_id") as string;
+      const prof = profissionais.find(p => p.id === profId) ?? null;
+      setEncaixes(prev => [{
+        id: crypto.randomUUID(),
+        paciente_nome: fd.get("paciente_nome") as string,
+        telefone: (fd.get("telefone") as string) || null,
+        observacoes: (fd.get("observacoes") as string) || null,
+        profissional_id: profId || null,
+        created_at: new Date().toISOString(),
+        profissional: prof ? { profile: prof.profile } : null,
+      }, ...prev]);
+      setShowForm(false);
+      setTelefone("");
+      (e.target as HTMLFormElement).reset();
+    });
+  }
+
+  function handleRemover(id: string) {
+    setEncaixes(prev => prev.filter(e => e.id !== id));
+    startTransition(async () => { await removerEncaixe(id); });
+  }
+
+  return (
+    <div className="rounded-xl border border-sand/40 bg-white shadow-sm overflow-hidden mb-4">
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setAberto(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-peach/20 hover:bg-peach/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <UserPlus className="w-4 h-4 text-rust" />
+          <span className="text-sm font-semibold text-forest">Lista de Encaixe</span>
+          {encaixes.length > 0 && (
+            <span className="text-xs bg-rust text-white px-2 py-0.5 rounded-full font-medium">
+              {encaixes.length}
+            </span>
+          )}
+        </div>
+        {aberto ? <ChevronUp className="w-4 h-4 text-forest-400" /> : <ChevronDown className="w-4 h-4 text-forest-400" />}
+      </button>
+
+      {aberto && (
+        <div className="p-3 space-y-3">
+          {/* Barra de busca + botão adicionar */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-forest-400" />
+              <input
+                type="text"
+                placeholder="Buscar por nome ou telefone…"
+                value={busca}
+                onChange={e => setBusca(e.target.value)}
+                className="input-field pl-8 py-1.5 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowForm(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-rust text-white rounded-lg hover:bg-rust/90 transition-colors shrink-0"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              Adicionar
+            </button>
+          </div>
+
+          {/* Formulário de adição */}
+          {showForm && (
+            <form onSubmit={handleSubmit} className="p-3 bg-sand/10 rounded-xl border border-sand/30 space-y-2.5">
+              {erro && <p className="text-xs text-rust">{erro}</p>}
+              <div className="grid sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-forest-600 mb-1 block">
+                    Nome do paciente <span className="text-rust">*</span>
+                  </label>
+                  <input
+                    name="paciente_nome"
+                    type="text"
+                    required
+                    placeholder="Nome completo"
+                    className="input-field py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-forest-600 mb-1 block">Telefone</label>
+                  <input
+                    name="telefone"
+                    type="text"
+                    placeholder="(42) 00000-0000"
+                    className="input-field py-1.5 text-sm"
+                    value={telefone}
+                    onChange={e => setTelefone(maskPhone(e.target.value))}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-forest-600 mb-1 block">Profissional</label>
+                <select name="profissional_id" className="input-field py-1.5 text-sm" defaultValue="">
+                  <option value="">— Qualquer profissional —</option>
+                  {profissionais.map(p => (
+                    <option key={p.id} value={p.id}>{p.profile?.nome_completo}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-forest-600 mb-1 block">Observações</label>
+                <textarea
+                  name="observacoes"
+                  rows={2}
+                  placeholder="Urgência, especialidade, etc."
+                  className="input-field py-1.5 text-sm resize-none"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-forest text-white rounded-lg hover:bg-forest/90 disabled:opacity-50 transition-colors"
+                >
+                  {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+                  Adicionar à lista
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowForm(false); setErro(null); }}
+                  className="px-4 py-1.5 text-sm text-forest-500 hover:text-forest transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Lista */}
+          {filtrados.length === 0 ? (
+            <p className="text-sm text-forest-400 text-center py-4">
+              {busca ? "Nenhum resultado encontrado." : "Nenhum paciente na lista de encaixe."}
+            </p>
+          ) : (
+            <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+              {filtrados.map((e, i) => (
+                <div key={e.id} className="flex items-start gap-2 p-2.5 rounded-lg bg-sand/10 border border-sand/20 hover:bg-sand/20 transition-colors">
+                  <div className="w-6 h-6 rounded-full bg-rust/15 text-rust text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-sm font-semibold text-forest truncate">{e.paciente_nome}</span>
+                      {e.profissional?.profile?.nome_completo && (
+                        <span className="text-xs bg-forest/10 text-forest px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                          <User className="w-2.5 h-2.5" />
+                          {e.profissional.profile.nome_completo}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      {e.telefone && (
+                        <span className="text-xs text-forest-500 flex items-center gap-1">
+                          <Phone className="w-3 h-3" /> {e.telefone}
+                        </span>
+                      )}
+                      {e.observacoes && (
+                        <span className="text-xs text-forest-400 flex items-center gap-1 truncate max-w-48">
+                          <FileText className="w-3 h-3 shrink-0" /> {e.observacoes}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRemover(e.id)}
+                    className="shrink-0 p-1 text-forest-300 hover:text-rust hover:bg-rust/10 rounded-lg transition-colors"
+                    title="Remover da lista"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
