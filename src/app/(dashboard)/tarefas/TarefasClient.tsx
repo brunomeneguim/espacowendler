@@ -462,19 +462,18 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
                 const canEdit = !isSecretaria || isOwner;
                 const canDelete = !isSecretaria || isOwner;
                 return (
-                <TarefaItem
-                  key={t.id}
-                  tarefa={t}
-                  onToggle={() => handleToggle(t.id, !t.concluida)}
-                  onDelete={() => handleDeleteTarefa(t.id)}
-                  onEdit={() => { setEditingTarefa(t); setShowModalTarefa(true); }}
-                  pending={pendingId === t.id}
-                  canEdit={canEdit}
-                  canDelete={canDelete}
-                />
+                  <TarefaItem
+                    key={t.id}
+                    tarefa={t}
+                    onToggle={() => handleToggle(t.id, !t.concluida)}
+                    onDelete={() => handleDeleteTarefa(t.id)}
+                    onEdit={() => { setEditingTarefa(t); setShowModalTarefa(true); }}
+                    pending={pendingId === t.id}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
+                  />
                 );
               })}
-              ))}
             </div>
           )}
         </div>
