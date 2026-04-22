@@ -65,6 +65,17 @@ const DIAS_SEMANA = [1, 2, 3, 4, 5, 6];
 
 function parseTimeToMinutes(t: string) { const [h,m] = t.split(":").map(Number); return h*60+m; }
 
+// Retorna true se a cor hex é escura (usa luminância relativa)
+function isColorDark(hex: string): boolean {
+  const h = hex.replace("#", "");
+  if (h.length < 6) return false;
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance < 0.5;
+}
+
 // ── Detecção de overlap ───────────────────────────────────────────
 function calcularColunas(ags: Agendamento[]) {
   const sorted = [...ags].sort((a,b)=>new Date(a.data_hora_inicio).getTime()-new Date(b.data_hora_inicio).getTime());
@@ -238,26 +249,26 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
   const [expanded, setExpanded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
+  const bgColor = ag.status === "faltou" ? "#dc2626" : ag.status === "cancelado" ? "#ffffff" : profHex;
+  const textColor = isColorDark(bgColor) ? "#ffffff" : "#1a1a1a";
+  const textMuted = isColorDark(bgColor) ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.5)";
+
   const durationMin = Math.round((new Date(ag.data_hora_fim).getTime() - new Date(ag.data_hora_inicio).getTime()) / 60000);
 
   return (
     <div
       ref={cardRef}
-      style={{
-        ...style,
-        backgroundColor: ag.status === "faltou" ? "#dc2626" : ag.status === "cancelado" ? "#ffffff" : profHex,
-        borderLeftColor: ag.status === "faltou" ? "#dc2626" : ag.status === "cancelado" ? "#dc2626" : profHex,
-      }}
+      style={{ ...style, backgroundColor: bgColor, borderLeftColor: ag.status === "cancelado" ? "#dc2626" : profHex }}
       className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
       onClick={() => setExpanded(v => !v)}
     >
       <div className="px-1.5 py-0.5 leading-tight flex items-start gap-1">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold truncate text-gray-800">
+          <p className="text-xs font-semibold truncate" style={{ color: textColor }}>
             {format(new Date(ag.data_hora_inicio), "HH:mm")} {ag.paciente?.nome_completo ?? "—"}
           </p>
-          <p className="text-[10px] text-gray-400 truncate">
-            {ag.profissional?.profile?.nome_completo}{ag.sala ? ` · ${ag.sala.nome}` : ""}
+          <p className="text-[10px] truncate" style={{ color: textMuted }}>
+            {ag.profissional?.profile?.nome_completo}
           </p>
         </div>
         <span className={`w-2 h-2 rounded-full shrink-0 mt-1 ${cfg.dot}`} title={cfg.label} />
