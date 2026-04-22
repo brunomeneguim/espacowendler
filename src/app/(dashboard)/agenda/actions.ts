@@ -183,7 +183,7 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
-  redirect("/agenda");
+  redirect("/dashboard");
 }
 
 export async function atualizarStatusAgendamento(
