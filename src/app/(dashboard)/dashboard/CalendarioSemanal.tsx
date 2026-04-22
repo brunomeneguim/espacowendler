@@ -8,7 +8,7 @@ import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
-  DoorOpen, X, Save, Loader2, Monitor, Trash2,
+  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw,
 } from "lucide-react";
 import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient } from "../agenda/actions";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
@@ -258,7 +258,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
   return (
     <div
       ref={cardRef}
-      style={{ ...style, backgroundColor: bgColor, borderLeftColor: ag.status === "cancelado" ? "#dc2626" : profHex }}
+      style={{ ...style, backgroundColor: bgColor, borderLeftColor: profHex }}
       className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
       onClick={() => setExpanded(v => !v)}
     >
@@ -303,6 +303,11 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
                 <XCircle className="w-3 h-3" /> Falta Justificada
               </button>
             </>
+          )}
+          {(ag.status === "faltou" || ag.status === "cancelado") && (
+            <button onClick={() => onStatus("agendado")} className="text-xs bg-gray-100 text-gray-700 border border-gray-300 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <RotateCcw className="w-3 h-3" /> Desfazer
+            </button>
           )}
           {canEdit && (
             <button onClick={onEdit} className="text-xs bg-forest text-cream px-1.5 py-0.5 rounded flex items-center gap-0.5">
