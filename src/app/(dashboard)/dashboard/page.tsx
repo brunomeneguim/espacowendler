@@ -62,18 +62,18 @@ export default async function DashboardPage({
       .select("id, nome_completo, telefone")
       .eq("ativo", true)
       .order("nome_completo"),
-    // Aniversariantes: buscamos todos os pacientes com data_nascimento
-    // O filtro por mês é feito client-side no CalendarioSemanal
-    supabase
-      .from("pacientes")
-      .select("id, nome_completo, telefone, data_nascimento")
-      .eq("ativo", true)
-      .not("data_nascimento", "is", null),
     supabase
       .from("lista_encaixe")
       .select("id, paciente_nome, telefone, observacoes, profissional_id, created_at, profissional:profissionais(profile:profiles(nome_completo))")
       .eq("ativo", true)
       .order("created_at", { ascending: true }),
+    // Aniversariantes: todos os pacientes com data_nascimento
+    // Filtro por mês é feito client-side no CalendarioSemanal
+    supabase
+      .from("pacientes")
+      .select("id, nome_completo, telefone, data_nascimento")
+      .eq("ativo", true)
+      .not("data_nascimento", "is", null),
   ]);
 
   return (
