@@ -271,54 +271,56 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
             {ag.profissional?.profile?.nome_completo}
           </p>
         </div>
-        <span className={`w-2 h-2 rounded-full shrink-0 mt-1 ${cfg.dot}`} title={cfg.label} />
       </div>
 
       {expanded && (
         <div
-          className="px-1.5 pb-2 pt-1 flex flex-wrap gap-1 bg-white rounded-b border border-t-0 border-gray-200 shadow-lg"
+          className="p-2 flex flex-col gap-1.5 bg-white rounded-b border border-t-0 border-gray-200 shadow-lg"
           style={{ position: "absolute", top: "100%", left: "-1px", right: "-1px", zIndex: 40 }}
           onClick={e => e.stopPropagation()}
         >
-          <div className="w-full flex items-center gap-1 mb-1">
-            <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-            <span className={`text-xs font-medium ${cfg.badge.split(" ")[1]}`}>{cfg.label}</span>
+          {/* Ações principais */}
+          <div className="flex flex-col gap-1">
+            {ativo && ag.status === "agendado" && (
+              <button onClick={() => onStatus("confirmado")} className="w-full flex items-center justify-center gap-1.5 text-sm font-medium bg-green-600 text-white py-1.5 rounded-lg">
+                <Check className="w-4 h-4" /> Confirmar
+              </button>
+            )}
+            {ativo && ag.status === "confirmado" && (
+              <button onClick={() => onStatus("realizado")} className="w-full flex items-center justify-center gap-1.5 text-sm font-medium bg-teal-600 text-white py-1.5 rounded-lg">
+                <Check className="w-4 h-4" /> Finalizar sessão
+              </button>
+            )}
+            {ativo && (
+              <div className="grid grid-cols-2 gap-1">
+                <button onClick={() => onStatus("faltou")} className="flex items-center justify-center gap-1 text-xs font-medium bg-red-600 text-white py-1.5 rounded-lg border border-red-600">
+                  <UserX className="w-3.5 h-3.5" /> Falta Cobrada
+                </button>
+                <button onClick={() => onStatus("cancelado")} className="flex items-center justify-center gap-1 text-xs font-medium bg-white text-red-600 py-1.5 rounded-lg border border-red-600">
+                  <XCircle className="w-3.5 h-3.5" /> Falta Justificada
+                </button>
+              </div>
+            )}
           </div>
-          {ativo && ag.status === "agendado" && (
-            <button onClick={() => onStatus("confirmado")} className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
-              <Check className="w-3 h-3" /> Confirmar
-            </button>
-          )}
-          {ativo && ag.status === "confirmado" && (
-            <button onClick={() => onStatus("realizado")} className="text-xs bg-teal-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
-              <Check className="w-3 h-3" /> Finalizar
-            </button>
-          )}
-          {ativo && (
-            <>
-              <button onClick={() => onStatus("faltou")} className="text-xs bg-red-600 text-white border border-red-600 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                <UserX className="w-3 h-3" /> Falta Cobrada
+
+          {/* Desfazer / Editar / Excluir */}
+          <div className="flex gap-1 pt-0.5 border-t border-gray-100">
+            {(ag.status === "faltou" || ag.status === "cancelado" || ag.status === "confirmado") && (
+              <button onClick={() => onStatus("agendado")} className="flex-1 flex items-center justify-center gap-1 text-xs text-gray-600 bg-gray-100 py-1.5 rounded-lg border border-gray-200">
+                <RotateCcw className="w-3.5 h-3.5" /> Desfazer
               </button>
-              <button onClick={() => onStatus("cancelado")} className="text-xs bg-white text-red-600 border border-red-600 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                <XCircle className="w-3 h-3" /> Falta Justificada
+            )}
+            {canEdit && (
+              <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1 text-xs text-forest bg-forest/10 py-1.5 rounded-lg">
+                <Pencil className="w-3.5 h-3.5" /> Editar
               </button>
-            </>
-          )}
-          {(ag.status === "faltou" || ag.status === "cancelado" || ag.status === "confirmado") && (
-            <button onClick={() => onStatus("agendado")} className="text-xs bg-gray-100 text-gray-700 border border-gray-300 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-              <RotateCcw className="w-3 h-3" /> Desfazer
-            </button>
-          )}
-          {canEdit && (
-            <button onClick={onEdit} className="text-xs bg-forest text-cream px-1.5 py-0.5 rounded flex items-center gap-0.5">
-              <Pencil className="w-3 h-3" /> Editar
-            </button>
-          )}
-          {canEdit && (
-            <button onClick={onDelete} className="text-xs bg-red-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
-              <Trash2 className="w-3 h-3" /> Excluir
-            </button>
-          )}
+            )}
+            {canEdit && (
+              <button onClick={onDelete} className="flex items-center justify-center gap-1 text-xs text-red-600 bg-red-50 px-3 py-1.5 rounded-lg">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       )}
 
