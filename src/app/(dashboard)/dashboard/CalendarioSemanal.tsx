@@ -489,8 +489,8 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
     const deltaY = e.clientY - startY;
     // 1px = 1 minute (PX_POR_HORA=60, 60min)
     const rawMin = startDurationMin + deltaY;
-    // snap to 5 min, minimum 15 min
-    const snappedMin = Math.max(15, Math.round(rawMin / 5) * 5);
+    // snap to 15 min, minimum 15 min
+    const snappedMin = Math.max(15, Math.round(rawMin / 15) * 15);
     const newHeight = Math.max(22, (snappedMin / 60) * PX_POR_HORA - 2);
     el.style.height = `${newHeight}px`;
   }, []);
@@ -504,7 +504,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
 
     const deltaY = e.clientY - startY;
     const rawMin = startDurationMin + deltaY;
-    const snappedMin = Math.max(15, Math.round(rawMin / 5) * 5);
+    const snappedMin = Math.max(15, Math.round(rawMin / 15) * 15);
     if (snappedMin === startDurationMin) return;
 
     const tzOffset = new Date().getTimezoneOffset();
