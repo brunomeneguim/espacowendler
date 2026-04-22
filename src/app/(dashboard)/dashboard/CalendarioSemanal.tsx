@@ -715,12 +715,14 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
 
       {/* ── Lista View ─────────────────────────────────────────── */}
       {viewMode === "lista" && (() => {
+        const inicioDia = new Date(); inicioDia.setHours(0, 0, 0, 0);
         const filtradosLista = agendamentos.filter(a => {
+          const matchData = new Date(a.data_hora_inicio) >= inicioDia;
           const matchSala = filtroSalaId === null || a.sala === null || a.sala?.id === filtroSalaId;
           const matchProf = listaFiltroProf === "todos" || a.profissional?.id === listaFiltroProf;
           const t = listaBusca.toLowerCase();
           const matchBusca = !t || (a.paciente?.nome_completo?.toLowerCase().includes(t) ?? false) || (a.profissional?.profile?.nome_completo?.toLowerCase().includes(t) ?? false);
-          return matchSala && matchProf && matchBusca;
+          return matchData && matchSala && matchProf && matchBusca;
         });
         const grupos: Record<string, Agendamento[]> = {};
         filtradosLista.forEach(a => {
