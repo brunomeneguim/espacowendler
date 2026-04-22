@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { RepeatIcon, Loader2, UserPlus } from "lucide-react";
 import { criarAgendamento } from "../actions";
 
-interface Prof  { id: string; nome: string; especialidade?: string; horario_inicio?: string }
+interface Prof  { id: string; nome: string; especialidade?: string }
 interface Pac   { id: string; nome_completo: string; telefone?: string }
 interface Sala  { id: number; nome: string }
 
@@ -30,14 +30,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
   const [meses, setMeses] = useState("3");
   const [submitError, setSubmitError] = useState(error ?? "");
   const [tzOffset, setTzOffset] = useState(0);
-  const [hora, setHora] = useState(defaultHora);
-
   useEffect(() => { setTzOffset(new Date().getTimezoneOffset()); }, []);
-
-  function handleProfChange(profId: string) {
-    const prof = profs.find(p => p.id === profId);
-    if (prof?.horario_inicio) setHora(prof.horario_inicio);
-  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -67,7 +60,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       {/* Profissional */}
       <div>
         <label htmlFor="profissional_id" className="label">Profissional <span className="text-rust">*</span></label>
-        <select id="profissional_id" name="profissional_id" required className="input-field" defaultValue="" onChange={e => handleProfChange(e.target.value)}>
+        <select id="profissional_id" name="profissional_id" required className="input-field" defaultValue="">
           <option value="" disabled>Selecione um profissional</option>
           {profs.map(p => (
             <option key={p.id} value={p.id}>{p.nome}</option>
@@ -120,7 +113,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
         </div>
         <div>
           <label htmlFor="hora" className="label">Horário <span className="text-rust">*</span></label>
-          <input id="hora" name="hora" type="time" required className="input-field" value={hora} onChange={e => setHora(e.target.value)} />
+          <input id="hora" name="hora" type="time" required className="input-field" defaultValue={defaultHora} />
         </div>
         <div>
           <label htmlFor="duracao" className="label">Duração (min)</label>
