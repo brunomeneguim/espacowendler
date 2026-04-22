@@ -231,12 +231,13 @@ export function Sidebar({
                 href="/configuracoes/conta"
                 className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
               >
+                <UserCircle className="w-4 h-4" strokeWidth={1.5} />
                 Gerenciar Conta
               </Link>
 
               {isAdmin && !editMode && (
                 <button
-                  onClick={() => { setConfigAberto(false); enterEditMode(); }}
+                  onClick={() => { setConfigAberto(false); enterEditMode(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                   className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
                 >
                   <GripVertical className="w-4 h-4" strokeWidth={1.5} />
