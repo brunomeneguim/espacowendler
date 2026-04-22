@@ -33,7 +33,7 @@ function maskPhone(v: string) {
 export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props) {
   const [isPending, startTransition] = useTransition();
   const [encaixes, setEncaixes] = useState(initialEncaixes);
-  const [aberto, setAberto] = useState(true);
+  const [aberto, setAberto] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [busca, setBusca] = useState("");
   const [filtroProf, setFiltroProf] = useState("todos");
