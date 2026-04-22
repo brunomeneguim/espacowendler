@@ -40,14 +40,12 @@ interface Sala         { id: number; nome: string }
 
 interface Props {
   agendamentos: Agendamento[];
-  listaAgendamentos: Agendamento[];
   profissionais: Profissional[];
   pacientes: Paciente[];
   horariosDisponiveis: HorarioDisponivel[];
   salas: Sala[];
   weekStartStr: string;
   userRole: string;
-  initialView?: ViewMode;
 }
 
 // ── Status config ─────────────────────────────────────────────────
@@ -461,15 +459,16 @@ const STATUS_BADGE_LISTA: Record<string, string> = {
 };
 
 // ── Componente principal ──────────────────────────────────────────
-export function CalendarioSemanal({ agendamentos, listaAgendamentos, profissionais, pacientes, horariosDisponiveis, salas, weekStartStr, userRole, initialView }: Props) {
+export function CalendarioSemanal({ agendamentos, profissionais, pacientes, horariosDisponiveis, salas, weekStartStr, userRole }: Props) {
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
   // Parse weekStart from string in local time (avoids UTC timezone offset bug)
   const [y, m, d] = weekStartStr.split("-").map(Number);
   const weekStart = new Date(y, m - 1, d);
+  const weekEnd = addDays(weekStart, 6);
 
-  const [viewMode, setViewMode] = useState<ViewMode>(initialView ?? "semana");
+  const [viewMode, setViewMode] = useState<ViewMode>("semana");
   const [listaFiltroProf, setListaFiltroProf] = useState("todos");
   const [listaBusca, setListaBusca] = useState("");
   const [filtroProf, setFiltroProf] = useState("todos");
@@ -567,9 +566,12 @@ export function CalendarioSemanal({ agendamentos, listaAgendamentos, profissiona
   const hoje = format(new Date(), "yyyy-MM-dd");
   const horas = Array.from({length:TOTAL_HORAS},(_,i)=>HORA_INICIO+i);
 
-  // Filtrar por sala e profissional
-  const agsFiltrados = agendamentos.filter(a => {
-    // appointments without sala appear in all sala tabs
+  // Filtrar por semana (client-side) + sala + profissional
+  const agsDaSemana = agendamentos.filter(a => {
+    const d = new Date(a.data_hora_inicio);
+    return d >= weekStart && d <= weekEnd;
+  });
+  const agsFiltrados = agsDaSemana.filter(a => {
     const matchSala = filtroSalaId === null || a.sala === null || a.sala?.id === filtroSalaId;
     const matchProf = filtroProf === "todos" || a.profissional?.id === filtroProf;
     return matchSala && matchProf;
@@ -611,7 +613,7 @@ export function CalendarioSemanal({ agendamentos, listaAgendamentos, profissiona
   }
 
   const isCurrentWeek = weekDays.some(d=>format(d,"yyyy-MM-dd")===hoje);
-  const agendadosHoje = agendamentos.filter(a=> {
+  const agendadosHoje = agsDaSemana.filter(a=> {
     const matchSala = filtroSalaId === null || a.sala === null || a.sala?.id === filtroSalaId;
     return matchSala && isSameDay(new Date(a.data_hora_inicio),new Date()) && ["agendado","confirmado"].includes(a.status);
   }).length;
@@ -633,11 +635,11 @@ export function CalendarioSemanal({ agendamentos, listaAgendamentos, profissiona
         <div className="flex gap-3">
           <div className="flex items-center gap-2 bg-white border border-sand/40 rounded-xl px-3 py-2">
             <CalendarDays className="w-4 h-4 text-forest-500" strokeWidth={1.5} />
-            <div><p className="text-xs text-forest-500 leading-none">Hoje</p><p className="text-lg font-semibold text-forest leading-tight">{agendadosHoje}</p></div>
+            <div className="text-center"><p className="text-xs text-forest-500 leading-none">Hoje</p><p className="text-lg font-semibold text-forest leading-tight">{agendadosHoje}</p></div>
           </div>
           <div className="flex items-center gap-2 bg-white border border-sand/40 rounded-xl px-3 py-2">
             <Clock className="w-4 h-4 text-forest-500" strokeWidth={1.5} />
-            <div><p className="text-xs text-forest-500 leading-none">Semana</p><p className="text-lg font-semibold text-forest leading-tight">{agsFiltrados.length}</p></div>
+            <div className="text-center"><p className="text-xs text-forest-500 leading-none">Semana</p><p className="text-lg font-semibold text-forest leading-tight">{agsFiltrados.length}</p></div>
           </div>
         </div>
       </div>
@@ -693,16 +695,7 @@ export function CalendarioSemanal({ agendamentos, listaAgendamentos, profissiona
             return (
               <button
                 key={mode}
-                onClick={() => {
-                  if (mode === "lista") {
-                    router.push(`/dashboard?view=lista`);
-                  } else if (viewMode === "lista") {
-                    router.push("/dashboard");
-                    setViewMode(mode);
-                  } else {
-                    setViewMode(mode);
-                  }
-                }}
+                onClick={() => setViewMode(mode)}
                 className={`px-3 h-8 flex items-center gap-1.5 transition-colors border-r border-sand/40 last:border-r-0 ${viewMode===mode?"bg-forest text-cream":"hover:bg-sand/20 text-forest"}`}
               >
                 {icons[mode]}
@@ -722,7 +715,7 @@ export function CalendarioSemanal({ agendamentos, listaAgendamentos, profissiona
 
       {/* ── Lista View ─────────────────────────────────────────── */}
       {viewMode === "lista" && (() => {
-        const filtradosLista = listaAgendamentos.filter(a => {
+        const filtradosLista = agendamentos.filter(a => {
           const matchProf = listaFiltroProf === "todos" || a.profissional?.id === listaFiltroProf;
           const t = listaBusca.toLowerCase();
           const matchBusca = !t || (a.paciente?.nome_completo?.toLowerCase().includes(t) ?? false) || (a.profissional?.profile?.nome_completo?.toLowerCase().includes(t) ?? false);

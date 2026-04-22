@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { UserPlus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Phone, FileText, User } from "lucide-react";
-import { adicionarEncaixe, removerEncaixe } from "./listaEncaixeActions";
+import { UserPlus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Phone, FileText, User, Pencil, Check, X } from "lucide-react";
+import { adicionarEncaixe, removerEncaixe, editarEncaixe } from "./listaEncaixeActions";
 
 interface Encaixe {
   id: string;
@@ -40,12 +40,58 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
   const [telefone, setTelefone] = useState("");
   const [erro, setErro] = useState<string | null>(null);
 
+  // ── Estado de edição inline ──
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editNome, setEditNome] = useState("");
+  const [editTel, setEditTel] = useState("");
+  const [editObs, setEditObs] = useState("");
+  const [editProfId, setEditProfId] = useState("");
+  const [editErro, setEditErro] = useState<string | null>(null);
+
   const filtrados = encaixes.filter(e => {
     const q = busca.toLowerCase();
     const matchBusca = e.paciente_nome.toLowerCase().includes(q) || (e.telefone ?? "").includes(q);
     const matchProf = filtroProf === "todos" || e.profissional_id === filtroProf;
     return matchBusca && matchProf;
   });
+
+  function iniciarEdicao(e: Encaixe) {
+    setEditandoId(e.id);
+    setEditNome(e.paciente_nome);
+    setEditTel(e.telefone ?? "");
+    setEditObs(e.observacoes ?? "");
+    setEditProfId(e.profissional_id ?? "");
+    setEditErro(null);
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setEditErro(null);
+  }
+
+  function handleSalvarEdicao(id: string) {
+    if (!editNome.trim()) { setEditErro("Nome é obrigatório."); return; }
+    setEditErro(null);
+    const prof = profissionais.find(p => p.id === editProfId) ?? null;
+    startTransition(async () => {
+      const res = await editarEncaixe(id, {
+        paciente_nome: editNome.trim(),
+        telefone: editTel || null,
+        observacoes: editObs || null,
+        profissional_id: editProfId || null,
+      });
+      if (res.error) { setEditErro(res.error); return; }
+      setEncaixes(prev => prev.map(e => e.id === id ? {
+        ...e,
+        paciente_nome: editNome.trim(),
+        telefone: editTel || null,
+        observacoes: editObs || null,
+        profissional_id: editProfId || null,
+        profissional: prof ? { profile: prof.profile } : null,
+      } : e));
+      setEditandoId(null);
+    });
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -54,7 +100,6 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
     startTransition(async () => {
       const res = await adicionarEncaixe(fd);
       if (res.error) { setErro(res.error); return; }
-      // optimistic: re-fetch via revalidate happens in background
       const profId = fd.get("profissional_id") as string;
       const prof = profissionais.find(p => p.id === profId) ?? null;
       setEncaixes(prev => [...prev, {
@@ -140,24 +185,12 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
                   <label className="text-xs font-medium text-forest-600 mb-1 block">
                     Nome do paciente <span className="text-rust">*</span>
                   </label>
-                  <input
-                    name="paciente_nome"
-                    type="text"
-                    required
-                    placeholder="Nome completo"
-                    className="input-field py-1.5 text-sm"
-                  />
+                  <input name="paciente_nome" type="text" required placeholder="Nome completo" className="input-field py-1.5 text-sm" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-forest-600 mb-1 block">Telefone</label>
-                  <input
-                    name="telefone"
-                    type="text"
-                    placeholder="(42) 00000-0000"
-                    className="input-field py-1.5 text-sm"
-                    value={telefone}
-                    onChange={e => setTelefone(maskPhone(e.target.value))}
-                  />
+                  <input name="telefone" type="text" placeholder="(42) 00000-0000" className="input-field py-1.5 text-sm"
+                    value={telefone} onChange={e => setTelefone(maskPhone(e.target.value))} />
                 </div>
               </div>
               <div>
@@ -171,27 +204,16 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
               </div>
               <div>
                 <label className="text-xs font-medium text-forest-600 mb-1 block">Observações</label>
-                <textarea
-                  name="observacoes"
-                  rows={2}
-                  placeholder="Urgência, especialidade, etc."
-                  className="input-field py-1.5 text-sm resize-none"
-                />
+                <textarea name="observacoes" rows={2} placeholder="Urgência, especialidade, etc." className="input-field py-1.5 text-sm resize-none" />
               </div>
               <div className="flex gap-2 pt-1">
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-forest text-white rounded-lg hover:bg-forest/90 disabled:opacity-50 transition-colors"
-                >
+                <button type="submit" disabled={isPending}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-forest text-white rounded-lg hover:bg-forest/90 disabled:opacity-50 transition-colors">
                   {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
                   Adicionar à lista
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowForm(false); setErro(null); }}
-                  className="px-4 py-1.5 text-sm text-forest-500 hover:text-forest transition-colors"
-                >
+                <button type="button" onClick={() => { setShowForm(false); setErro(null); }}
+                  className="px-4 py-1.5 text-sm text-forest-500 hover:text-forest transition-colors">
                   Cancelar
                 </button>
               </div>
@@ -201,45 +223,97 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
           {/* Lista */}
           {filtrados.length === 0 ? (
             <p className="text-sm text-forest-400 text-center py-4">
-              {busca ? "Nenhum resultado encontrado." : "Nenhum paciente na lista de encaixe."}
+              {busca || filtroProf !== "todos" ? "Nenhum resultado encontrado." : "Nenhum paciente na lista de encaixe."}
             </p>
           ) : (
-            <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
               {filtrados.map((e, i) => (
-                <div key={e.id} className="flex items-start gap-2 p-2.5 rounded-lg bg-sand/10 border border-sand/20 hover:bg-sand/20 transition-colors">
-                  <div className="w-6 h-6 rounded-full bg-rust/15 text-rust text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-semibold text-forest truncate">{e.paciente_nome}</span>
-                      {e.profissional?.profile?.nome_completo && (
-                        <span className="text-xs bg-forest/10 text-forest px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
-                          <User className="w-2.5 h-2.5" />
-                          {e.profissional.profile.nome_completo}
-                        </span>
-                      )}
+                <div key={e.id} className="rounded-lg border border-sand/20 bg-sand/10 overflow-hidden">
+                  {editandoId === e.id ? (
+                    /* ── Formulário de edição inline ── */
+                    <div className="p-2.5 space-y-2">
+                      {editErro && <p className="text-xs text-rust">{editErro}</p>}
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs font-medium text-forest-600 mb-0.5 block">Nome <span className="text-rust">*</span></label>
+                          <input type="text" value={editNome} onChange={e2 => setEditNome(e2.target.value)}
+                            className="input-field py-1 text-sm" placeholder="Nome completo" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-forest-600 mb-0.5 block">Telefone</label>
+                          <input type="text" value={editTel} onChange={e2 => setEditTel(maskPhone(e2.target.value))}
+                            className="input-field py-1 text-sm" placeholder="(42) 00000-0000" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-forest-600 mb-0.5 block">Profissional</label>
+                        <select value={editProfId} onChange={e2 => setEditProfId(e2.target.value)} className="input-field py-1 text-sm">
+                          <option value="">— Qualquer profissional —</option>
+                          {profissionais.map(p => (
+                            <option key={p.id} value={p.id}>{p.profile?.nome_completo}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-forest-600 mb-0.5 block">Observações</label>
+                        <textarea rows={2} value={editObs} onChange={e2 => setEditObs(e2.target.value)}
+                          className="input-field py-1 text-sm resize-none" placeholder="Urgência, especialidade, etc." />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSalvarEdicao(e.id)} disabled={isPending}
+                          className="flex items-center gap-1 px-3 py-1 text-xs font-medium bg-forest text-white rounded-lg hover:bg-forest/90 disabled:opacity-50 transition-colors">
+                          {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          Salvar
+                        </button>
+                        <button onClick={cancelarEdicao}
+                          className="flex items-center gap-1 px-3 py-1 text-xs text-forest-500 hover:text-forest transition-colors">
+                          <X className="w-3 h-3" /> Cancelar
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      {e.telefone && (
-                        <span className="text-xs text-forest-500 flex items-center gap-1">
-                          <Phone className="w-3 h-3" /> {e.telefone}
-                        </span>
-                      )}
-                      {e.observacoes && (
-                        <span className="text-xs text-forest-400 flex items-center gap-1 truncate max-w-48">
-                          <FileText className="w-3 h-3 shrink-0" /> {e.observacoes}
-                        </span>
-                      )}
+                  ) : (
+                    /* ── Exibição normal ── */
+                    <div className="flex items-start gap-2 p-2.5 hover:bg-sand/20 transition-colors">
+                      <div className="w-6 h-6 rounded-full bg-rust/15 text-rust text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-semibold text-forest truncate">{e.paciente_nome}</span>
+                          {e.profissional?.profile?.nome_completo && (
+                            <span className="text-xs bg-forest/10 text-forest px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                              <User className="w-2.5 h-2.5" />
+                              {e.profissional.profile.nome_completo}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          {e.telefone && (
+                            <span className="text-xs text-forest-500 flex items-center gap-1">
+                              <Phone className="w-3 h-3" /> {e.telefone}
+                            </span>
+                          )}
+                          {e.observacoes && (
+                            <span className="text-xs text-forest-400 flex items-center gap-1 truncate max-w-48">
+                              <FileText className="w-3 h-3 shrink-0" /> {e.observacoes}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button onClick={() => iniciarEdicao(e)}
+                          className="p-1 text-forest-300 hover:text-forest hover:bg-forest/10 rounded-lg transition-colors"
+                          title="Editar">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleRemover(e.id)}
+                          className="p-1 text-forest-300 hover:text-rust hover:bg-rust/10 rounded-lg transition-colors"
+                          title="Remover da lista">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => handleRemover(e.id)}
-                    className="shrink-0 p-1 text-forest-300 hover:text-rust hover:bg-rust/10 rounded-lg transition-colors"
-                    title="Remover da lista"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  )}
                 </div>
               ))}
             </div>

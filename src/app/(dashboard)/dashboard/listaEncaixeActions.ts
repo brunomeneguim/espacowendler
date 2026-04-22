@@ -35,3 +35,14 @@ export async function removerEncaixe(id: string): Promise<{ error: string | null
   revalidatePath("/dashboard");
   return { error: null };
 }
+
+export async function editarEncaixe(
+  id: string,
+  dados: { paciente_nome: string; telefone: string | null; observacoes: string | null; profissional_id: string | null }
+): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from("lista_encaixe").update(dados).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+  return { error: null };
+}
