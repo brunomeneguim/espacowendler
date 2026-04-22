@@ -5,6 +5,37 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 
+// ── Verificar horário de atendimento do profissional ─────────────
+async function verificarHorarioProfissional(
+  supabase: ReturnType<typeof createClient>,
+  profissional_id: string,
+  inicio: Date,
+  fim: Date
+): Promise<string | null> {
+  const { data: prof } = await supabase
+    .from("profissionais")
+    .select("horario_inicio, horario_fim, nome_completo:profile_id(nome_completo)")
+    .eq("id", profissional_id)
+    .single();
+
+  if (!prof || !prof.horario_inicio || !prof.horario_fim) return null;
+
+  // Extrai HH:MM do horário cadastrado
+  const [hIni, mIni] = (prof.horario_inicio as string).split(":").map(Number);
+  const [hFim, mFim] = (prof.horario_fim as string).split(":").map(Number);
+
+  const totalIni = inicio.getHours() * 60 + inicio.getMinutes();
+  const totalFim = (fim.getHours() * 60 + fim.getMinutes()) || 24 * 60; // meia-noite = 1440
+
+  const limiteIni = hIni * 60 + mIni;
+  const limiteFim = hFim * 60 + mFim;
+
+  if (totalIni < limiteIni || totalFim > limiteFim) {
+    return `Este profissional atende apenas das ${prof.horario_inicio.slice(0,5)} às ${prof.horario_fim.slice(0,5)}. Ajuste o horário do agendamento.`;
+  }
+  return null;
+}
+
 // ── Verificar conflito de profissional ────────────────────────────
 async function verificarConflito(
   supabase: ReturnType<typeof createClient>,
@@ -105,6 +136,10 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
 
+  // Verificar horário de atendimento do profissional
+  const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, inicio, fim);
+  if (erroHorario) return { error: erroHorario };
+
   // Verificar conflito do agendamento principal
   const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim);
   if (conflito) return { error: conflito };
@@ -176,6 +211,9 @@ export async function editarAgendamento(id: string, formData: FormData) {
   const inicio = new Date(`${data}T${hora}:00`);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
+
+  const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, inicio, fim);
+  if (erroHorario) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(erroHorario)}`);
 
   const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim, id);
   if (conflito) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(conflito)}`);

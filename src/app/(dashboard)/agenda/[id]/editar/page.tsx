@@ -124,8 +124,8 @@ export default async function EditarAgendamentoPage({
             <option value="agendado">Agendado</option>
             <option value="confirmado">Confirmado</option>
             <option value="realizado">Realizado</option>
-            <option value="cancelado">Cancelado</option>
-            <option value="faltou">Faltou</option>
+            <option value="cancelado">Falta Justificada</option>
+            <option value="faltou">Falta Cobrada</option>
           </select>
         </div>
 

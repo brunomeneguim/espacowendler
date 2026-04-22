@@ -53,8 +53,8 @@ const STATUS: Record<Status, { label: string; card: string; dot: string; badge: 
   agendado:   { label: "Agendado",   card: "bg-blue-50 border-blue-200 text-blue-900",       dot: "bg-blue-400",   badge: "bg-blue-100 text-blue-700"    },
   confirmado: { label: "Confirmado", card: "bg-green-50 border-green-200 text-green-900",    dot: "bg-green-500",  badge: "bg-green-100 text-green-700"  },
   realizado:  { label: "Realizado",  card: "bg-teal-50 border-teal-200 text-teal-900",       dot: "bg-teal-500",   badge: "bg-teal-100 text-teal-700"    },
-  cancelado:  { label: "Cancelado",  card: "bg-red-50 border-red-200 text-red-800",          dot: "bg-red-400",    badge: "bg-red-100 text-red-600"      },
-  faltou:     { label: "Faltou",     card: "bg-orange-50 border-orange-200 text-orange-900", dot: "bg-orange-400", badge: "bg-orange-100 text-orange-700" },
+  cancelado:  { label: "Falta Justificada", card: "bg-red-50 border-red-200 text-red-800",          dot: "bg-red-400",    badge: "bg-red-100 text-red-600"      },
+  faltou:     { label: "Falta Cobrada",    card: "bg-orange-50 border-orange-200 text-orange-900", dot: "bg-orange-400", badge: "bg-orange-100 text-orange-700" },
 };
 
 const BORDA_PROF = PROF_CORES.map(c => c.border);
@@ -243,8 +243,8 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
   return (
     <div
       ref={cardRef}
-      style={{ ...style, backgroundColor: profHex + "28" }}
-      className={`absolute rounded border-l-4 ${bordaProf} border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
+      style={{ ...style, backgroundColor: profHex + "40", borderLeftColor: profHex }}
+      className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
       onClick={() => setExpanded(v => !v)}
     >
       <div className="px-1.5 py-0.5 leading-tight flex items-start gap-1">
@@ -281,11 +281,11 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
           )}
           {ativo && (
             <>
-              <button onClick={() => onStatus("faltou")} className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                <UserX className="w-3 h-3" /> Faltou
+              <button onClick={() => onStatus("faltou")} className="text-xs bg-red-600 text-white border border-red-600 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                <UserX className="w-3 h-3" /> Falta Cobrada
               </button>
-              <button onClick={() => onStatus("cancelado")} className="text-xs bg-red-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                <XCircle className="w-3 h-3" /> Cancelar
+              <button onClick={() => onStatus("cancelado")} className="text-xs bg-white text-red-600 border border-red-600 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                <XCircle className="w-3 h-3" /> Falta Justificada
               </button>
             </>
           )}
