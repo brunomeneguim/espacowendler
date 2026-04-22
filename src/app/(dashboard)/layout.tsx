@@ -10,15 +10,13 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const profile = await getCurrentProfile();
+  const supabase = createClient();
 
   // Profissional sem perfil completo → forçar completar cadastro
   if (profile.role === "profissional") {
     const pathname = headers().get("x-pathname") ?? "";
-    // Só redireciona se soubermos o pathname e ele não for a própria página de completar.
-    // Se o header não chegou (pathname vazio), não redireciona para evitar loop infinito.
     const deveVerificar = pathname !== "" && !pathname.startsWith("/profissionais/completar");
     if (deveVerificar) {
-      const supabase = createClient();
       const { data: profReg } = await supabase
         .from("profissionais")
         .select("perfil_completo")
@@ -30,9 +28,19 @@ export default async function DashboardLayout({
     }
   }
 
+  // Fetch menu config (ordered)
+  const { data: menuConfig } = await supabase
+    .from("menu_config")
+    .select("id, href, label, icon_name, ordem")
+    .order("ordem", { ascending: true });
+
   return (
     <div className="flex min-h-screen bg-cream">
-      <Sidebar role={profile.role} nome={profile.nome_completo} />
+      <Sidebar
+        role={profile.role}
+        nome={profile.nome_completo}
+        menuConfig={(menuConfig as any) ?? []}
+      />
       <main className="flex-1 min-w-0">{children}</main>
     </div>
   );

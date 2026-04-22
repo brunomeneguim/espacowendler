@@ -8,7 +8,7 @@ import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
-  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw,
+  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search,
 } from "lucide-react";
 import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient } from "../agenda/actions";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
@@ -21,7 +21,7 @@ const TOTAL_HORAS = HORA_FIM - HORA_INICIO;
 
 // ── Tipos ────────────────────────────────────────────────────────
 type Status = "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou";
-type ViewMode = "semana" | "dia";
+type ViewMode = "semana" | "dia" | "lista";
 
 interface Agendamento {
   id: string;
@@ -40,12 +40,14 @@ interface Sala         { id: number; nome: string }
 
 interface Props {
   agendamentos: Agendamento[];
+  listaAgendamentos: Agendamento[];
   profissionais: Profissional[];
   pacientes: Paciente[];
   horariosDisponiveis: HorarioDisponivel[];
   salas: Sala[];
   weekStartStr: string;
   userRole: string;
+  initialView?: ViewMode;
 }
 
 // ── Status config ─────────────────────────────────────────────────
@@ -283,12 +285,17 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
           onClick={e => e.stopPropagation()}
         >
           {/* Info do agendamento */}
-          <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
-            <p className="text-xs font-semibold text-gray-800 truncate">{ag.paciente?.nome_completo ?? "—"}</p>
-            <p className="text-[11px] text-gray-400 truncate">
-              {format(new Date(ag.data_hora_inicio), "HH:mm")} – {format(new Date(ag.data_hora_fim), "HH:mm")}
-              {ag.sala ? ` · ${ag.sala.nome}` : ""}
-            </p>
+          <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-start gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-800 truncate">{ag.paciente?.nome_completo ?? "—"}</p>
+              <p className="text-[11px] text-gray-400 truncate">
+                {format(new Date(ag.data_hora_inicio), "HH:mm")} – {format(new Date(ag.data_hora_fim), "HH:mm")}
+                {ag.sala ? ` · ${ag.sala.nome}` : ""}
+              </p>
+            </div>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 whitespace-nowrap ${cfg.badge}`}>
+              {cfg.label}
+            </span>
           </div>
 
           {/* Botões de ação */}
@@ -443,8 +450,18 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
   );
 }
 
+// ── Status badge styles para lista view ──────────────────────────
+const STATUS_BADGE_LISTA: Record<string, string> = {
+  agendado:   "bg-blue-100 text-blue-700",
+  confirmado: "bg-green-100 text-green-700",
+  realizado:  "bg-teal-100 text-teal-700",
+  finalizado: "bg-gray-100 text-gray-600",
+  cancelado:  "bg-red-100 text-red-600",
+  faltou:     "bg-orange-100 text-orange-700",
+};
+
 // ── Componente principal ──────────────────────────────────────────
-export function CalendarioSemanal({ agendamentos, profissionais, pacientes, horariosDisponiveis, salas, weekStartStr, userRole }: Props) {
+export function CalendarioSemanal({ agendamentos, listaAgendamentos, profissionais, pacientes, horariosDisponiveis, salas, weekStartStr, userRole, initialView }: Props) {
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
@@ -452,7 +469,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
   const [y, m, d] = weekStartStr.split("-").map(Number);
   const weekStart = new Date(y, m - 1, d);
 
-  const [viewMode, setViewMode] = useState<ViewMode>("semana");
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView ?? "semana");
+  const [listaFiltroProf, setListaFiltroProf] = useState("todos");
+  const [listaBusca, setListaBusca] = useState("");
   const [filtroProf, setFiltroProf] = useState("todos");
   const [filtroSalaId, setFiltroSalaId] = useState<number | null>(salas[0]?.id ?? null);
   const [selectedDay, setSelectedDay] = useState<Date>(() => {
@@ -668,12 +687,29 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
         </div>
         <div className="flex-1" />
         <div className="flex rounded-lg border border-sand/40 overflow-hidden text-sm">
-          {(["dia","semana"] as const).map(mode=>(
-            <button key={mode} onClick={()=>setViewMode(mode)} className={`px-3 h-8 flex items-center gap-1.5 transition-colors border-r border-sand/40 last:border-r-0 ${viewMode===mode?"bg-forest text-cream":"hover:bg-sand/20 text-forest"}`}>
-              {mode==="dia"?<AlignLeft className="w-3.5 h-3.5"/>:<LayoutGrid className="w-3.5 h-3.5"/>}
-              {mode==="dia"?"Dia":"Semana"}
-            </button>
-          ))}
+          {(["dia","semana","lista"] as const).map(mode => {
+            const icons = { dia: <AlignLeft className="w-3.5 h-3.5"/>, semana: <LayoutGrid className="w-3.5 h-3.5"/>, lista: <List className="w-3.5 h-3.5"/> };
+            const labels = { dia: "Dia", semana: "Semana", lista: "Lista" };
+            return (
+              <button
+                key={mode}
+                onClick={() => {
+                  if (mode === "lista") {
+                    router.push(`/dashboard?view=lista`);
+                  } else if (viewMode === "lista") {
+                    router.push("/dashboard");
+                    setViewMode(mode);
+                  } else {
+                    setViewMode(mode);
+                  }
+                }}
+                className={`px-3 h-8 flex items-center gap-1.5 transition-colors border-r border-sand/40 last:border-r-0 ${viewMode===mode?"bg-forest text-cream":"hover:bg-sand/20 text-forest"}`}
+              >
+                {icons[mode]}
+                {labels[mode]}
+              </button>
+            );
+          })}
         </div>
         <select value={filtroProf} onChange={e=>setFiltroProf(e.target.value)} className="h-8 text-sm border border-sand/40 rounded-lg px-2 bg-white text-forest focus:outline-none focus:ring-2 focus:ring-forest/20">
           <option value="todos">Todos os profissionais</option>
@@ -684,8 +720,83 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
         </Link>
       </div>
 
+      {/* ── Lista View ─────────────────────────────────────────── */}
+      {viewMode === "lista" && (() => {
+        const filtradosLista = listaAgendamentos.filter(a => {
+          const matchProf = listaFiltroProf === "todos" || a.profissional?.id === listaFiltroProf;
+          const t = listaBusca.toLowerCase();
+          const matchBusca = !t || (a.paciente?.nome_completo?.toLowerCase().includes(t) ?? false) || (a.profissional?.profile?.nome_completo?.toLowerCase().includes(t) ?? false);
+          return matchProf && matchBusca;
+        });
+        const grupos: Record<string, Agendamento[]> = {};
+        filtradosLista.forEach(a => {
+          const key = format(new Date(a.data_hora_inicio), "yyyy-MM-dd");
+          if (!grupos[key]) grupos[key] = [];
+          grupos[key].push(a);
+        });
+        return (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-forest-400" />
+                <input type="text" placeholder="Buscar por paciente ou profissional…" value={listaBusca} onChange={e => setListaBusca(e.target.value)} className="input-field pl-9 h-9 text-sm" />
+              </div>
+              <select value={listaFiltroProf} onChange={e => setListaFiltroProf(e.target.value)} className="h-9 text-sm border border-sand/40 rounded-lg px-3 bg-white text-forest focus:outline-none focus:ring-2 focus:ring-forest/20">
+                <option value="todos">Todos os profissionais</option>
+                {profissionais.map(p => <option key={p.id} value={p.id}>{p.profile?.nome_completo ?? p.id}</option>)}
+              </select>
+            </div>
+            {Object.keys(grupos).length === 0 ? (
+              <div className="card text-center py-16">
+                <CalendarDays className="w-12 h-12 mx-auto mb-4 text-sand" strokeWidth={1} />
+                <p className="font-display text-xl text-forest mb-2">Nenhum agendamento</p>
+                <p className="text-forest-600">{listaBusca || listaFiltroProf !== "todos" ? "Nenhum resultado com esse filtro." : "Nenhum agendamento cadastrado."}</p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {Object.entries(grupos).map(([data, itens]) => (
+                  <section key={data}>
+                    <h2 className="font-display text-xl text-forest mb-3">
+                      {format(new Date(data + "T12:00:00"), "EEEE, d 'de' MMMM yyyy", { locale: ptBR })}
+                    </h2>
+                    <div className="card p-0 overflow-hidden">
+                      <ul className="divide-y divide-sand/20">
+                        {itens.map(a => (
+                          <li key={a.id} className="flex items-center gap-4 px-6 py-4 hover:bg-cream/40 transition-colors">
+                            <div className="w-16 text-center shrink-0">
+                              <p className="font-display text-xl text-forest">{format(new Date(a.data_hora_inicio), "HH:mm")}</p>
+                              <p className="font-mono text-xs text-forest-500">{format(new Date(a.data_hora_fim), "HH:mm")}</p>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-forest truncate">{a.paciente?.nome_completo ?? "—"}</p>
+                              <p className="text-sm text-forest-600 truncate">
+                                com {a.profissional?.profile?.nome_completo ?? "—"}
+                                {a.paciente?.telefone && <> · {a.paciente.telefone}</>}
+                              </p>
+                            </div>
+                            <span className={`text-xs px-3 py-1 rounded-full font-medium shrink-0 ${STATUS_BADGE_LISTA[a.status] ?? STATUS_BADGE_LISTA.agendado}`}>
+                              {STATUS[a.status as Status]?.label ?? a.status}
+                            </span>
+                            {canEdit && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Link href={`/agenda/${a.id}/editar`} className="p-2 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors" title="Editar"><Pencil className="w-4 h-4" /></Link>
+                                <button onClick={() => handleDelete(a.id)} className="p-2 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors" title="Excluir"><Trash2 className="w-4 h-4" /></button>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Grid */}
-      <div
+      {viewMode !== "lista" && <div
         className="rounded-xl border border-sand/30 bg-white overflow-auto"
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -815,23 +926,25 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, hora
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Legenda */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(STATUS).map(([key,cfg])=>(
-            <span key={key} className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border border-gray-200 bg-white text-gray-600">
-              <span className={`w-2 h-2 rounded-full ${cfg.dot}`} /> {cfg.label}
+      {viewMode !== "lista" && (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(STATUS).map(([key,cfg])=>(
+              <span key={key} className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border border-gray-200 bg-white text-gray-600">
+                <span className={`w-2 h-2 rounded-full ${cfg.dot}`} /> {cfg.label}
+              </span>
+            ))}
+          </div>
+          {filtroProf!=="todos"&&(
+            <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-green-50 border-green-200 text-green-800">
+              <span className="w-2 h-2 rounded-full bg-green-400" /> Horário disponível
             </span>
-          ))}
+          )}
         </div>
-        {filtroProf!=="todos"&&(
-          <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-green-50 border-green-200 text-green-800">
-            <span className="w-2 h-2 rounded-full bg-green-400" /> Horário disponível
-          </span>
-        )}
-      </div>
+      )}
 
       {/* Modal de edição */}
       {editingAg && (

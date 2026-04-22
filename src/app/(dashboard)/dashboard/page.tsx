@@ -7,10 +7,11 @@ import { ListaEncaixe } from "./ListaEncaixe";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { semana?: string };
+  searchParams: { semana?: string; view?: string };
 }) {
   const supabase = createClient();
   const profile = await getCurrentProfile();
+  const isListaView = searchParams.view === "lista";
 
   let weekStart: Date;
   if (searchParams.semana) {
@@ -30,22 +31,34 @@ export default async function DashboardPage({
   const inicioPeriodo = format(weekStart, "yyyy-MM-dd") + "T00:00:00";
   const fimPeriodo = format(weekEnd, "yyyy-MM-dd") + "T23:59:59";
 
+  const agendamentosSelect =
+    "id, data_hora_inicio, data_hora_fim, status, observacoes, paciente:pacientes(id, nome_completo, telefone), profissional:profissionais(id, profile:profiles(nome_completo)), sala:salas(id, nome)";
+
   const [
     { data: agendamentos },
+    { data: listaAgendamentos },
     { data: profissionais },
     { data: horarios },
     { data: salas },
     { data: pacientes },
     { data: encaixes },
   ] = await Promise.all([
-    supabase
-      .from("agendamentos")
-      .select(
-        "id, data_hora_inicio, data_hora_fim, status, observacoes, paciente:pacientes(id, nome_completo, telefone), profissional:profissionais(id, profile:profiles(nome_completo)), sala:salas(id, nome)"
-      )
-      .gte("data_hora_inicio", inicioPeriodo)
-      .lte("data_hora_inicio", fimPeriodo)
-      .order("data_hora_inicio"),
+    // Weekly agendamentos for calendar view
+    isListaView
+      ? Promise.resolve({ data: [] })
+      : supabase
+          .from("agendamentos")
+          .select(agendamentosSelect)
+          .gte("data_hora_inicio", inicioPeriodo)
+          .lte("data_hora_inicio", fimPeriodo)
+          .order("data_hora_inicio"),
+    // All agendamentos for list view
+    isListaView
+      ? supabase
+          .from("agendamentos")
+          .select(agendamentosSelect)
+          .order("data_hora_inicio", { ascending: true })
+      : Promise.resolve({ data: [] }),
     supabase
       .from("profissionais")
       .select("id, cor, profile:profiles(nome_completo)")
@@ -68,7 +81,7 @@ export default async function DashboardPage({
       .from("lista_encaixe")
       .select("id, paciente_nome, telefone, observacoes, profissional_id, created_at, profissional:profissionais(profile:profiles(nome_completo))")
       .eq("ativo", true)
-      .order("created_at"),
+      .order("created_at", { ascending: true }),
   ]);
 
   return (
@@ -79,12 +92,14 @@ export default async function DashboardPage({
       />
       <CalendarioSemanal
         agendamentos={(agendamentos as any) ?? []}
+        listaAgendamentos={(listaAgendamentos as any) ?? []}
         profissionais={(profissionais as any) ?? []}
         horariosDisponiveis={(horarios as any) ?? []}
         salas={(salas as any) ?? []}
         pacientes={(pacientes as any) ?? []}
         weekStartStr={format(weekStart, "yyyy-MM-dd")}
         userRole={profile.role}
+        initialView={isListaView ? "lista" : "semana"}
       />
     </div>
   );

@@ -36,15 +36,15 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
   const [aberto, setAberto] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [busca, setBusca] = useState("");
+  const [filtroProf, setFiltroProf] = useState("todos");
   const [telefone, setTelefone] = useState("");
   const [erro, setErro] = useState<string | null>(null);
 
   const filtrados = encaixes.filter(e => {
     const q = busca.toLowerCase();
-    return (
-      e.paciente_nome.toLowerCase().includes(q) ||
-      (e.telefone ?? "").includes(q)
-    );
+    const matchBusca = e.paciente_nome.toLowerCase().includes(q) || (e.telefone ?? "").includes(q);
+    const matchProf = filtroProf === "todos" || e.profissional_id === filtroProf;
+    return matchBusca && matchProf;
   });
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -57,7 +57,7 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
       // optimistic: re-fetch via revalidate happens in background
       const profId = fd.get("profissional_id") as string;
       const prof = profissionais.find(p => p.id === profId) ?? null;
-      setEncaixes(prev => [{
+      setEncaixes(prev => [...prev, {
         id: crypto.randomUUID(),
         paciente_nome: fd.get("paciente_nome") as string,
         telefone: (fd.get("telefone") as string) || null,
@@ -65,7 +65,7 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
         profissional_id: profId || null,
         created_at: new Date().toISOString(),
         profissional: prof ? { profile: prof.profile } : null,
-      }, ...prev]);
+      }]);
       setShowForm(false);
       setTelefone("");
       (e.target as HTMLFormElement).reset();
@@ -99,9 +99,9 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
 
       {aberto && (
         <div className="p-3 space-y-3">
-          {/* Barra de busca + botão adicionar */}
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          {/* Barra de busca + filtro profissional + botão adicionar */}
+          <div className="flex gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[140px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-forest-400" />
               <input
                 type="text"
@@ -111,6 +111,16 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
                 className="input-field pl-8 py-1.5 text-sm"
               />
             </div>
+            <select
+              value={filtroProf}
+              onChange={e => setFiltroProf(e.target.value)}
+              className="h-[34px] text-sm border border-sand/40 rounded-lg px-2 bg-white text-forest focus:outline-none focus:ring-2 focus:ring-forest/20 shrink-0"
+            >
+              <option value="todos">Todos os profissionais</option>
+              {profissionais.map(p => (
+                <option key={p.id} value={p.id}>{p.profile?.nome_completo}</option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={() => setShowForm(v => !v)}
