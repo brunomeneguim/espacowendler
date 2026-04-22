@@ -666,64 +666,6 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
         </div>
       </div>
 
-      {/* ── Painel Aniversariantes ─────────────────────────────── */}
-      {showAniversariantes && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowAniversariantes(false)} />
-          <div className="fixed right-4 top-16 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-sand/30 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 bg-peach/20 border-b border-sand/20">
-              <div className="flex items-center gap-2">
-                <Cake className="w-4 h-4 text-rust" />
-                <span className="text-sm font-semibold text-forest">Aniversariantes de {new Date().toLocaleDateString("pt-BR",{month:"long"})}</span>
-                {aniversariantesMes.length > 0 && (
-                  <span className="text-xs bg-rust text-white px-1.5 py-0.5 rounded-full font-medium">{aniversariantesMes.length}</span>
-                )}
-              </div>
-              <button onClick={() => setShowAniversariantes(false)} className="p-1 rounded-lg hover:bg-forest/10 text-forest-400">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="max-h-80 overflow-y-auto">
-              {aniversariantesMes.length === 0 ? (
-                <p className="text-sm text-forest-400 text-center py-8">Nenhum aniversariante este mês.</p>
-              ) : (
-                <div className="divide-y divide-sand/20">
-                  {aniversariantesMes.map(a => {
-                    const nasc = new Date(a.data_nascimento + "T12:00:00");
-                    const dia = nasc.getDate();
-                    const isHoje = dia === diaAtual;
-                    const digits = (a.telefone ?? "").replace(/\D/g, "");
-                    return (
-                      <div key={a.id} className={`flex items-center gap-3 px-4 py-2.5 ${isHoje ? "bg-peach/10" : ""}`}>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${isHoje ? "bg-rust text-white" : "bg-sand/30 text-forest"}`}>
-                          {dia}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium truncate ${isHoje ? "text-rust" : "text-forest"}`}>
-                            {a.nome_completo}
-                            {isHoje && <span className="ml-1 text-[10px] bg-rust/10 text-rust px-1 py-0.5 rounded-full">hoje 🎂</span>}
-                          </p>
-                          {digits && (
-                            <a
-                              href={`https://wa.me/55${digits}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-xs text-forest-500 hover:text-forest transition-colors"
-                            >
-                              <Phone className="w-3 h-3" /> {a.telefone}
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
       {/* Tabs de sala */}
       <div className="flex gap-1 p-1 bg-sand/20 rounded-xl w-fit">
         {salas.map(s => {
@@ -777,9 +719,65 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
             <Cake className="w-4 h-4" />
           </button>
           {aniversariantesHoje.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-rust text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-rust text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none">
               {aniversariantesHoje.length}
             </span>
+          )}
+          {showAniversariantes && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowAniversariantes(false)} />
+              <div className="absolute left-0 top-full mt-2 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-sand/30 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 bg-peach/20 border-b border-sand/20">
+                  <div className="flex items-center gap-2">
+                    <Cake className="w-4 h-4 text-rust" />
+                    <span className="text-sm font-semibold text-forest">Aniversariantes de {new Date().toLocaleDateString("pt-BR",{month:"long"})}</span>
+                    {aniversariantesMes.length > 0 && (
+                      <span className="text-xs bg-rust text-white px-1.5 py-0.5 rounded-full font-medium">{aniversariantesMes.length}</span>
+                    )}
+                  </div>
+                  <button onClick={() => setShowAniversariantes(false)} className="p-1 rounded-lg hover:bg-forest/10 text-forest-400">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {aniversariantesMes.length === 0 ? (
+                    <p className="text-sm text-forest-400 text-center py-8">Nenhum aniversariante este mês.</p>
+                  ) : (
+                    <div className="divide-y divide-sand/20">
+                      {aniversariantesMes.map(a => {
+                        const nasc = new Date(a.data_nascimento + "T12:00:00");
+                        const dia = nasc.getDate();
+                        const isHoje = dia === diaAtual;
+                        const digits = (a.telefone ?? "").replace(/\D/g, "");
+                        return (
+                          <div key={a.id} className={`flex items-center gap-3 px-4 py-2.5 ${isHoje ? "bg-peach/10" : ""}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${isHoje ? "bg-rust text-white" : "bg-sand/30 text-forest"}`}>
+                              {dia}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium truncate ${isHoje ? "text-rust" : "text-forest"}`}>
+                                {a.nome_completo}
+                                {isHoje && <span className="ml-1 text-[10px] bg-rust/10 text-rust px-1 py-0.5 rounded-full">hoje 🎂</span>}
+                              </p>
+                              {digits && (
+                                <a
+                                  href={`https://wa.me/55${digits}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-xs text-forest-500 hover:text-forest transition-colors"
+                                >
+                                  <Phone className="w-3 h-3" /> {a.telefone}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
         <div className="flex-1" />
