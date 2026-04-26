@@ -16,7 +16,6 @@ export default async function PacientesPage() {
     supabase
       .from("pacientes")
       .select("id, nome_completo, email, telefone, cpf, data_nascimento, ativo")
-      .eq("ativo", true)
       .order("nome_completo"),
     supabase
       .from("configuracoes_campos_paciente")

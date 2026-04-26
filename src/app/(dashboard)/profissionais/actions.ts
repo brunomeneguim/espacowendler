@@ -60,6 +60,26 @@ export async function removerEspecialidade(
 
 // ── Excluir profissional ────────────────────────────────────────────
 
+export async function toggleAtivoProfissional(id: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { data: prof } = await supabase.from("profissionais").select("ativo").eq("id", id).single();
+  if (!prof) return { error: "Profissional não encontrado." };
+  const { error } = await supabase.from("profissionais").update({ ativo: !prof.ativo }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/profissionais");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
+export async function alterarCorProfissional(id: string, cor: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from("profissionais").update({ cor }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/profissionais");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function excluirProfissional(id: string): Promise<{ error: string | null; temConsultas: boolean; count: number }> {
   const supabase = createClient();
   const { data: consultas } = await supabase

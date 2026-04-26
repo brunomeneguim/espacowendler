@@ -52,8 +52,6 @@ export async function editarProfissionalCompleto(
     sexo:                  get("sexo"),
     cpf:                   get("cpf"),
     cnpj:                  get("cnpj"),
-    horario_inicio:        get("horario_inicio"),
-    horario_fim:           get("horario_fim"),
     tempo_atendimento:     get("tempo_atendimento") ? parseInt(get("tempo_atendimento")!) : null,
     cor:                   get("cor"),
     observacoes:           get("observacoes"),
@@ -62,6 +60,7 @@ export async function editarProfissionalCompleto(
     telefone_2:            get("telefone_2"),
     especialidade_id:      especialidadeId ? parseInt(especialidadeId) : null,
     valor_consulta:        get("valor_consulta") ? parseFloat(get("valor_consulta")!) : null,
+    valor_plano:           get("valor_plano") ? parseFloat(get("valor_plano")!) : null,
   };
 
   const { error } = await supabase.from("profissionais").update(profData).eq("id", profissionalId);

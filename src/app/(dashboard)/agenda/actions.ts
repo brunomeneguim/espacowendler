@@ -188,7 +188,7 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
 export async function atualizarStatusAgendamento(
   id: string,
-  status: "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou"
+  status: "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou" | "ausencia"
 ) {
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").update({ status }).eq("id", id);
@@ -253,14 +253,15 @@ export async function editarAgendamento(id: string, formData: FormData) {
 export async function atualizarAgendamento(
   id: string,
   profissional_id: string,
-  paciente_id: string,
+  paciente_id: string | null,
   sala_id: string | null,
   data: string,
   hora: string,
   duracao: number,
   status: string,
   observacoes: string | null,
-  tzOffset: number = 0
+  tzOffset: number = 0,
+  tipo_agendamento?: string
 ): Promise<{ error: string | null }> {
   const supabase = createClient();
   const inicio = new Date(`${data}T${hora}:00`);
@@ -268,17 +269,21 @@ export async function atualizarAgendamento(
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
 
-  const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim, id);
-  if (conflito) return { error: conflito };
+  // Skip patient conflict check for ausencia
+  if (tipo_agendamento !== "ausencia" && paciente_id) {
+    const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim, id);
+    if (conflito) return { error: conflito };
+  }
 
   const { error } = await supabase.from("agendamentos").update({
     profissional_id,
-    paciente_id,
+    paciente_id: tipo_agendamento === "ausencia" ? null : paciente_id,
     sala_id: salaIdNum,
     data_hora_inicio: inicio.toISOString(),
     data_hora_fim:    fim.toISOString(),
-    status,
+    status: tipo_agendamento === "ausencia" ? "ausencia" : status,
     observacoes: observacoes || null,
+    tipo_agendamento: tipo_agendamento || "consulta_avulsa",
   }).eq("id", id);
 
   if (error) return { error: error.message };

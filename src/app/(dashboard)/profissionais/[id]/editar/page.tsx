@@ -33,7 +33,7 @@ export default async function EditarProfissionalPage({
     supabase
       .from("profissionais")
       .select(
-        "id, profile_id, especialidade_id, registro_profissional, valor_consulta, ativo, cor, foto_url, data_nascimento, sexo, cpf, cnpj, horario_inicio, horario_fim, tempo_atendimento, observacoes, telefone_1, telefone_2, profile:profiles(id, nome_completo, email)"
+        "id, profile_id, especialidade_id, registro_profissional, valor_consulta, valor_plano, ativo, cor, foto_url, data_nascimento, sexo, cpf, cnpj, tempo_atendimento, observacoes, telefone_1, telefone_2, profile:profiles(id, nome_completo, email)"
       )
       .eq("id", params.id)
       .single(),
@@ -74,7 +74,7 @@ export default async function EditarProfissionalPage({
         </div>
       )}
 
-      {/* ── Formulário completo (mesmo que tela de cadastro) ── */}
+      {/* ── Formulário completo ── */}
       <EditarPerfilProfissionalForm
         profissionalId={params.id}
         profileId={(prof.profile as any)?.id ?? prof.profile_id}
@@ -148,6 +148,17 @@ export default async function EditarProfissionalPage({
             Adicionar horário
           </button>
         </form>
+      </div>
+
+      {/* ── Salvar alterações (abaixo dos horários) ── */}
+      <div className="mt-6">
+        <button
+          type="submit"
+          form="prof-edit-form"
+          className="btn-primary w-full flex items-center justify-center gap-2"
+        >
+          Salvar alterações
+        </button>
       </div>
     </div>
   );

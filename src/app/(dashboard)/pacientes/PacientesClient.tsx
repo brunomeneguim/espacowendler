@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useTransition, useEffect } from "react";
 import Link from "next/link";
-import { Search, Pencil, Users, Plus, Mail, Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { Search, Pencil, Users, Plus, Mail, Trash2, Loader2, AlertTriangle, ToggleLeft, ToggleRight } from "lucide-react";
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -11,7 +11,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import { excluirPaciente, excluirPacienteConfirmado } from "./actions";
+import { excluirPaciente, excluirPacienteConfirmado, toggleAtivoPaciente } from "./actions";
 
 interface Paciente {
   id: string;
@@ -106,27 +106,53 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
 export function PacientesClient({ pacientes, canEdit }: Props) {
   const [busca, setBusca] = useState("");
   const [excluindo, setExcluindo] = useState<Paciente | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [mostrarInativos, setMostrarInativos] = useState(false);
+  const [, startTransition] = useTransition();
+
+  function handleToggleAtivo(p: Paciente) {
+    setTogglingId(p.id);
+    startTransition(async () => {
+      await toggleAtivoPaciente(p.id);
+      setTogglingId(null);
+    });
+  }
 
   const filtrados = useMemo(() =>
-    pacientes.filter(p =>
-      !busca || p.nome_completo?.toLowerCase().includes(busca.toLowerCase()) ||
-      p.email?.toLowerCase().includes(busca.toLowerCase()) ||
-      p.telefone?.includes(busca)
-    ), [pacientes, busca]);
+    pacientes.filter(p => {
+      if (!mostrarInativos && !p.ativo) return false;
+      return !busca || p.nome_completo?.toLowerCase().includes(busca.toLowerCase()) ||
+        p.email?.toLowerCase().includes(busca.toLowerCase()) ||
+        p.telefone?.includes(busca);
+    }), [pacientes, busca, mostrarInativos]);
+
+  const inativos = pacientes.filter(p => !p.ativo).length;
 
   return (
     <div>
       {excluindo && <ModalExcluir paciente={excluindo} onClose={() => setExcluindo(null)} />}
 
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-forest-400" />
-        <input
-          type="text"
-          placeholder="Buscar paciente por nome, e-mail ou telefone…"
-          value={busca}
-          onChange={e => setBusca(e.target.value)}
-          className="input-field pl-9 h-9 text-sm"
-        />
+      <div className="flex gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-forest-400" />
+          <input
+            type="text"
+            placeholder="Buscar paciente por nome, e-mail ou telefone…"
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            className="input-field pl-9 h-9 text-sm"
+          />
+        </div>
+        {inativos > 0 && (
+          <button
+            onClick={() => setMostrarInativos(v => !v)}
+            className={`flex items-center gap-1.5 text-sm px-3 h-9 rounded-xl border transition-colors ${mostrarInativos ? "bg-forest/10 border-forest/30 text-forest" : "border-sand/40 text-forest-500 hover:bg-sand/20"}`}
+            title={mostrarInativos ? "Ocultar inativos" : "Mostrar inativos"}
+          >
+            {mostrarInativos ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+            Inativos ({inativos})
+          </button>
+        )}
       </div>
 
       {filtrados.length === 0 ? (
@@ -148,12 +174,17 @@ export function PacientesClient({ pacientes, canEdit }: Props) {
         <div className="card p-0 overflow-hidden">
           <ul className="divide-y divide-sand/20">
             {filtrados.map(p => (
-              <li key={p.id} className="flex items-center gap-4 px-6 py-4 hover:bg-cream/50 transition-colors">
-                <div className="w-11 h-11 rounded-full bg-peach/40 text-rust flex items-center justify-center font-display text-lg shrink-0">
+              <li key={p.id} className={`flex items-center gap-4 px-6 py-4 hover:bg-cream/50 transition-colors ${!p.ativo ? "opacity-60" : ""}`}>
+                <div className={`w-11 h-11 rounded-full flex items-center justify-center font-display text-lg shrink-0 ${p.ativo ? "bg-peach/40 text-rust" : "bg-gray-100 text-gray-400"}`}>
                   {p.nome_completo.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-forest truncate">{p.nome_completo}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-forest truncate">{p.nome_completo}</p>
+                    {!p.ativo && (
+                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full shrink-0">Inativo</span>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-x-4 text-sm text-forest-600">
                     {p.telefone && (
                       <a
@@ -173,20 +204,32 @@ export function PacientesClient({ pacientes, canEdit }: Props) {
                     )}
                   </div>
                 </div>
-                {canEdit && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Link href={`/pacientes/${p.id}/editar`} className="p-2 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors" title="Editar paciente">
-                      <Pencil className="w-4 h-4" />
-                    </Link>
-                    <button
-                      onClick={() => setExcluindo(p)}
-                      className="p-2 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors"
-                      title="Excluir paciente"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => handleToggleAtivo(p)}
+                    disabled={togglingId === p.id}
+                    className={`p-2 rounded-lg transition-colors ${p.ativo ? "hover:bg-amber-50 text-amber-500 hover:text-amber-600" : "hover:bg-green-50 text-gray-400 hover:text-green-600"}`}
+                    title={p.ativo ? "Desativar paciente" : "Reativar paciente"}
+                  >
+                    {togglingId === p.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : p.ativo ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                  </button>
+                  {canEdit && (
+                    <>
+                      <Link href={`/pacientes/${p.id}/editar`} className="p-2 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors" title="Editar paciente">
+                        <Pencil className="w-4 h-4" />
+                      </Link>
+                      <button
+                        onClick={() => setExcluindo(p)}
+                        className="p-2 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors"
+                        title="Excluir paciente"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

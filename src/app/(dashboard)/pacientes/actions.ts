@@ -116,6 +116,17 @@ export async function excluirPacienteConfirmado(id: string): Promise<{ error: st
   return { error: null };
 }
 
+export async function toggleAtivoPaciente(id: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { data: pac } = await supabase.from("pacientes").select("ativo").eq("id", id).single();
+  if (!pac) return { error: "Paciente não encontrado." };
+  const { error } = await supabase.from("pacientes").update({ ativo: !pac.ativo }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/pacientes");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function salvarConfigCampos(
   configs: { campo: string; obrigatorio: boolean }[]
 ): Promise<{ error: string | null }> {

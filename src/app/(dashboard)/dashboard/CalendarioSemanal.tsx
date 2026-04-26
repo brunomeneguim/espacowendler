@@ -8,8 +8,16 @@ import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
-  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Phone,
+  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope,
 } from "lucide-react";
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+    </svg>
+  );
+}
 import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient } from "../agenda/actions";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
 
@@ -20,7 +28,7 @@ const PX_POR_HORA = 60;
 const TOTAL_HORAS = HORA_FIM - HORA_INICIO;
 
 // ── Tipos ────────────────────────────────────────────────────────
-type Status = "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou";
+type Status = "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou" | "ausencia";
 type ViewMode = "semana" | "dia" | "lista";
 
 interface Agendamento {
@@ -29,6 +37,7 @@ interface Agendamento {
   data_hora_fim: string;
   status: Status;
   observacoes?: string | null;
+  tipo_agendamento?: string | null;
   paciente: { id: string; nome_completo: string; telefone?: string } | null;
   profissional: { id: string; profile: { nome_completo: string } | null } | null;
   sala: { id: number; nome: string } | null;
@@ -37,7 +46,14 @@ interface Profissional { id: string; cor?: string | null; profile: { nome_comple
 interface Paciente     { id: string; nome_completo: string; telefone?: string }
 interface HorarioDisponivel { profissional_id: string; dia_semana: number; hora_inicio: string; hora_fim: string }
 interface Sala         { id: number; nome: string }
-interface Aniversariante { id: string; nome_completo: string; telefone?: string | null; data_nascimento: string }
+interface Aniversariante {
+  id: string;
+  nome_completo: string;
+  telefone?: string | null;
+  data_nascimento: string;
+  tipo?: "paciente" | "profissional";
+  profissional_nome?: string | null;
+}
 
 interface Props {
   agendamentos: Agendamento[];
@@ -52,12 +68,13 @@ interface Props {
 
 // ── Status config ─────────────────────────────────────────────────
 const STATUS: Record<Status, { label: string; card: string; dot: string; badge: string }> = {
-  agendado:   { label: "Agendado",   card: "bg-blue-50 border-blue-200 text-blue-900",       dot: "bg-blue-400",   badge: "bg-blue-100 text-blue-700"    },
-  confirmado: { label: "Confirmado", card: "bg-green-50 border-green-200 text-green-900",    dot: "bg-green-500",  badge: "bg-green-100 text-green-700"  },
-  realizado:  { label: "Realizado",  card: "bg-teal-50 border-teal-200 text-teal-900",       dot: "bg-teal-500",   badge: "bg-teal-100 text-teal-700"    },
-  finalizado: { label: "Finalizado", card: "bg-gray-50 border-gray-200 text-gray-800",        dot: "bg-white border border-gray-300",   badge: "bg-gray-100 text-gray-600"    },
+  agendado:   { label: "Agendado",          card: "bg-blue-50 border-blue-200 text-blue-900",       dot: "bg-blue-400",   badge: "bg-blue-100 text-blue-700"    },
+  confirmado: { label: "Confirmado",        card: "bg-green-50 border-green-200 text-green-900",    dot: "bg-green-500",  badge: "bg-green-100 text-green-700"  },
   cancelado:  { label: "Falta Justificada", card: "bg-red-50 border-red-200 text-red-800",          dot: "bg-red-400",    badge: "bg-red-100 text-red-600"      },
-  faltou:     { label: "Falta Cobrada",    card: "bg-orange-50 border-orange-200 text-orange-900", dot: "bg-orange-400", badge: "bg-orange-100 text-orange-700" },
+  faltou:     { label: "Falta Cobrada",     card: "bg-orange-50 border-orange-200 text-orange-900", dot: "bg-orange-400", badge: "bg-orange-100 text-orange-700" },
+  realizado:  { label: "Realizado",         card: "bg-teal-50 border-teal-200 text-teal-900",       dot: "bg-teal-500",   badge: "bg-teal-100 text-teal-700"    },
+  finalizado: { label: "Finalizado",        card: "bg-gray-50 border-gray-200 text-gray-800",       dot: "bg-white border border-gray-300",   badge: "bg-gray-100 text-gray-600"    },
+  ausencia:   { label: "Ausência",          card: "bg-gray-100 border-gray-300 text-gray-600",      dot: "bg-gray-400",   badge: "bg-gray-100 text-gray-500"    },
 };
 
 const BORDA_PROF = PROF_CORES.map(c => c.border);
@@ -121,7 +138,9 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
 
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string|null>(null);
+  const [tipoAg, setTipoAg] = useState(ag.tipo_agendamento ?? "consulta_avulsa");
   const tzOffset = typeof window !== "undefined" ? new Date().getTimezoneOffset() : 0;
+  const isAusencia = tipoAg === "ausencia";
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -131,14 +150,15 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
       const res = await atualizarAgendamento(
         ag.id,
         fd.get("profissional_id") as string,
-        fd.get("paciente_id") as string,
+        isAusencia ? null : fd.get("paciente_id") as string,
         fd.get("sala_id") as string || null,
         fd.get("data") as string,
         fd.get("hora") as string,
         parseInt(fd.get("duracao") as string || "60"),
-        fd.get("status") as string,
+        isAusencia ? "ausencia" : fd.get("status") as string,
         fd.get("observacoes") as string || null,
         tzOffset,
+        tipoAg,
       );
       if (res.error) { setErro(res.error); }
       else { onSaved(); onClose(); }
@@ -152,7 +172,7 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
         <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30 bg-cream/60">
           <div>
             <p className="text-xs uppercase tracking-wider text-forest-500">Editar agendamento</p>
-            <p className="font-display text-lg text-forest leading-tight">{ag.paciente?.nome_completo ?? "—"}</p>
+            <p className="font-display text-lg text-forest leading-tight">{ag.paciente?.nome_completo ?? (isAusencia ? "Ausência" : "—")}</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-forest/10 text-forest-500 transition-colors">
             <X className="w-5 h-5" />
@@ -163,12 +183,23 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
           {erro && <div className="p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">{erro}</div>}
 
           <div>
-            <label className="label">Paciente</label>
-            <select name="paciente_id" required className="input-field" defaultValue={ag.paciente?.id ?? ""}>
-              <option value="" disabled>Selecione</option>
-              {pacientes.map(p => <option key={p.id} value={p.id}>{p.nome_completo}{p.telefone ? ` — ${p.telefone}` : ""}</option>)}
+            <label className="label">Tipo de Agendamento</label>
+            <select className="input-field" value={tipoAg} onChange={e => setTipoAg(e.target.value)}>
+              <option value="consulta_avulsa">Consulta Avulsa</option>
+              <option value="plano_mensal">Plano Mensal</option>
+              <option value="ausencia">Ausência</option>
             </select>
           </div>
+
+          {!isAusencia && (
+            <div>
+              <label className="label">Paciente</label>
+              <select name="paciente_id" required className="input-field" defaultValue={ag.paciente?.id ?? ""}>
+                <option value="" disabled>Selecione</option>
+                {pacientes.map(p => <option key={p.id} value={p.id}>{p.nome_completo}{p.telefone ? ` — ${p.telefone}` : ""}</option>)}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="label">Profissional</label>
@@ -202,16 +233,18 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
               <label className="label">Duração (min)</label>
               <input name="duracao" type="number" min="15" step="5" required className="input-field" defaultValue={duracaoInicial} />
             </div>
-            <div>
-              <label className="label">Status</label>
-              <select name="status" required className="input-field" defaultValue={ag.status}>
-                <option value="agendado">Agendado</option>
-                <option value="confirmado">Confirmado</option>
-                <option value="realizado">Realizado</option>
-                <option value="cancelado">Cancelado</option>
-                <option value="faltou">Faltou</option>
-              </select>
-            </div>
+            {!isAusencia && (
+              <div>
+                <label className="label">Status</label>
+                <select name="status" required className="input-field" defaultValue={ag.status === "ausencia" ? "agendado" : ag.status}>
+                  <option value="agendado">Agendado</option>
+                  <option value="confirmado">Confirmado</option>
+                  <option value="realizado">Realizado</option>
+                  <option value="cancelado">Falta Justificada</option>
+                  <option value="faltou">Falta Cobrada</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <div>
@@ -730,10 +763,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                 <div className="flex items-center justify-between px-4 py-3 bg-peach/20 border-b border-sand/20">
                   <div className="flex items-center gap-2">
                     <Cake className="w-4 h-4 text-rust" />
-                    <span className="text-sm font-semibold text-forest">Aniversariantes de {new Date().toLocaleDateString("pt-BR",{month:"long"})}</span>
-                    {aniversariantesMes.length > 0 && (
-                      <span className="text-xs bg-rust text-white px-1.5 py-0.5 rounded-full font-medium">{aniversariantesMes.length}</span>
-                    )}
+                    <span className="text-sm font-semibold text-forest">
+                      Aniversariantes de {new Date().toLocaleDateString("pt-BR", { month: "long" }).replace(/^\w/, c => c.toUpperCase())}
+                    </span>
                   </div>
                   <button onClick={() => setShowAniversariantes(false)} className="p-1 rounded-lg hover:bg-forest/10 text-forest-400">
                     <X className="w-4 h-4" />
@@ -748,28 +780,38 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                         const nasc = new Date(a.data_nascimento + "T12:00:00");
                         const dia = nasc.getDate();
                         const isHoje = dia === diaAtual;
-                        const digits = (a.telefone ?? "").replace(/\D/g, "");
+                        const rawPhone = (a.telefone ?? "").replace(/\D/g, "");
+                        const waLink = rawPhone ? `https://wa.me/${rawPhone.length <= 11 ? "55" + rawPhone : rawPhone}` : null;
+                        const isProfissional = a.tipo === "profissional";
                         return (
                           <div key={a.id} className={`flex items-center gap-3 px-4 py-2.5 ${isHoje ? "bg-peach/10" : ""}`}>
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${isHoje ? "bg-rust text-white" : "bg-sand/30 text-forest"}`}>
                               {dia}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-medium truncate ${isHoje ? "text-rust" : "text-forest"}`}>
-                                {a.nome_completo}
-                                {isHoje && <span className="ml-1 text-[10px] bg-rust/10 text-rust px-1 py-0.5 rounded-full">hoje 🎂</span>}
-                              </p>
-                              {digits && (
+                              <div className="flex items-center gap-1.5">
+                                {isProfissional && <Stethoscope className="w-3 h-3 text-forest-400 shrink-0" />}
+                                <p className={`text-sm font-medium truncate ${isHoje ? "text-rust" : "text-forest"}`}>
+                                  {a.nome_completo}
+                                  {isHoje && <span className="ml-1 text-[10px] bg-rust/10 text-rust px-1 py-0.5 rounded-full">hoje 🎂</span>}
+                                </p>
+                              </div>
+                              {waLink && (
                                 <a
-                                  href={`https://wa.me/55${digits}`}
+                                  href={waLink}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-xs text-forest-500 hover:text-forest transition-colors"
+                                  className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors"
                                 >
-                                  <Phone className="w-3 h-3" /> {a.telefone}
+                                  <WhatsAppIcon className="w-3 h-3" /> {a.telefone}
                                 </a>
                               )}
                             </div>
+                            {a.profissional_nome && (
+                              <span className="text-xs text-forest-400 shrink-0 text-right max-w-[90px] truncate" title={a.profissional_nome}>
+                                {a.profissional_nome}
+                              </span>
+                            )}
                           </div>
                         );
                       })}

@@ -2,11 +2,10 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import {
-  Upload, X, Loader2, User, FileText, ChevronDown, Check, Phone,
+  Upload, X, Loader2, User, FileText, ChevronDown, Check,
 } from "lucide-react";
 import { editarProfissionalCompleto } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
-import { ValorConsultaInput } from "./ValorConsultaInput";
 import { AddEspecialidadeButton } from "../../AddEspecialidadeButton";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
@@ -66,11 +65,28 @@ function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; 
   );
 }
 
+// ── Máscara telefone com suporte internacional ───────────────────
 function maskPhone(v: string) {
-  v = v.replace(/\D/g, "").substring(0, 11);
-  if (v.length <= 10) return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
-  return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+  // Remove tudo exceto dígitos e +
+  const raw = v.replace(/[^\d+]/g, "");
+
+  // Se começa com +, é internacional
+  if (raw.startsWith("+")) {
+    // Permite digitar livremente após o +
+    const digits = raw.slice(1).replace(/\D/g, "");
+    if (!digits) return "+";
+    // Formato: +XX XXXXX-XXXX (genérico)
+    return "+" + digits;
+  }
+
+  // Nacional brasileiro
+  const digits = raw.replace(/\D/g, "").substring(0, 11);
+  if (digits.length <= 10) {
+    return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+  }
+  return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
 }
+
 function maskCpf(v: string) {
   v = v.replace(/\D/g, "").substring(0, 11);
   return v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
@@ -79,6 +95,43 @@ function maskCnpj(v: string) {
   v = v.replace(/\D/g, "").substring(0, 14);
   return v.replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
     .replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+// ── Input de valor monetário ──────────────────────────────────────
+function MoneyInput({ name, defaultValue, placeholder }: { name: string; defaultValue?: number | null; placeholder?: string }) {
+  const toDisplay = (v: number | string | null | undefined) => {
+    if (!v && v !== 0) return "";
+    const num = parseFloat(String(v));
+    if (isNaN(num)) return "";
+    return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  const [display, setDisplay] = useState(toDisplay(defaultValue));
+  const [raw, setRaw] = useState(defaultValue ? String(defaultValue) : "");
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/\D/g, "");
+    if (!digits) { setDisplay(""); setRaw(""); return; }
+    const num = parseInt(digits, 10) / 100;
+    setRaw(num.toFixed(2));
+    setDisplay(num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  }
+
+  return (
+    <>
+      <input type="hidden" name={name} value={raw} />
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-forest-400 font-medium">R$</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          className="input-field pl-9"
+          placeholder={placeholder ?? "0,00"}
+          value={display}
+          onChange={handleChange}
+        />
+      </div>
+    </>
+  );
 }
 
 function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
@@ -101,10 +154,10 @@ interface Props {
   prof: {
     foto_url?: string | null; data_nascimento?: string | null; sexo?: string | null;
     cpf?: string | null; cnpj?: string | null; uf_conselho?: string | null;
-    cbos_codigo?: string | null; horario_inicio?: string | null; horario_fim?: string | null;
-    tempo_atendimento?: number | null; observacoes?: string | null;
+    cbos_codigo?: string | null; tempo_atendimento?: number | null; observacoes?: string | null;
     registro_profissional?: string | null; especialidade_id?: number | null;
     cor?: string | null; telefone_1?: string | null; telefone_2?: string | null;
+    valor_consulta?: number | null; valor_plano?: number | null;
     ativo?: boolean;
   };
   especialidades: Especialidade[];
@@ -121,8 +174,8 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
   const [cpf, setCpf] = useState(prof.cpf ?? "");
   const [cnpj, setCnpj] = useState(prof.cnpj ?? "");
   const [corSelecionada, setCorSelecionada] = useState(prof.cor ?? "");
-  const [tel1, setTel1] = useState(prof.telefone_1 ?? "(42) ");
-  const [tel2, setTel2] = useState(prof.telefone_2 ?? "(42) ");
+  const [tel1, setTel1] = useState(prof.telefone_1 ?? "");
+  const [tel2, setTel2] = useState(prof.telefone_2 ?? "");
   const [especialidadesList, setEspecialidadesList] = useState(especialidades);
   const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState(String(prof.especialidade_id ?? ""));
 
@@ -160,7 +213,7 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
         <div className="p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">{erro}</div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form id="prof-edit-form" onSubmit={handleSubmit} className="space-y-5">
         {/* ── Dados Gerais ── */}
         <Section icon={User} title="Dados Gerais">
           {/* Foto */}
@@ -250,8 +303,12 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
               <input name="registro_profissional" type="text" className="input-field" placeholder="Ex: CRP 08/12345" defaultValue={prof.registro_profissional ?? ""} />
             </div>
             <div>
-              <label className="label">Valor da consulta</label>
-              <ValorConsultaInput defaultValue={(prof as any).valor_consulta} />
+              <label className="label">Valor Consulta Avulsa</label>
+              <MoneyInput name="valor_consulta" defaultValue={prof.valor_consulta} />
+            </div>
+            <div>
+              <label className="label">Valor Plano</label>
+              <MoneyInput name="valor_plano" defaultValue={prof.valor_plano} />
             </div>
           </div>
 
@@ -259,29 +316,13 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Telefone 1</label>
-              <input name="telefone_1" type="text" className="input-field" placeholder="(42) 00000-0000"
+              <input name="telefone_1" type="text" className="input-field" placeholder="(00) 00000-0000 ou +XX XXXXXXXXX"
                 value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
             </div>
             <div>
               <label className="label">Telefone 2</label>
-              <input name="telefone_2" type="text" className="input-field" placeholder="(42) 00000-0000"
+              <input name="telefone_2" type="text" className="input-field" placeholder="(00) 00000-0000 ou +XX XXXXXXXXX"
                 value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
-            </div>
-          </div>
-
-          {/* Horários e tempo */}
-          <div className="grid sm:grid-cols-3 gap-4">
-            <div>
-              <label className="label">Horário inicial</label>
-              <input name="horario_inicio" type="time" className="input-field" defaultValue={prof.horario_inicio?.slice(0, 5) ?? "08:00"} />
-            </div>
-            <div>
-              <label className="label">Horário final</label>
-              <input name="horario_fim" type="time" className="input-field" defaultValue={prof.horario_fim?.slice(0, 5) ?? "18:00"} />
-            </div>
-            <div>
-              <label className="label">Tempo de atendimento (min)</label>
-              <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field" placeholder="60" defaultValue={prof.tempo_atendimento ?? 60} />
             </div>
           </div>
 
@@ -291,11 +332,13 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
           </div>
         </Section>
 
-        <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={isPending} className="btn-primary flex-1 flex items-center justify-center gap-2">
-            {isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</> : "Salvar alterações"}
-          </button>
-        </div>
+        {/* ── Tempo de atendimento (aparece junto ao card de horários) ── */}
+        <Section icon={FileText} title="Tempo de atendimento">
+          <div>
+            <label className="label">Duração padrão da sessão (minutos)</label>
+            <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field w-48" placeholder="60" defaultValue={prof.tempo_atendimento ?? 60} />
+          </div>
+        </Section>
       </form>
     </div>
   );

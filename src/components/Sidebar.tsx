@@ -236,13 +236,22 @@ export function Sidebar({
               </Link>
 
               {isAdmin && !editMode && (
-                <button
-                  onClick={() => { setConfigAberto(false); enterEditMode(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                  className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
-                >
-                  <GripVertical className="w-4 h-4" strokeWidth={1.5} />
-                  Reorganizar
-                </button>
+                <>
+                  <button
+                    onClick={() => alert("Editar Sistema: em breve você poderá editar os rótulos de toda a interface.")}
+                    className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" strokeWidth={1.5} />
+                    Editar Sistema
+                  </button>
+                  <button
+                    onClick={() => { setConfigAberto(false); enterEditMode(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
+                  >
+                    <GripVertical className="w-4 h-4" strokeWidth={1.5} />
+                    Editar menus
+                  </button>
+                </>
               )}
             </div>
           )}

@@ -8,7 +8,6 @@ import {
   User, MapPin, Phone, FileText, AlertCircle,
 } from "lucide-react";
 import { atualizarPacienteCompleto } from "./actions";
-import { DDISelector } from "../../novo/DDISelector";
 
 interface CampoConfig { campo: string; obrigatorio: boolean }
 interface ContatoEmergencia { nome: string; relacao: string; telefone: string }
@@ -28,9 +27,14 @@ function maskCep(v: string) {
   return v.replace(/(\d{5})(\d)/, "$1-$2");
 }
 function maskPhone(v: string) {
-  v = v.replace(/\D/g, "").substring(0, 11);
-  if (v.length <= 10) return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
-  return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+  const raw = v.replace(/[^\d+]/g, "");
+  if (raw.startsWith("+")) {
+    const digits = raw.slice(1).replace(/\D/g, "");
+    return "+" + digits;
+  }
+  const digits = raw.replace(/\D/g, "").substring(0, 11);
+  if (digits.length <= 10) return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+  return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
 }
 function maskRg(v: string) {
   v = v.replace(/[^0-9Xx]/g, "").substring(0, 9);
@@ -81,8 +85,6 @@ export function EditarPacienteForm({ paciente, camposConfig }: Props) {
   const [dataNasc, setDataNasc] = useState(paciente.data_nascimento ?? "");
   const [cpfCnpj, setCpfCnpj] = useState(paciente.cpf ?? "");
   const [rg, setRg] = useState(paciente.rg ?? "");
-  const [ddi1, setDdi1] = useState(paciente.ddi_telefone_1 ?? "+55");
-  const [ddi2, setDdi2] = useState(paciente.ddi_telefone_2 ?? "+55");
   const [tel1, setTel1] = useState(paciente.telefone ?? "");
   const [tel2, setTel2] = useState(paciente.telefone_2 ?? "");
   const [cep, setCep] = useState(paciente.cep ?? "");
@@ -182,8 +184,6 @@ export function EditarPacienteForm({ paciente, camposConfig }: Props) {
     const fd = new FormData(e.currentTarget);
     fd.set("foto_url", foto ?? "");
     fd.set("contatos_emergencia", JSON.stringify(contatos));
-    fd.set("ddi_telefone_1", ddi1);
-    fd.set("ddi_telefone_2", ddi2);
     fd.set("parceiro_mesmo_endereco", mesmoEndereco ? "true" : "false");
     setErro(null);
     startTransition(async () => {
@@ -516,21 +516,16 @@ export function EditarPacienteForm({ paciente, camposConfig }: Props) {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               {req("Telefone 1", "telefone_1")}
-              <div className="flex items-stretch">
-                <DDISelector value={ddi1} onChange={setDdi1} name="ddi_telefone_1_raw" />
-                <input name="telefone_1" type="text" className="input-field rounded-l-none flex-1"
-                  required={isReq("telefone_1")} placeholder={ddi1 === "+55" ? "(00) 00000-0000" : "Número"}
-                  value={tel1} onChange={e => setTel1(ddi1 === "+55" ? maskPhone(e.target.value) : e.target.value)} />
-              </div>
+              <input name="telefone_1" type="text" className="input-field"
+                required={isReq("telefone_1")} placeholder="(00) 00000-0000 ou +XX XXXXXXXXX"
+                value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
+              <p className="text-xs text-forest-400 mt-1">Para número internacional, comece com +</p>
             </div>
             <div>
               {req("Telefone 2", "telefone_2")}
-              <div className="flex">
-                <DDISelector value={ddi2} onChange={setDdi2} name="ddi_telefone_2_raw" />
-                <input name="telefone_2" type="text" className="input-field rounded-l-none flex-1"
-                  required={isReq("telefone_2")} placeholder={ddi2 === "+55" ? "(00) 00000-0000" : "Número"}
-                  value={tel2} onChange={e => setTel2(ddi2 === "+55" ? maskPhone(e.target.value) : e.target.value)} />
-              </div>
+              <input name="telefone_2" type="text" className="input-field"
+                required={isReq("telefone_2")} placeholder="(00) 00000-0000 ou +XX XXXXXXXXX"
+                value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
             </div>
             <div>
               {req("E-mail", "email")}

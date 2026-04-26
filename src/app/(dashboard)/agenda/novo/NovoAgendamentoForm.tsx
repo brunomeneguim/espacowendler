@@ -24,6 +24,7 @@ interface Props {
 export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHora, defaultSalaId, defaultPacienteId, error }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [tipoAg, setTipoAg] = useState<"consulta_avulsa" | "plano_mensal" | "ausencia">("consulta_avulsa");
   const [repetir, setRepetir] = useState(false);
   const [recorrencia, setRecorrencia] = useState<"semanal" | "quinzenal" | "mensal">("semanal");
   const [mensal_tipo, setMensalTipo] = useState<"dia_semana" | "dia_mes">("dia_semana");
@@ -35,7 +36,8 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    if (!repetir) {
+    fd.set("tipo_agendamento", tipoAg);
+    if (!repetir || tipoAg === "ausencia") {
       fd.set("recorrencia", "nenhuma");
     }
     if (recorrencia === "mensal") {
@@ -57,6 +59,21 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
         </div>
       )}
 
+      {/* Tipo de Agendamento */}
+      <div>
+        <label htmlFor="tipo_agendamento" className="label">Tipo de Agendamento</label>
+        <select
+          id="tipo_agendamento"
+          value={tipoAg}
+          onChange={e => setTipoAg(e.target.value as typeof tipoAg)}
+          className="input-field"
+        >
+          <option value="consulta_avulsa">Consulta Avulsa</option>
+          <option value="plano_mensal">Plano Mensal</option>
+          <option value="ausencia">Ausência</option>
+        </select>
+      </div>
+
       {/* Profissional */}
       <div>
         <label htmlFor="profissional_id" className="label">Profissional <span className="text-rust">*</span></label>
@@ -70,31 +87,33 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       </div>
 
       {/* Paciente */}
-      <div>
-        <label htmlFor="paciente_id" className="label">Paciente <span className="text-rust">*</span></label>
-        {pacs.length === 0 ? (
-          <div className="p-4 bg-peach/10 border border-peach/30 rounded-xl text-sm text-rust">
-            Nenhum paciente cadastrado.{" "}
-            <Link href="/pacientes/novo?from=agenda" className="font-medium underline">Cadastrar paciente</Link>
-          </div>
-        ) : (
-          <div className="flex items-stretch gap-2">
-            <select id="paciente_id" name="paciente_id" required className="input-field flex-1" defaultValue={defaultPacienteId ?? ""}>
-              <option value="" disabled>Selecione um paciente</option>
-              {pacs.map(p => (
-                <option key={p.id} value={p.id}>{p.nome_completo}</option>
-              ))}
-            </select>
-            <Link
-              href="/pacientes/novo?from=agenda"
-              className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg border border-sand/40 hover:bg-forest/5 text-forest-500 hover:text-forest transition-colors"
-              title="Cadastrar novo paciente"
-            >
-              <UserPlus className="w-4 h-4" />
-            </Link>
-          </div>
-        )}
-      </div>
+      {tipoAg !== "ausencia" && (
+        <div>
+          <label htmlFor="paciente_id" className="label">Paciente <span className="text-rust">*</span></label>
+          {pacs.length === 0 ? (
+            <div className="p-4 bg-peach/10 border border-peach/30 rounded-xl text-sm text-rust">
+              Nenhum paciente cadastrado.{" "}
+              <Link href="/pacientes/novo?from=agenda" className="font-medium underline">Cadastrar paciente</Link>
+            </div>
+          ) : (
+            <div className="flex items-stretch gap-2">
+              <select id="paciente_id" name="paciente_id" required className="input-field flex-1" defaultValue={defaultPacienteId ?? ""}>
+                <option value="" disabled>Selecione um paciente</option>
+                {pacs.map(p => (
+                  <option key={p.id} value={p.id}>{p.nome_completo}</option>
+                ))}
+              </select>
+              <Link
+                href="/pacientes/novo?from=agenda"
+                className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg border border-sand/40 hover:bg-forest/5 text-forest-500 hover:text-forest transition-colors"
+                title="Cadastrar novo paciente"
+              >
+                <UserPlus className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sala */}
       <div>
@@ -121,8 +140,13 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
         </div>
       </div>
 
-      {/* Repetição */}
-      <div className="rounded-xl border border-sand/40">
+      {/* Repetição — oculto para ausência */}
+      {tipoAg === "ausencia" && (
+        <div className="p-3 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500">
+          Ausência registrada — sem paciente nem recorrência.
+        </div>
+      )}
+      {tipoAg !== "ausencia" && <div className="rounded-xl border border-sand/40">
         <button
           type="button"
           onClick={() => setRepetir(v => !v)}
@@ -205,7 +229,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Observações */}
       <div>
@@ -215,9 +239,9 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button type="submit" disabled={isPending || pacs.length === 0} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50">
+        <button type="submit" disabled={isPending || (tipoAg !== "ausencia" && pacs.length === 0)} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50">
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-          {isPending ? "Agendando…" : repetir ? "Agendar sessões" : "Agendar sessão"}
+          {isPending ? "Agendando…" : tipoAg === "ausencia" ? "Registrar ausência" : repetir ? "Agendar sessões" : "Agendar sessão"}
         </button>
         <Link href="/dashboard" className="btn-ghost">Cancelar</Link>
       </div>
