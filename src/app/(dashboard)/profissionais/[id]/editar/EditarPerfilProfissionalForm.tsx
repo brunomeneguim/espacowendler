@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import {
-  Upload, X, Loader2, User, FileText, ChevronDown, Check,
+  Upload, X, Loader2, User, ChevronDown, Check,
 } from "lucide-react";
 import { editarProfissionalCompleto } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
@@ -332,13 +332,6 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
           </div>
         </Section>
 
-        {/* ── Tempo de atendimento (aparece junto ao card de horários) ── */}
-        <Section icon={FileText} title="Tempo de atendimento">
-          <div>
-            <label className="label">Duração padrão da sessão (minutos)</label>
-            <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field w-48" placeholder="60" defaultValue={prof.tempo_atendimento ?? 60} />
-          </div>
-        </Section>
       </form>
     </div>
   );

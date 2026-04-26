@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useTransition, useEffect } from "react";
 import Link from "next/link";
-import { Search, Pencil, Users, Plus, Mail, Trash2, Loader2, AlertTriangle, ToggleLeft, ToggleRight } from "lucide-react";
+import { Search, Pencil, Users, Plus, Mail, Trash2, Loader2, AlertTriangle, ToggleLeft, ToggleRight, ChevronDown } from "lucide-react";
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -22,9 +22,13 @@ interface Paciente {
   ativo: boolean;
 }
 
+interface Profissional { id: string; nome_completo: string }
+
 interface Props {
   pacientes: Paciente[];
   canEdit: boolean;
+  profissionais?: Profissional[];
+  pacienteProfMap?: Record<string, string>;
 }
 
 function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () => void }) {
@@ -103,11 +107,12 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
   );
 }
 
-export function PacientesClient({ pacientes, canEdit }: Props) {
+export function PacientesClient({ pacientes, canEdit, profissionais = [], pacienteProfMap = {} }: Props) {
   const [busca, setBusca] = useState("");
   const [excluindo, setExcluindo] = useState<Paciente | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [mostrarInativos, setMostrarInativos] = useState(false);
+  const [filtroProfId, setFiltroProfId] = useState("");
   const [, startTransition] = useTransition();
 
   function handleToggleAtivo(p: Paciente) {
@@ -121,10 +126,11 @@ export function PacientesClient({ pacientes, canEdit }: Props) {
   const filtrados = useMemo(() =>
     pacientes.filter(p => {
       if (!mostrarInativos && !p.ativo) return false;
+      if (filtroProfId && pacienteProfMap[p.id] !== filtroProfId) return false;
       return !busca || p.nome_completo?.toLowerCase().includes(busca.toLowerCase()) ||
         p.email?.toLowerCase().includes(busca.toLowerCase()) ||
         p.telefone?.includes(busca);
-    }), [pacientes, busca, mostrarInativos]);
+    }), [pacientes, busca, mostrarInativos, filtroProfId, pacienteProfMap]);
 
   const inativos = pacientes.filter(p => !p.ativo).length;
 
@@ -132,8 +138,8 @@ export function PacientesClient({ pacientes, canEdit }: Props) {
     <div>
       {excluindo && <ModalExcluir paciente={excluindo} onClose={() => setExcluindo(null)} />}
 
-      <div className="flex gap-3 mb-6">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap gap-3 mb-6">
+        <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-forest-400" />
           <input
             type="text"
@@ -143,6 +149,21 @@ export function PacientesClient({ pacientes, canEdit }: Props) {
             className="input-field pl-9 h-9 text-sm"
           />
         </div>
+        {profissionais.length > 0 && (
+          <div className="relative">
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-forest-400 pointer-events-none" />
+            <select
+              value={filtroProfId}
+              onChange={e => setFiltroProfId(e.target.value)}
+              className={`h-9 pl-3 pr-8 rounded-xl border text-sm appearance-none transition-colors ${filtroProfId ? "bg-forest/10 border-forest/30 text-forest font-medium" : "border-sand/40 text-forest-500 hover:bg-sand/20 bg-white"}`}
+            >
+              <option value="">Todos os profissionais</option>
+              {profissionais.map(p => (
+                <option key={p.id} value={p.id}>{p.nome_completo}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {inativos > 0 && (
           <button
             onClick={() => setMostrarInativos(v => !v)}

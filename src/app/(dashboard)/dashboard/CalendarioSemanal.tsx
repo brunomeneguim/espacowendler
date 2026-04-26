@@ -8,8 +8,10 @@ import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
-  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope,
+  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope, Users,
 } from "lucide-react";
+
+const Users2Icon = Users;
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -774,49 +776,63 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                 <div className="max-h-80 overflow-y-auto">
                   {aniversariantesMes.length === 0 ? (
                     <p className="text-sm text-forest-400 text-center py-8">Nenhum aniversariante este mês.</p>
-                  ) : (
-                    <div className="divide-y divide-sand/20">
-                      {aniversariantesMes.map(a => {
-                        const nasc = new Date(a.data_nascimento + "T12:00:00");
-                        const dia = nasc.getDate();
-                        const isHoje = dia === diaAtual;
-                        const rawPhone = (a.telefone ?? "").replace(/\D/g, "");
-                        const waLink = rawPhone ? `https://wa.me/${rawPhone.length <= 11 ? "55" + rawPhone : rawPhone}` : null;
-                        const isProfissional = a.tipo === "profissional";
-                        return (
-                          <div key={a.id} className={`flex items-center gap-3 px-4 py-2.5 ${isHoje ? "bg-peach/10" : ""}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${isHoje ? "bg-rust text-white" : "bg-sand/30 text-forest"}`}>
-                              {dia}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                {isProfissional && <Stethoscope className="w-3 h-3 text-forest-400 shrink-0" />}
-                                <p className={`text-sm font-medium truncate ${isHoje ? "text-rust" : "text-forest"}`}>
-                                  {a.nome_completo}
-                                  {isHoje && <span className="ml-1 text-[10px] bg-rust/10 text-rust px-1 py-0.5 rounded-full">hoje 🎂</span>}
-                                </p>
-                              </div>
-                              {waLink && (
-                                <a
-                                  href={waLink}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors"
-                                >
-                                  <WhatsAppIcon className="w-3 h-3" /> {a.telefone}
-                                </a>
-                              )}
-                            </div>
-                            {a.profissional_nome && (
-                              <span className="text-xs text-forest-400 shrink-0 text-right max-w-[90px] truncate" title={a.profissional_nome}>
-                                {a.profissional_nome}
-                              </span>
+                  ) : (() => {
+                    const pacientes = aniversariantesMes.filter(a => a.tipo !== "profissional");
+                    const profissionais = aniversariantesMes.filter(a => a.tipo === "profissional");
+                    const renderItem = (a: typeof aniversariantesMes[0]) => {
+                      const nasc = new Date(a.data_nascimento + "T12:00:00");
+                      const dia = nasc.getDate();
+                      const isHoje = dia === diaAtual;
+                      const rawPhone = (a.telefone ?? "").replace(/\D/g, "");
+                      const waLink = rawPhone ? `https://wa.me/${rawPhone.length <= 11 ? "55" + rawPhone : rawPhone}` : null;
+                      return (
+                        <div key={a.id} className={`flex items-center gap-3 px-4 py-2.5 ${isHoje ? "bg-peach/10" : ""}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${isHoje ? "bg-rust text-white" : "bg-sand/30 text-forest"}`}>
+                            {dia}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${isHoje ? "text-rust" : "text-forest"}`}>
+                              {a.nome_completo}
+                              {isHoje && <span className="ml-1 text-[10px] bg-rust/10 text-rust px-1 py-0.5 rounded-full">hoje 🎂</span>}
+                            </p>
+                            {waLink && (
+                              <a href={waLink} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors">
+                                <WhatsAppIcon className="w-3 h-3" /> {a.telefone}
+                              </a>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          {a.profissional_nome && (
+                            <span className="text-xs text-forest-400 shrink-0 text-right max-w-[90px] truncate" title={a.profissional_nome}>
+                              {a.profissional_nome}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    };
+                    return (
+                      <div>
+                        {pacientes.length > 0 && (
+                          <>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-sand/10 border-b border-sand/20">
+                              <Users2Icon className="w-3.5 h-3.5 text-forest-400" />
+                              <span className="text-xs font-semibold text-forest-500 uppercase tracking-wider">Pacientes</span>
+                            </div>
+                            <div className="divide-y divide-sand/20">{pacientes.map(renderItem)}</div>
+                          </>
+                        )}
+                        {profissionais.length > 0 && (
+                          <>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-sand/10 border-b border-sand/20 border-t border-sand/20">
+                              <Stethoscope className="w-3.5 h-3.5 text-forest-400" />
+                              <span className="text-xs font-semibold text-forest-500 uppercase tracking-wider">Profissionais</span>
+                            </div>
+                            <div className="divide-y divide-sand/20">{profissionais.map(renderItem)}</div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </>

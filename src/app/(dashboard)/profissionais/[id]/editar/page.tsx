@@ -94,6 +94,22 @@ export default async function EditarProfissionalPage({
           Define quando este profissional está disponível para receber agendamentos.
         </p>
 
+        {/* Tempo de atendimento — faz parte do prof-edit-form */}
+        <div className="p-4 bg-cream rounded-xl border border-sand/30">
+          <label className="label">Duração padrão da sessão (minutos)</label>
+          <input
+            name="tempo_atendimento"
+            type="number"
+            min="5"
+            step="5"
+            form="prof-edit-form"
+            className="input-field w-48"
+            placeholder="60"
+            defaultValue={prof.tempo_atendimento ?? 60}
+          />
+          <p className="text-xs text-forest-400 mt-1.5">Usado como padrão ao criar novos agendamentos.</p>
+        </div>
+
         {(horarios ?? []).length === 0 ? (
           <p className="text-sm text-forest-400">Nenhum horário cadastrado.</p>
         ) : (
@@ -144,9 +160,11 @@ export default async function EditarProfissionalPage({
               <input name="hora_fim" type="time" required className="input-field" defaultValue="12:00" />
             </div>
           </div>
-          <button type="submit" className="btn-primary text-sm">
-            Adicionar horário
-          </button>
+          <div className="flex justify-center">
+            <button type="submit" className="btn-primary text-sm px-8">
+              Adicionar horário
+            </button>
+          </div>
         </form>
       </div>
 

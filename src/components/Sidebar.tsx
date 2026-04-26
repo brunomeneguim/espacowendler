@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Calendar, Users, UserCircle, LogOut, Leaf,
   Stethoscope, CheckSquare, Settings2, Check,
-  ChevronUp, ChevronDown, X, Pencil, GripVertical,
+  ChevronUp, ChevronDown, X, Pencil,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
 import { signOut } from "@/app/(auth)/actions";
@@ -56,6 +56,11 @@ export function Sidebar({
   const isAdmin = role === "admin";
   const access = ROLE_ACCESS[role] ?? ROLE_ACCESS.profissional;
   const overrides = ROLE_LABEL_OVERRIDE[role] ?? {};
+
+  // Fechar configurações a cada navegação
+  useEffect(() => {
+    setConfigAberto(false);
+  }, [pathname]);
 
   // Filter and sort menu items based on role access
   const visibleItems = menuConfig
@@ -236,22 +241,13 @@ export function Sidebar({
               </Link>
 
               {isAdmin && !editMode && (
-                <>
-                  <button
-                    onClick={() => alert("Editar Sistema: em breve você poderá editar os rótulos de toda a interface.")}
-                    className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
-                  >
-                    <Pencil className="w-4 h-4" strokeWidth={1.5} />
-                    Editar Sistema
-                  </button>
-                  <button
-                    onClick={() => { setConfigAberto(false); enterEditMode(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                    className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
-                  >
-                    <GripVertical className="w-4 h-4" strokeWidth={1.5} />
-                    Editar menus
-                  </button>
-                </>
+                <button
+                  onClick={() => { setConfigAberto(false); enterEditMode(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
+                >
+                  <Pencil className="w-4 h-4" strokeWidth={1.5} />
+                  Editar Sistema
+                </button>
               )}
             </div>
           )}

@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { cadastrarProfissionalCompleto, buscarDadosProfissionalPorProfile } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
-import { ValorConsultaInput } from "../[id]/editar/ValorConsultaInput";
 import { AddEspecialidadeButton } from "../AddEspecialidadeButton";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
@@ -70,9 +69,14 @@ function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; 
 
 // ── Masks ──────────────────────────────────────────────────────────
 function maskPhone(v: string) {
-  v = v.replace(/\D/g, "").substring(0, 11);
-  if (v.length <= 10) return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
-  return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+  const raw = v.replace(/[^\d+]/g, "");
+  if (raw.startsWith("+")) {
+    const digits = raw.slice(1).replace(/\D/g, "");
+    return "+" + digits;
+  }
+  const digits = raw.replace(/\D/g, "").substring(0, 11);
+  if (digits.length <= 10) return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+  return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
 }
 function maskCpf(v: string) {
   v = v.replace(/\D/g, "").substring(0, 11);
@@ -82,6 +86,36 @@ function maskCnpj(v: string) {
   v = v.replace(/\D/g, "").substring(0, 14);
   return v.replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
     .replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+// ── Input monetário ────────────────────────────────────────────────
+function MoneyInput({ name, defaultValue, placeholder }: { name: string; defaultValue?: number | string | null; placeholder?: string }) {
+  const toDisplay = (v: number | string | null | undefined) => {
+    if (!v && v !== 0) return "";
+    const num = parseFloat(String(v));
+    if (isNaN(num)) return "";
+    return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  const [display, setDisplay] = useState(toDisplay(defaultValue));
+  const [raw, setRaw] = useState(defaultValue ? String(defaultValue) : "");
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/\D/g, "");
+    if (!digits) { setDisplay(""); setRaw(""); return; }
+    const num = parseInt(digits, 10) / 100;
+    setRaw(num.toFixed(2));
+    setDisplay(num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  }
+
+  return (
+    <>
+      <input type="hidden" name={name} value={raw} />
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-forest-400 font-medium">R$</span>
+        <input type="text" inputMode="numeric" className="input-field pl-9" placeholder={placeholder ?? "0,00"} value={display} onChange={handleChange} />
+      </div>
+    </>
+  );
 }
 
 // ── Section ────────────────────────────────────────────────────────
@@ -119,11 +153,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   const [dataNascimento, setDataNascimento] = useState("");
   const [sexo, setSexo] = useState("");
   const [registroProfissional, setRegistroProfissional] = useState("");
-  const [horarioInicio, setHorarioInicio] = useState("08:00");
-  const [horarioFim, setHorarioFim] = useState("18:00");
-  const [tempoAtendimento, setTempoAtendimento] = useState("60");
   const [observacoes, setObservacoes] = useState("");
-  const [valorConsulta, setValorConsulta] = useState("");
   const [corSelecionada, setCorSelecionada] = useState("");
   const [especialidades, setEspecialidades] = useState(initialEspecialidades);
   const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState("");
@@ -144,14 +174,10 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
         if (d.data_nascimento) setDataNascimento(d.data_nascimento);
         if (d.sexo) setSexo(d.sexo);
         if (d.registro_profissional) setRegistroProfissional(d.registro_profissional);
-        if (d.horario_inicio) setHorarioInicio(d.horario_inicio.slice(0, 5));
-        if (d.horario_fim) setHorarioFim(d.horario_fim.slice(0, 5));
-        if (d.tempo_atendimento) setTempoAtendimento(String(d.tempo_atendimento));
         if (d.observacoes) setObservacoes(d.observacoes);
         if (d.foto_url) setFoto(d.foto_url);
         if (d.cor) setCorSelecionada(d.cor);
         if (d.especialidade_id) setEspecialidadeSelecionada(String(d.especialidade_id));
-        if (d.valor_consulta) setValorConsulta(String(d.valor_consulta));
       }
     } finally {
       setLoadingPerfil(false);
@@ -248,7 +274,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
               )}
             </div>
             <div className="space-y-2">
-              <p className="text-xs text-forest-500">Foto do profissional</p>
+              <p className="text-xs text-forest-500">Foto do profissional <span className="text-forest-400">(opcional)</span></p>
               <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 text-xs border border-sand/40 px-3 py-1.5 rounded-lg hover:bg-sand/20 text-forest transition-colors">
                 <Upload className="w-3.5 h-3.5" /> Selecionar foto
               </button>
@@ -310,11 +336,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
             </div>
             <div>
               <label className="label">Cor no calendário <span className="text-rust">*</span></label>
-              <CorDropdown
-                coresUsadas={coresUsadas}
-                value={corSelecionada}
-                onChange={setCorSelecionada}
-              />
+              <CorDropdown coresUsadas={coresUsadas} value={corSelecionada} onChange={setCorSelecionada} />
             </div>
             <div>
               <label className="label">Registro profissional</label>
@@ -322,40 +344,28 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
                 value={registroProfissional} onChange={e => setRegistroProfissional(e.target.value)} />
             </div>
             <div>
-              <label className="label">Valor da consulta</label>
-              <ValorConsultaInput key={valorConsulta} defaultValue={valorConsulta ? parseFloat(valorConsulta) : undefined} />
+              <label className="label">Valor Consulta Avulsa</label>
+              <MoneyInput name="valor_consulta" />
+            </div>
+            <div>
+              <label className="label">Valor Plano</label>
+              <MoneyInput name="valor_plano" />
             </div>
           </div>
 
-          {/* Horários e tempo */}
-          <div className="grid sm:grid-cols-3 gap-4">
-            <div>
-              <label className="label">Horário inicial de atendimento <span className="text-rust">*</span></label>
-              <input name="horario_inicio" type="time" className="input-field" required
-                value={horarioInicio} onChange={e => setHorarioInicio(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Horário final de atendimento <span className="text-rust">*</span></label>
-              <input name="horario_fim" type="time" className="input-field" required
-                value={horarioFim} onChange={e => setHorarioFim(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Tempo de atendimento (min)</label>
-              <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field" placeholder="60"
-                value={tempoAtendimento} onChange={e => setTempoAtendimento(e.target.value)} />
-            </div>
-          </div>
-
+          {/* Telefones */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Telefone 1</label>
-              <input name="telefone_1" type="text" className="input-field" placeholder="(42) 00000-0000"
+              <input name="telefone_1" type="text" className="input-field" placeholder="(00) 00000-0000"
                 value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
+              <p className="text-xs text-forest-400 mt-1">Para número internacional, comece com +</p>
             </div>
             <div>
               <label className="label">Telefone 2</label>
-              <input name="telefone_2" type="text" className="input-field" placeholder="(42) 00000-0000"
+              <input name="telefone_2" type="text" className="input-field" placeholder="(00) 00000-0000"
                 value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
+              <p className="text-xs text-forest-400 mt-1">Para número internacional, comece com +</p>
             </div>
           </div>
 
