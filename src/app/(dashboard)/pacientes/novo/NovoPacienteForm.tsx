@@ -30,13 +30,12 @@ function maskCep(v: string) {
 }
 function maskPhone(v: string) {
   const raw = v.replace(/[^\d+]/g, "");
-  if (raw.startsWith("+")) {
-    const digits = raw.slice(1).replace(/\D/g, "");
-    return "+" + digits;
-  }
-  const digits = raw.replace(/\D/g, "").substring(0, 11);
-  if (digits.length <= 10) return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
-  return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D/g, "");
+  const d = raw.replace(/\D/g, "").substring(0, 11);
+  if (d.length === 0) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 function maskRg(v: string) {
   v = v.replace(/[^0-9Xx]/g, "").substring(0, 9);

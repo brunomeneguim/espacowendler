@@ -232,8 +232,6 @@ export async function cadastrarProfissionalCompleto(
     sexo:                  get("sexo"),
     cpf:                   get("cpf"),
     cnpj:                  get("cnpj"),
-    horario_inicio:        get("horario_inicio"),
-    horario_fim:           get("horario_fim"),
     tempo_atendimento:     get("tempo_atendimento") ? parseInt(get("tempo_atendimento")!) : null,
     cor:                   get("cor"),
     observacoes:           get("observacoes"),
@@ -242,13 +240,27 @@ export async function cadastrarProfissionalCompleto(
     registro_profissional: get("registro_profissional"),
     especialidade_id:      especialidadeId ? parseInt(especialidadeId) : null,
     valor_consulta:        get("valor_consulta") ? parseFloat(get("valor_consulta")!) : null,
+    valor_plano:           get("valor_plano") ? parseFloat(get("valor_plano")!) : null,
     data_cadastro:         new Date().toISOString().split("T")[0],
     perfil_completo:       true,
     ativo:                 true,
   };
 
-  const { error } = await supabase.from("profissionais").insert(profData);
+  const { data: profCriado, error } = await supabase.from("profissionais").insert(profData).select("id").single();
   if (error) return { error: error.message };
+
+  // Inserir horários disponíveis, se houver
+  const horariosJson = get("horarios_json");
+  if (horariosJson && profCriado?.id) {
+    try {
+      const horarios = JSON.parse(horariosJson) as { dia_semana: number; hora_inicio: string; hora_fim: string }[];
+      if (horarios.length > 0) {
+        await supabase.from("horarios_disponiveis").insert(
+          horarios.map(h => ({ profissional_id: profCriado.id, ...h }))
+        );
+      }
+    } catch { /* ignora JSON inválido */ }
+  }
 
   revalidatePath("/profissionais");
   revalidatePath("/dashboard");

@@ -107,20 +107,62 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
   );
 }
 
+function ModalConfirmarInativar({ nome, onConfirm, onClose }: { nome: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-display text-lg text-forest">Desativar paciente</p>
+              <p className="text-sm text-forest-600 mt-1">
+                Tem certeza que deseja desativar <strong>{nome}</strong>? O paciente não aparecerá mais nas listagens ativas.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={onConfirm}
+              className="flex-1 bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <ToggleLeft className="w-4 h-4" />
+              Sim, desativar
+            </button>
+            <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function PacientesClient({ pacientes, canEdit, profissionais = [], pacienteProfMap = {} }: Props) {
   const [busca, setBusca] = useState("");
   const [excluindo, setExcluindo] = useState<Paciente | null>(null);
+  const [inativando, setInativando] = useState<Paciente | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [mostrarInativos, setMostrarInativos] = useState(false);
   const [filtroProfId, setFiltroProfId] = useState("");
   const [, startTransition] = useTransition();
 
-  function handleToggleAtivo(p: Paciente) {
-    setTogglingId(p.id);
+  function executarToggle(id: string) {
+    setTogglingId(id);
     startTransition(async () => {
-      await toggleAtivoPaciente(p.id);
+      await toggleAtivoPaciente(id);
       setTogglingId(null);
     });
+  }
+
+  function handleToggleAtivo(p: Paciente) {
+    if (p.ativo) {
+      setInativando(p);
+    } else {
+      executarToggle(p.id);
+    }
   }
 
   const filtrados = useMemo(() =>
@@ -137,6 +179,13 @@ export function PacientesClient({ pacientes, canEdit, profissionais = [], pacien
   return (
     <div>
       {excluindo && <ModalExcluir paciente={excluindo} onClose={() => setExcluindo(null)} />}
+      {inativando && (
+        <ModalConfirmarInativar
+          nome={inativando.nome_completo}
+          onConfirm={() => { executarToggle(inativando.id); setInativando(null); }}
+          onClose={() => setInativando(null)}
+        />
+      )}
 
       <div className="flex flex-wrap gap-3 mb-6">
         <div className="relative flex-1 min-w-48">

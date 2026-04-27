@@ -25,9 +25,13 @@ interface Props {
 }
 
 function maskPhone(v: string) {
-  v = v.replace(/\D/g, "").substring(0, 11);
-  if (v.length <= 10) return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
-  return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+  const raw = v.replace(/[^\d+]/g, "");
+  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D/g, "");
+  const d = raw.replace(/\D/g, "").substring(0, 11);
+  if (d.length === 0) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
 export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props) {

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Upload, X, Loader2, User, FileText, AlertCircle, ChevronDown, Check,
+  Upload, X, Loader2, User, FileText, AlertCircle, ChevronDown, Check, Clock, Trash2,
 } from "lucide-react";
 import { cadastrarProfissionalCompleto, buscarDadosProfissionalPorProfile } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
@@ -70,13 +70,12 @@ function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; 
 // ── Masks ──────────────────────────────────────────────────────────
 function maskPhone(v: string) {
   const raw = v.replace(/[^\d+]/g, "");
-  if (raw.startsWith("+")) {
-    const digits = raw.slice(1).replace(/\D/g, "");
-    return "+" + digits;
-  }
-  const digits = raw.replace(/\D/g, "").substring(0, 11);
-  if (digits.length <= 10) return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
-  return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D/g, "");
+  const d = raw.replace(/\D/g, "").substring(0, 11);
+  if (d.length === 0) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 function maskCpf(v: string) {
   v = v.replace(/\D/g, "").substring(0, 11);
@@ -145,6 +144,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [foto, setFoto] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
   const [nomeCompleto, setNomeCompleto] = useState("");
   const [cpf, setCpf] = useState("");
   const [cnpj, setCnpj] = useState("");
@@ -158,14 +158,21 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   const [especialidades, setEspecialidades] = useState(initialEspecialidades);
   const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState("");
   const [loadingPerfil, setLoadingPerfil] = useState(false);
+  // Horários
+  const [tempoAtendimento, setTempoAtendimento] = useState(60);
+  const [horarios, setHorarios] = useState<{ dia_semana: number; hora_inicio: string; hora_fim: string }[]>([]);
+  const [novoHoraDia, setNovoHoraDia] = useState(1);
+  const [novoHoraInicio, setNovoHoraInicio] = useState("07:00");
+  const [novoHoraFim, setNovoHoraFim] = useState("21:00");
 
   async function handleProfileChange(profileId: string) {
-    if (!profileId) return;
+    if (!profileId) { setEmail(""); return; }
     setLoadingPerfil(true);
     try {
       const res = await buscarDadosProfissionalPorProfile(profileId);
       if (res.data) {
         const d = res.data;
+        setEmail(d.email ?? "");
         if (d.nome_completo) setNomeCompleto(d.nome_completo);
         if (d.cpf) setCpf(maskCpf(d.cpf));
         if (d.cnpj) setCnpj(maskCnpj(d.cnpj));
@@ -205,12 +212,23 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     fd.set("foto_url", foto ?? "");
+    fd.set("tempo_atendimento", String(tempoAtendimento));
+    fd.set("horarios_json", JSON.stringify(horarios));
     setErro(null);
     startTransition(async () => {
       const res = await cadastrarProfissionalCompleto(fd);
       if (res?.error) setErro(res.error);
       else router.push("/profissionais");
     });
+  }
+
+  function adicionarHorario() {
+    if (!novoHoraInicio || !novoHoraFim) return;
+    setHorarios(prev => [...prev, { dia_semana: novoHoraDia, hora_inicio: novoHoraInicio, hora_fim: novoHoraFim }]);
+  }
+
+  function removerHorario(idx: number) {
+    setHorarios(prev => prev.filter((_, i) => i !== idx));
   }
 
   return (
@@ -253,6 +271,19 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
               </div>
             )}
           </div>
+          {email && (
+            <div>
+              <label className="label">E-mail</label>
+              <input
+                type="email"
+                className="input-field bg-sand/10 text-forest-500 cursor-not-allowed"
+                value={email}
+                disabled
+                readOnly
+              />
+              <p className="text-xs text-forest-400 mt-1">E-mail do usuário vinculado (não editável aqui).</p>
+            </div>
+          )}
         </Section>
 
         {/* ── Dados Gerais ── */}
@@ -373,6 +404,105 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
             <label className="label">Observações</label>
             <textarea name="observacoes" rows={3} className="input-field resize-none" placeholder="Informações relevantes…"
               value={observacoes} onChange={e => setObservacoes(e.target.value)} />
+          </div>
+        </Section>
+
+        {/* ── Horários de atendimento ── */}
+        <Section icon={Clock} title="Horários de atendimento">
+          <p className="text-sm text-forest-600">
+            Define quando este profissional está disponível para receber agendamentos.
+          </p>
+
+          {/* Duração padrão */}
+          <div className="p-4 bg-cream rounded-xl border border-sand/30">
+            <label className="label">Duração padrão da sessão (minutos)</label>
+            <input
+              type="number"
+              min="5"
+              step="5"
+              className="input-field w-48"
+              placeholder="60"
+              value={tempoAtendimento}
+              onChange={e => setTempoAtendimento(Number(e.target.value))}
+            />
+            <p className="text-xs text-forest-400 mt-1.5">Usado como padrão ao criar novos agendamentos.</p>
+          </div>
+
+          {/* Lista de horários adicionados */}
+          {horarios.length === 0 ? (
+            <p className="text-sm text-forest-400">Nenhum horário adicionado ainda.</p>
+          ) : (
+            <div className="space-y-2">
+              {horarios.map((h, idx) => {
+                const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+                const DIAS_FULL = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+                return (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-cream rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-forest w-32 shrink-0">{DIAS_FULL[h.dia_semana]}</span>
+                      <span className="text-sm text-forest-500">{h.hora_inicio} – {h.hora_fim}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removerHorario(idx)}
+                      className="p-1.5 rounded-lg text-rust hover:bg-rust/10 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Formulário para adicionar horário */}
+          <div className="border-t border-sand/30 pt-4 space-y-3">
+            <p className="text-sm font-medium text-forest">Adicionar horário</p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label className="label">Dia da semana</label>
+                <select
+                  className="input-field"
+                  value={novoHoraDia}
+                  onChange={e => setNovoHoraDia(Number(e.target.value))}
+                >
+                  <option value={1}>Segunda-feira</option>
+                  <option value={2}>Terça-feira</option>
+                  <option value={3}>Quarta-feira</option>
+                  <option value={4}>Quinta-feira</option>
+                  <option value={5}>Sexta-feira</option>
+                  <option value={6}>Sábado</option>
+                  <option value={0}>Domingo</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Início</label>
+                <input
+                  type="time"
+                  className="input-field"
+                  value={novoHoraInicio}
+                  onChange={e => setNovoHoraInicio(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label">Fim</label>
+                <input
+                  type="time"
+                  className="input-field"
+                  value={novoHoraFim}
+                  onChange={e => setNovoHoraFim(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={adicionarHorario}
+                className="btn-primary text-sm px-8"
+              >
+                Adicionar horário
+              </button>
+            </div>
           </div>
         </Section>
 

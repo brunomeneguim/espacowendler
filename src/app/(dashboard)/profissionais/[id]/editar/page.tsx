@@ -153,11 +153,11 @@ export default async function EditarProfissionalPage({
             </div>
             <div>
               <label className="label">Início</label>
-              <input name="hora_inicio" type="time" required className="input-field" defaultValue="08:00" />
+              <input name="hora_inicio" type="time" required className="input-field" defaultValue="07:00" />
             </div>
             <div>
               <label className="label">Fim</label>
-              <input name="hora_fim" type="time" required className="input-field" defaultValue="12:00" />
+              <input name="hora_fim" type="time" required className="input-field" defaultValue="21:00" />
             </div>
           </div>
           <div className="flex justify-center">
