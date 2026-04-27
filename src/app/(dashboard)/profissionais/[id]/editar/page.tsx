@@ -250,7 +250,7 @@ export default async function EditarProfissionalPage({
               </div>
             </div>
             <div className="flex justify-center">
-              <button type="submit" className="btn-secondary text-sm px-8 border border-rust/30 text-rust hover:bg-rust/5">
+              <button type="submit" className="btn-secondary text-sm px-8">
                 Adicionar horário indisponível
               </button>
             </div>
