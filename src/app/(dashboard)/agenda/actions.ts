@@ -151,7 +151,7 @@ function gerarDatas(inicio: Date, recorrencia: string, meses: number, mensal_tip
 }
 
 // ── Criar agendamento ─────────────────────────────────────────────
-export async function criarAgendamento(formData: FormData): Promise<{ error: string; ignoradas?: never } | { error: null; ignoradas: number }> {
+export async function criarAgendamento(formData: FormData): Promise<{ error: string | null; ignoradas: number }> {
   const supabase = createClient();
 
   const profissional_id = formData.get("profissional_id") as string;
@@ -176,11 +176,11 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
   // Verificar horário de atendimento do profissional (usa hora local, não UTC)
   const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, hora, duracao);
-  if (erroHorario) return { error: erroHorario };
+  if (erroHorario) return { error: erroHorario, ignoradas: 0 };
 
   // Verificar conflito do agendamento principal
   const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim);
-  if (conflito) return { error: conflito };
+  if (conflito) return { error: conflito, ignoradas: 0 };
 
   // Grupo para recorrências
   const grupo_id = recorrencia !== "nenhuma" ? randomUUID() : null;
@@ -200,7 +200,7 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
     data_hora_inicio: inicio.toISOString(),
     data_hora_fim:    fim.toISOString(),
   });
-  if (error) return { error: error.message };
+  if (error) return { error: error.message, ignoradas: 0 };
 
   // Inserir recorrências
   let ignoradas = 0;
