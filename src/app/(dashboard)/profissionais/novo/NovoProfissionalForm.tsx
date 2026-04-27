@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { cadastrarProfissionalCompleto, buscarDadosProfissionalPorProfile } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
-import { AddEspecialidadeButton } from "../AddEspecialidadeButton";
+import { EspecialidadesMultiSelect } from "../EspecialidadesMultiSelect";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
 function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; value: string; onChange: (v: string) => void }) {
@@ -156,7 +156,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   const [observacoes, setObservacoes] = useState("");
   const [corSelecionada, setCorSelecionada] = useState("");
   const [especialidades, setEspecialidades] = useState(initialEspecialidades);
-  const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState("");
+  const [especialidadesSelecionadas, setEspecialidadesSelecionadas] = useState<number[]>([]);
   const [loadingPerfil, setLoadingPerfil] = useState(false);
   // Horários
   const [tempoAtendimento, setTempoAtendimento] = useState(60);
@@ -184,7 +184,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
         if (d.observacoes) setObservacoes(d.observacoes);
         if (d.foto_url) setFoto(d.foto_url);
         if (d.cor) setCorSelecionada(d.cor);
-        if (d.especialidade_id) setEspecialidadeSelecionada(String(d.especialidade_id));
+        if (d.especialidade_ids?.length) setEspecialidadesSelecionadas(d.especialidade_ids);
       }
     } finally {
       setLoadingPerfil(false);
@@ -372,25 +372,14 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
         {/* ── Dados Profissionais ── */}
         <Section icon={Stethoscope} title="Dados Profissionais">
           <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Especialidade</label>
-              <div className="flex items-center gap-2">
-                <select
-                  name="especialidade_id"
-                  className="input-field flex-1"
-                  value={especialidadeSelecionada}
-                  onChange={e => setEspecialidadeSelecionada(e.target.value)}
-                >
-                  <option value="">— Sem especialidade —</option>
-                  {especialidades.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-                </select>
-                <AddEspecialidadeButton
-                  onAdded={esp => {
-                    setEspecialidades(prev => [...prev, esp]);
-                    setEspecialidadeSelecionada(String(esp.id));
-                  }}
-                />
-              </div>
+            <div className="sm:col-span-2">
+              <label className="label">Especialidades</label>
+              <EspecialidadesMultiSelect
+                especialidades={especialidades}
+                selecionadas={especialidadesSelecionadas}
+                onChange={setEspecialidadesSelecionadas}
+                onEspecialidadeAdded={esp => setEspecialidades(prev => [...prev, esp])}
+              />
             </div>
             <div>
               <label className="label">Cor no calendário <span className="text-rust">*</span></label>

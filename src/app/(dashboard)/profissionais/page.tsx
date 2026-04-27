@@ -18,7 +18,7 @@ export default async function ProfissionaisPage() {
       supabase
         .from("profissionais")
         .select(
-          "id, registro_profissional, valor_plano, telefone_1, ativo, foto_url, cor, data_nascimento, profile:profiles(nome_completo, email), especialidade:especialidades(nome)"
+          "id, registro_profissional, valor_plano, telefone_1, ativo, foto_url, cor, data_nascimento, profile:profiles(nome_completo, email), especialidades:profissional_especialidades(especialidade:especialidades(nome))"
         )
         .order("created_at", { ascending: false }),
       supabase.from("especialidades").select("id, nome").order("nome"),

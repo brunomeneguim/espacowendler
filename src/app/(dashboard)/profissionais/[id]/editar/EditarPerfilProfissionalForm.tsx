@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { editarProfissionalCompleto } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
-import { AddEspecialidadeButton } from "../../AddEspecialidadeButton";
+import { EspecialidadesMultiSelect } from "../../EspecialidadesMultiSelect";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
 function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; value: string; onChange: (v: string) => void }) {
@@ -144,18 +144,19 @@ interface Props {
     foto_url?: string | null; data_nascimento?: string | null; sexo?: string | null;
     cpf?: string | null; cnpj?: string | null; uf_conselho?: string | null;
     cbos_codigo?: string | null; tempo_atendimento?: number | null; observacoes?: string | null;
-    registro_profissional?: string | null; especialidade_id?: number | null;
+    registro_profissional?: string | null;
     cor?: string | null; telefone_1?: string | null; telefone_2?: string | null;
     valor_consulta?: number | null; valor_plano?: number | null;
     ativo?: boolean;
   };
   especialidades: Especialidade[];
+  especialidadesSelecionadas: number[];
   coresUsadas: string[];
   searchError?: string;
   canChangePassword?: boolean;
 }
 
-export function EditarPerfilProfissionalForm({ profissionalId, profileId, profile, prof, especialidades, coresUsadas, searchError, canChangePassword }: Props) {
+export function EditarPerfilProfissionalForm({ profissionalId, profileId, profile, prof, especialidades, especialidadesSelecionadas: initialSelecionadas, coresUsadas, searchError, canChangePassword }: Props) {
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(searchError ?? null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -167,7 +168,7 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
   const [tel1, setTel1] = useState(prof.telefone_1 ?? "");
   const [tel2, setTel2] = useState(prof.telefone_2 ?? "");
   const [especialidadesList, setEspecialidadesList] = useState(especialidades);
-  const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState(String(prof.especialidade_id ?? ""));
+  const [especialidadesSelecionadas, setEspecialidadesSelecionadas] = useState<number[]>(initialSelecionadas);
 
   // Senha
   const [novaSenha, setNovaSenha] = useState("");
@@ -383,25 +384,14 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
         {/* ── Dados Profissionais ── */}
         <Section icon={Stethoscope} title="Dados Profissionais">
           <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Especialidade</label>
-              <div className="flex items-center gap-2">
-                <select
-                  name="especialidade_id"
-                  className="input-field flex-1"
-                  value={especialidadeSelecionada}
-                  onChange={e => setEspecialidadeSelecionada(e.target.value)}
-                >
-                  <option value="">— Sem especialidade —</option>
-                  {especialidadesList.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-                </select>
-                <AddEspecialidadeButton
-                  onAdded={esp => {
-                    setEspecialidadesList(prev => [...prev, esp]);
-                    setEspecialidadeSelecionada(String(esp.id));
-                  }}
-                />
-              </div>
+            <div className="sm:col-span-2">
+              <label className="label">Especialidades</label>
+              <EspecialidadesMultiSelect
+                especialidades={especialidadesList}
+                selecionadas={especialidadesSelecionadas}
+                onChange={setEspecialidadesSelecionadas}
+                onEspecialidadeAdded={esp => setEspecialidadesList(prev => [...prev, esp])}
+              />
             </div>
             <div>
               <label className="label">Cor no calendário <span className="text-rust">*</span></label>

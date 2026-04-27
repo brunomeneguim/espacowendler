@@ -23,7 +23,7 @@ interface Profissional {
   foto_url?: string | null;
   cor?: string | null;
   profile: { nome_completo: string; email: string } | null;
-  especialidade: { nome: string } | null;
+  especialidades?: { especialidade: { nome: string } }[] | null;
 }
 
 interface Props {
@@ -356,7 +356,11 @@ export function ProfissionaisClient({ profissionais, canManage, canDelete }: Pro
                   </div>
                 </div>
                 <h3 className="font-display text-xl text-forest mb-1">{p.profile?.nome_completo ?? "—"}</h3>
-                {p.especialidade?.nome && <p className="text-sm text-rust mb-3">{p.especialidade.nome}</p>}
+                {p.especialidades && p.especialidades.length > 0 && (
+                  <p className="text-sm text-rust mb-3">
+                    {p.especialidades.map(e => e.especialidade.nome).join(" · ")}
+                  </p>
+                )}
                 {p.registro_profissional && <p className="text-xs text-forest-500 mb-3">{p.registro_profissional}</p>}
                 <div className="flex items-center justify-between text-xs text-forest-500 pt-3 border-t border-sand/30 flex-wrap gap-1">
                   {p.telefone_1 ? (

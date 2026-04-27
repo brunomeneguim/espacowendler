@@ -46,7 +46,6 @@ export async function editarProfissionalCompleto(
   const nome_completo = formData.get("nome_completo") as string;
   await supabase.from("profiles").update({ nome_completo }).eq("id", profileId);
 
-  const especialidadeId = get("especialidade_id");
   const profData = {
     foto_url:              get("foto_url"),
     data_nascimento:       get("data_nascimento"),
@@ -59,13 +58,21 @@ export async function editarProfissionalCompleto(
     registro_profissional: get("registro_profissional"),
     telefone_1:            get("telefone_1"),
     telefone_2:            get("telefone_2"),
-    especialidade_id:      especialidadeId ? parseInt(especialidadeId) : null,
     valor_consulta:        get("valor_consulta") ? parseFloat(get("valor_consulta")!) : null,
     valor_plano:           get("valor_plano") ? parseFloat(get("valor_plano")!) : null,
   };
 
   const { error } = await supabase.from("profissionais").update(profData).eq("id", profissionalId);
   if (error) return { error: error.message };
+
+  // Atualizar especialidades na junction table
+  const especialidadeIds = formData.getAll("especialidade_ids") as string[];
+  await supabase.from("profissional_especialidades").delete().eq("profissional_id", profissionalId);
+  if (especialidadeIds.length > 0) {
+    await supabase.from("profissional_especialidades").insert(
+      especialidadeIds.map(eid => ({ profissional_id: profissionalId, especialidade_id: parseInt(eid) }))
+    );
+  }
 
   // Redefinir senha se fornecida
   const novaSenha = get("nova_senha");

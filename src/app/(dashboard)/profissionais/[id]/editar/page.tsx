@@ -29,11 +29,11 @@ export default async function EditarProfissionalPage({
 
   const supabase = createClient();
 
-  const [{ data: prof }, { data: especialidades }, { data: horarios }, { data: todasCores }] = await Promise.all([
+  const [{ data: prof }, { data: especialidades }, { data: horarios }, { data: todasCores }, { data: espSelecionadasRaw }] = await Promise.all([
     supabase
       .from("profissionais")
       .select(
-        "id, profile_id, especialidade_id, registro_profissional, valor_consulta, valor_plano, ativo, cor, foto_url, data_nascimento, sexo, cpf, cnpj, tempo_atendimento, observacoes, telefone_1, telefone_2, profile:profiles(id, nome_completo, email)"
+        "id, profile_id, registro_profissional, valor_consulta, valor_plano, ativo, cor, foto_url, data_nascimento, sexo, cpf, cnpj, tempo_atendimento, observacoes, telefone_1, telefone_2, profile:profiles(id, nome_completo, email)"
       )
       .eq("id", params.id)
       .single(),
@@ -45,7 +45,13 @@ export default async function EditarProfissionalPage({
       .order("dia_semana")
       .order("hora_inicio"),
     supabase.from("profissionais").select("cor").eq("ativo", true).neq("id", params.id),
+    supabase
+      .from("profissional_especialidades")
+      .select("especialidade_id")
+      .eq("profissional_id", params.id),
   ]);
+
+  const especialidadesSelecionadas = (espSelecionadasRaw ?? []).map((r: any) => r.especialidade_id as number);
 
   if (!prof) notFound();
 
@@ -84,6 +90,7 @@ export default async function EditarProfissionalPage({
         }}
         prof={prof as any}
         especialidades={especialidades ?? []}
+        especialidadesSelecionadas={especialidadesSelecionadas}
         coresUsadas={coresUsadas}
         canChangePassword={["admin", "supervisor"].includes(profile.role)}
       />

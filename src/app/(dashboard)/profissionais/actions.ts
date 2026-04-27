@@ -201,9 +201,19 @@ export async function buscarDadosProfissionalPorProfile(
     .eq("id", profile_id)
     .single();
 
+  // Buscar especialidades da junction table se o profissional já existir
+  let especialidade_ids: number[] = [];
+  if (prof?.id) {
+    const { data: espRows } = await supabase
+      .from("profissional_especialidades")
+      .select("especialidade_id")
+      .eq("profissional_id", prof.id);
+    especialidade_ids = (espRows ?? []).map((r: any) => r.especialidade_id as number);
+  }
+
   return {
     error: null,
-    data: { ...profile, ...prof },
+    data: { ...profile, ...prof, especialidade_ids },
   };
 }
 
@@ -224,7 +234,6 @@ export async function cadastrarProfissionalCompleto(
     await supabase.from("profiles").update({ nome_completo }).eq("id", profile_id);
   }
 
-  const especialidadeId = get("especialidade_id");
   const profData = {
     profile_id,
     foto_url:              get("foto_url"),
@@ -238,7 +247,6 @@ export async function cadastrarProfissionalCompleto(
     telefone_1:            get("telefone_1"),
     telefone_2:            get("telefone_2"),
     registro_profissional: get("registro_profissional"),
-    especialidade_id:      especialidadeId ? parseInt(especialidadeId) : null,
     valor_consulta:        get("valor_consulta") ? parseFloat(get("valor_consulta")!) : null,
     valor_plano:           get("valor_plano") ? parseFloat(get("valor_plano")!) : null,
     data_cadastro:         new Date().toISOString().split("T")[0],
@@ -248,6 +256,14 @@ export async function cadastrarProfissionalCompleto(
 
   const { data: profCriado, error } = await supabase.from("profissionais").insert(profData).select("id").single();
   if (error) return { error: error.message };
+
+  // Inserir especialidades na junction table
+  const especialidadeIds = formData.getAll("especialidade_ids") as string[];
+  if (especialidadeIds.length > 0 && profCriado?.id) {
+    await supabase.from("profissional_especialidades").insert(
+      especialidadeIds.map(eid => ({ profissional_id: profCriado.id, especialidade_id: parseInt(eid) }))
+    );
+  }
 
   // Inserir horários disponíveis, se houver
   const horariosJson = get("horarios_json");
