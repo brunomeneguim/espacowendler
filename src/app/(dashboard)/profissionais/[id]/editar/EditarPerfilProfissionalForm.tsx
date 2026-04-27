@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import {
-  Upload, X, Loader2, User, ChevronDown, Check,
+  Upload, X, Loader2, User, ChevronDown, Check, Eye, EyeOff, KeyRound,
 } from "lucide-react";
 import { editarProfissionalCompleto } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
@@ -152,9 +152,10 @@ interface Props {
   especialidades: Especialidade[];
   coresUsadas: string[];
   searchError?: string;
+  canChangePassword?: boolean;
 }
 
-export function EditarPerfilProfissionalForm({ profissionalId, profileId, profile, prof, especialidades, coresUsadas, searchError }: Props) {
+export function EditarPerfilProfissionalForm({ profissionalId, profileId, profile, prof, especialidades, coresUsadas, searchError, canChangePassword }: Props) {
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(searchError ?? null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -167,6 +168,13 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
   const [tel2, setTel2] = useState(prof.telefone_2 ?? "");
   const [especialidadesList, setEspecialidadesList] = useState(especialidades);
   const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState(String(prof.especialidade_id ?? ""));
+
+  // Senha
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [showSenha, setShowSenha] = useState(false);
+  const [showConfirmar, setShowConfirmar] = useState(false);
+  const senhasDivertem = novaSenha.length > 0 && confirmarSenha.length > 0 && novaSenha !== confirmarSenha;
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
@@ -187,8 +195,17 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (novaSenha && novaSenha !== confirmarSenha) {
+      setErro("As senhas não coincidem.");
+      return;
+    }
+    if (novaSenha && novaSenha.length < 6) {
+      setErro("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     fd.set("foto_url", foto ?? "");
+    if (novaSenha) fd.set("nova_senha", novaSenha);
     setErro(null);
     startTransition(async () => {
       const res = await editarProfissionalCompleto(profissionalId, profileId, fd);
@@ -203,6 +220,89 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
       )}
 
       <form id="prof-edit-form" onSubmit={handleSubmit} className="space-y-5">
+        {/* ── Usuário ── */}
+        <Section icon={User} title="Usuário">
+          <div>
+            <label className="label">Usuário vinculado</label>
+            <input
+              type="text"
+              className="input-field opacity-60 cursor-not-allowed"
+              value={profile.nome_completo}
+              disabled
+              readOnly
+            />
+            <p className="text-xs text-forest-400 mt-1">O usuário vinculado não pode ser alterado aqui.</p>
+          </div>
+          <div>
+            <label className="label">E-mail</label>
+            <input
+              type="email"
+              className="input-field opacity-60 cursor-not-allowed"
+              value={profile.email}
+              disabled
+              readOnly
+            />
+          </div>
+
+          {canChangePassword && (
+            <div className="pt-2 border-t border-sand/20 space-y-3">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-forest-400" />
+                <p className="text-sm font-medium text-forest">Redefinir senha</p>
+              </div>
+              <p className="text-xs text-forest-500">Deixe em branco para manter a senha atual.</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Nova senha</label>
+                  <div className="relative">
+                    <input
+                      type={showSenha ? "text" : "password"}
+                      className="input-field pr-10"
+                      placeholder="Mínimo 6 caracteres"
+                      value={novaSenha}
+                      onChange={e => setNovaSenha(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSenha(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-forest-400 hover:text-forest"
+                    >
+                      {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Confirmar senha</label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmar ? "text" : "password"}
+                      className={`input-field pr-10 ${senhasDivertem ? "border-rust focus:ring-rust/30" : ""}`}
+                      placeholder="Repita a senha"
+                      value={confirmarSenha}
+                      onChange={e => setConfirmarSenha(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmar(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-forest-400 hover:text-forest"
+                    >
+                      {showConfirmar ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {senhasDivertem && (
+                    <p className="text-xs text-rust mt-1">As senhas não coincidem.</p>
+                  )}
+                  {!senhasDivertem && novaSenha && confirmarSenha && (
+                    <p className="text-xs text-green-700 mt-1">✓ Senhas coincidem.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </Section>
+
         {/* ── Dados Gerais ── */}
         <Section icon={User} title="Dados Gerais">
           {/* Foto */}
@@ -234,11 +334,6 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
             <div className="sm:col-span-2">
               <label className="label">Nome completo <span className="text-rust">*</span></label>
               <input name="nome_completo" type="text" className="input-field" required defaultValue={profile.nome_completo} />
-            </div>
-            <div>
-              <label className="label">E-mail</label>
-              <input type="email" className="input-field opacity-60 cursor-not-allowed" value={profile.email} disabled readOnly />
-              <p className="text-xs text-forest-400 mt-1">O e-mail não pode ser alterado.</p>
             </div>
             <div>
               <label className="label">Data de nascimento <span className="text-rust">*</span></label>

@@ -85,6 +85,7 @@ export default async function EditarProfissionalPage({
         prof={prof as any}
         especialidades={especialidades ?? []}
         coresUsadas={coresUsadas}
+        canChangePassword={["admin", "supervisor"].includes(profile.role)}
       />
 
       {/* ── Horários disponíveis ── */}

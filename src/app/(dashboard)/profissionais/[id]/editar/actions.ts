@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -65,6 +66,14 @@ export async function editarProfissionalCompleto(
 
   const { error } = await supabase.from("profissionais").update(profData).eq("id", profissionalId);
   if (error) return { error: error.message };
+
+  // Redefinir senha se fornecida
+  const novaSenha = get("nova_senha");
+  if (novaSenha) {
+    const admin = createAdminClient();
+    const { error: senhaError } = await admin.auth.admin.updateUserById(profileId, { password: novaSenha });
+    if (senhaError) return { error: `Erro ao redefinir senha: ${senhaError.message}` };
+  }
 
   revalidatePath("/profissionais");
   revalidatePath("/dashboard");
