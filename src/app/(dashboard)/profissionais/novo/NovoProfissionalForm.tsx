@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Upload, X, Loader2, User, FileText, AlertCircle, ChevronDown, Check, Clock, Trash2,
+  Upload, X, Loader2, User, FileText, AlertCircle, ChevronDown, Check, Clock, Trash2, Stethoscope,
 } from "lucide-react";
 import { cadastrarProfissionalCompleto, buscarDadosProfissionalPorProfile } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
@@ -344,6 +344,34 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
               <input name="cnpj" type="text" className="input-field" placeholder="00.000.000/0000-00"
                 value={cnpj} onChange={e => setCnpj(maskCnpj(e.target.value))} />
             </div>
+          </div>
+
+          {/* Telefones */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Telefone 1</label>
+              <input name="telefone_1" type="text" className="input-field" placeholder="(00) 00000-0000"
+                value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
+              <p className="text-xs text-forest-400 mt-1">Para número internacional, comece com +</p>
+            </div>
+            <div>
+              <label className="label">Telefone 2</label>
+              <input name="telefone_2" type="text" className="input-field" placeholder="(00) 00000-0000"
+                value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
+              <p className="text-xs text-forest-400 mt-1">Para número internacional, comece com +</p>
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Observações</label>
+            <textarea name="observacoes" rows={3} className="input-field resize-none" placeholder="Informações relevantes…"
+              value={observacoes} onChange={e => setObservacoes(e.target.value)} />
+          </div>
+        </Section>
+
+        {/* ── Dados Profissionais ── */}
+        <Section icon={Stethoscope} title="Dados Profissionais">
+          <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Especialidade</label>
               <div className="flex items-center gap-2">
@@ -381,28 +409,6 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
               <label className="label">Valor Plano</label>
               <MoneyInput name="valor_plano" />
             </div>
-          </div>
-
-          {/* Telefones */}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Telefone 1</label>
-              <input name="telefone_1" type="text" className="input-field" placeholder="(00) 00000-0000"
-                value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
-              <p className="text-xs text-forest-400 mt-1">Para número internacional, comece com +</p>
-            </div>
-            <div>
-              <label className="label">Telefone 2</label>
-              <input name="telefone_2" type="text" className="input-field" placeholder="(00) 00000-0000"
-                value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
-              <p className="text-xs text-forest-400 mt-1">Para número internacional, comece com +</p>
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Observações</label>
-            <textarea name="observacoes" rows={3} className="input-field resize-none" placeholder="Informações relevantes…"
-              value={observacoes} onChange={e => setObservacoes(e.target.value)} />
           </div>
         </Section>
 
