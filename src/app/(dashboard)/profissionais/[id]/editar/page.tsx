@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, Clock } from "lucide-react";
 import { editarProfissional, gerenciarHorario } from "./actions";
 import { EditarPerfilProfissionalForm } from "./EditarPerfilProfissionalForm";
 
@@ -96,8 +96,12 @@ export default async function EditarProfissionalPage({
       />
 
       {/* ── Horários disponíveis ── */}
-      <div className="card space-y-4 mt-6">
-        <h2 className="font-display text-lg text-forest">Horários de atendimento</h2>
+      <div className="card p-0 overflow-hidden mt-6">
+        <div className="flex items-center gap-3 px-5 py-3 bg-forest/5 border-b border-sand/30">
+          <Clock className="w-4 h-4 text-forest" />
+          <h2 className="font-display text-base text-forest">Horários de atendimento</h2>
+        </div>
+        <div className="p-5 space-y-4">
         <p className="text-sm text-forest-600">
           Define quando este profissional está disponível para receber agendamentos.
         </p>
@@ -174,6 +178,7 @@ export default async function EditarProfissionalPage({
             </button>
           </div>
         </form>
+        </div>{/* /p-5 */}
       </div>
 
       {/* ── Salvar alterações (abaixo dos horários) ── */}
