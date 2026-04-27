@@ -50,8 +50,8 @@ const POSTIT_CORES: Record<string, { bg: string; border: string; label: string }
 };
 
 const PRIORIDADE: Record<string, { label: string; dot: string }> = {
-  baixa:  { label: "Baixa",  dot: "bg-gray-400"   },
-  normal: { label: "Normal", dot: "bg-blue-400"   },
+  baixa:  { label: "Baixa",  dot: "bg-blue-400"   },
+  normal: { label: "Normal", dot: "bg-yellow-400" },
   alta:   { label: "Alta",   dot: "bg-red-500"    },
 };
 

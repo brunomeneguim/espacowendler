@@ -101,7 +101,7 @@ export async function gerenciarHorario(
     const dia_semana = parseInt(formData.get("dia_semana") as string);
     const hora_inicio = formData.get("hora_inicio") as string;
     const hora_fim = formData.get("hora_fim") as string;
-    const dias = dia_semana === 7 ? [0, 1, 2, 3, 4, 5, 6] : [dia_semana];
+    const dias = dia_semana === 7 ? [1, 2, 3, 4, 5, 6] : [dia_semana];
 
     for (const dia of dias) {
       const { data: existing } = await supabase
@@ -141,7 +141,7 @@ export async function gerenciarHorarioIndisponivel(
     const dia_semana = parseInt(formData.get("dia_semana") as string);
     const hora_inicio = formData.get("hora_inicio") as string;
     const hora_fim = formData.get("hora_fim") as string;
-    const dias = dia_semana === 7 ? [0, 1, 2, 3, 4, 5, 6] : [dia_semana];
+    const dias = dia_semana === 7 ? [1, 2, 3, 4, 5, 6] : [dia_semana];
 
     for (const dia of dias) {
       const { data: existing } = await supabase

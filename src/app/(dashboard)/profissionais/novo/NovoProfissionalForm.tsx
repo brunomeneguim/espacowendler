@@ -231,7 +231,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   function adicionarHorario() {
     if (!novoHoraInicio || !novoHoraFim) return;
     if (novoHoraDia === 7) {
-      const novos = [0, 1, 2, 3, 4, 5, 6].map(dia => ({ dia_semana: dia, hora_inicio: novoHoraInicio, hora_fim: novoHoraFim }));
+      const novos = [1, 2, 3, 4, 5, 6].map(dia => ({ dia_semana: dia, hora_inicio: novoHoraInicio, hora_fim: novoHoraFim }));
       setHorarios(prev => [...prev, ...novos]);
     } else {
       setHorarios(prev => [...prev, { dia_semana: novoHoraDia, hora_inicio: novoHoraInicio, hora_fim: novoHoraFim }]);
@@ -245,7 +245,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   function adicionarIndisponivel() {
     if (!novoIndispInicio || !novoIndispFim) return;
     if (novoIndispDia === 7) {
-      const novos = [0, 1, 2, 3, 4, 5, 6].map(dia => ({ dia_semana: dia, hora_inicio: novoIndispInicio, hora_fim: novoIndispFim }));
+      const novos = [1, 2, 3, 4, 5, 6].map(dia => ({ dia_semana: dia, hora_inicio: novoIndispInicio, hora_fim: novoIndispFim }));
       setHorariosIndisponiveis(prev => [...prev, ...novos]);
     } else {
       setHorariosIndisponiveis(prev => [...prev, { dia_semana: novoIndispDia, hora_inicio: novoIndispInicio, hora_fim: novoIndispFim }]);
@@ -492,7 +492,6 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
                   <option value={4}>Quinta-feira</option>
                   <option value={5}>Sexta-feira</option>
                   <option value={6}>Sábado</option>
-                  <option value={0}>Domingo</option>
                 </select>
               </div>
               <div>
@@ -574,7 +573,6 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
                   <option value={4}>Quinta-feira</option>
                   <option value={5}>Sexta-feira</option>
                   <option value={6}>Sábado</option>
-                  <option value={0}>Domingo</option>
                 </select>
               </div>
               <div>
