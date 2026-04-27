@@ -116,6 +116,35 @@ export async function excluirPacienteConfirmado(id: string): Promise<{ error: st
   return { error: null };
 }
 
+export async function buscarAgendamentosPaciente(
+  id: string
+): Promise<{ id: string; profissional: string | null; data_hora_inicio: string; status: string }[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("agendamentos")
+    .select("id, data_hora_inicio, status, profissional:profissionais(profile:profiles(nome_completo))")
+    .eq("paciente_id", id)
+    .not("status", "in", "(cancelado,faltou)")
+    .order("data_hora_inicio");
+  return (data ?? []).map((a: any) => ({
+    id: a.id,
+    profissional: a.profissional?.profile?.nome_completo ?? null,
+    data_hora_inicio: a.data_hora_inicio,
+    status: a.status,
+  }));
+}
+
+export async function deletarAgendamento(
+  agendamentoId: string
+): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from("agendamentos").delete().eq("id", agendamentoId);
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+  revalidatePath("/agenda");
+  return { error: null };
+}
+
 export async function toggleAtivoPaciente(id: string): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { data: pac } = await supabase.from("pacientes").select("ativo").eq("id", id).single();

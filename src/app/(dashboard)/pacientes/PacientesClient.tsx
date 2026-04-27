@@ -11,7 +11,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import { excluirPaciente, excluirPacienteConfirmado, toggleAtivoPaciente } from "./actions";
+import { excluirPaciente, excluirPacienteConfirmado, toggleAtivoPaciente, buscarAgendamentosPaciente, deletarAgendamento } from "./actions";
 
 interface Paciente {
   id: string;
@@ -107,7 +107,42 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
   );
 }
 
-function ModalConfirmarInativar({ nome, onConfirm, onClose }: { nome: string; onConfirm: () => void; onClose: () => void }) {
+type AgendamentoPac = { id: string; profissional: string | null; data_hora_inicio: string; status: string };
+
+function formatDataHoraPac(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function ModalConfirmarInativar({ pacienteId, nome, onConfirm, onClose }: { pacienteId: string; nome: string; onConfirm: () => void; onClose: () => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [carregando, setCarregando] = useState(true);
+  const [agendamentos, setAgendamentos] = useState<AgendamentoPac[]>([]);
+  const [deletandoId, setDeletandoId] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    buscarAgendamentosPaciente(pacienteId).then(res => {
+      setAgendamentos(res);
+      setCarregando(false);
+    });
+  }, [pacienteId]);
+
+  function handleDeletarAgendamento(agendamentoId: string) {
+    setDeletandoId(agendamentoId);
+    startTransition(async () => {
+      const res = await deletarAgendamento(agendamentoId);
+      if (res.error) {
+        setErro(res.error);
+      } else {
+        setAgendamentos(prev => prev.filter(a => a.id !== agendamentoId));
+      }
+      setDeletandoId(null);
+    });
+  }
+
+  const temAgendamentos = agendamentos.length > 0;
+
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
@@ -124,10 +159,47 @@ function ModalConfirmarInativar({ nome, onConfirm, onClose }: { nome: string; on
               </p>
             </div>
           </div>
+
+          {carregando ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-6 h-6 animate-spin text-forest-400" />
+            </div>
+          ) : temAgendamentos ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                <strong>Atenção:</strong> Este paciente possui {agendamentos.length} agendamento{agendamentos.length !== 1 ? "s" : ""} ativo{agendamentos.length !== 1 ? "s" : ""}. Exclua todos antes de continuar.
+              </p>
+              <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+                {agendamentos.map(a => (
+                  <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-cream rounded-lg border border-sand/30">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-forest truncate">{a.profissional ?? "Profissional"}</p>
+                      <p className="text-xs text-forest-500">{formatDataHoraPac(a.data_hora_inicio)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={deletandoId === a.id || isPending}
+                      onClick={() => handleDeletarAgendamento(a.id)}
+                      className="p-1.5 rounded-lg text-rust hover:bg-rust/10 transition-colors shrink-0 disabled:opacity-40"
+                      title="Excluir agendamento"
+                    >
+                      {deletandoId === a.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {erro && <p className="text-sm text-rust">{erro}</p>}
+
           <div className="flex gap-3 pt-2">
             <button
               onClick={onConfirm}
-              className="flex-1 bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors flex items-center justify-center gap-2"
+              disabled={isPending || carregando || temAgendamentos}
+              className="flex-1 bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <ToggleLeft className="w-4 h-4" />
               Sim, desativar
@@ -181,6 +253,7 @@ export function PacientesClient({ pacientes, canEdit, profissionais = [], pacien
       {excluindo && <ModalExcluir paciente={excluindo} onClose={() => setExcluindo(null)} />}
       {inativando && (
         <ModalConfirmarInativar
+          pacienteId={inativando.id}
           nome={inativando.nome_completo}
           onConfirm={() => { executarToggle(inativando.id); setInativando(null); }}
           onClose={() => setInativando(null)}
