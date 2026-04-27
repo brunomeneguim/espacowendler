@@ -127,3 +127,44 @@ export async function gerenciarHorario(
   revalidatePath(`/profissionais/${profissionalId}/editar`);
   revalidatePath("/dashboard");
 }
+
+export async function gerenciarHorarioIndisponivel(
+  profissionalId: string,
+  action: "add" | "remove",
+  formData: FormData
+) {
+  const supabase = createClient();
+
+  if (action === "remove") {
+    const id = formData.get("horario_id") as string;
+    await supabase.from("horarios_indisponiveis").delete().eq("id", id);
+  } else {
+    const dia_semana = parseInt(formData.get("dia_semana") as string);
+    const hora_inicio = formData.get("hora_inicio") as string;
+    const hora_fim = formData.get("hora_fim") as string;
+
+    const { data: existing } = await supabase
+      .from("horarios_indisponiveis")
+      .select("id")
+      .eq("profissional_id", profissionalId)
+      .eq("dia_semana", dia_semana)
+      .eq("hora_inicio", hora_inicio)
+      .maybeSingle();
+
+    if (existing) {
+      return redirect(
+        `/profissionais/${profissionalId}/editar?error=${encodeURIComponent("Este horário indisponível já foi adicionado.")}`
+      );
+    }
+
+    await supabase.from("horarios_indisponiveis").insert({
+      profissional_id: profissionalId,
+      dia_semana,
+      hora_inicio,
+      hora_fim,
+    });
+  }
+
+  revalidatePath(`/profissionais/${profissionalId}/editar`);
+  revalidatePath("/dashboard");
+}

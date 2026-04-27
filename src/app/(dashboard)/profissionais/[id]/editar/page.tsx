@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
-import { ArrowLeft, Trash2, Clock } from "lucide-react";
-import { editarProfissional, gerenciarHorario } from "./actions";
+import { ArrowLeft, Trash2, Clock, Ban } from "lucide-react";
+import { editarProfissional, gerenciarHorario, gerenciarHorarioIndisponivel } from "./actions";
 import { EditarPerfilProfissionalForm } from "./EditarPerfilProfissionalForm";
 
 const DIAS_SEMANA = [
@@ -29,7 +29,7 @@ export default async function EditarProfissionalPage({
 
   const supabase = createClient();
 
-  const [{ data: prof }, { data: especialidades }, { data: horarios }, { data: todasCores }, { data: espSelecionadasRaw }] = await Promise.all([
+  const [{ data: prof }, { data: especialidades }, { data: horarios }, { data: horariosIndisp }, { data: todasCores }, { data: espSelecionadasRaw }] = await Promise.all([
     supabase
       .from("profissionais")
       .select(
@@ -40,6 +40,12 @@ export default async function EditarProfissionalPage({
     supabase.from("especialidades").select("id, nome").order("nome"),
     supabase
       .from("horarios_disponiveis")
+      .select("id, dia_semana, hora_inicio, hora_fim")
+      .eq("profissional_id", params.id)
+      .order("dia_semana")
+      .order("hora_inicio"),
+    supabase
+      .from("horarios_indisponiveis")
       .select("id, dia_semana, hora_inicio, hora_fim")
       .eq("profissional_id", params.id)
       .order("dia_semana")
@@ -57,6 +63,7 @@ export default async function EditarProfissionalPage({
 
   const coresUsadas = (todasCores ?? []).map((p: any) => p.cor).filter(Boolean) as string[];
   const addHorarioAction = gerenciarHorario.bind(null, params.id, "add");
+  const addIndisponivelAction = gerenciarHorarioIndisponivel.bind(null, params.id, "add");
 
   return (
     <div className="p-6 md:p-10 max-w-3xl">
@@ -181,12 +188,88 @@ export default async function EditarProfissionalPage({
         </div>{/* /p-5 */}
       </div>
 
+      {/* ── Horários indisponíveis ── */}
+      <div className="card p-0 overflow-hidden mt-6">
+        <div className="flex items-center gap-3 px-5 py-3 bg-rust/5 border-b border-rust/10">
+          <Ban className="w-4 h-4 text-rust" />
+          <h2 className="font-display text-base text-rust">Horários indisponíveis</h2>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-forest-600">
+            Períodos em que este profissional não pode receber agendamentos, mesmo dentro do horário de atendimento.
+          </p>
+
+          {(horariosIndisp ?? []).length === 0 ? (
+            <p className="text-sm text-forest-400">Nenhum horário indisponível cadastrado.</p>
+          ) : (
+            <div className="space-y-2">
+              {(horariosIndisp ?? []).map((h: any) => {
+                const dia = DIAS_SEMANA.find((d) => d.value === h.dia_semana);
+                const removeIndispAction = gerenciarHorarioIndisponivel.bind(null, params.id, "remove");
+                return (
+                  <div key={h.id} className="flex items-center justify-between p-3 bg-rust/5 rounded-lg border border-rust/10">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-forest w-32 shrink-0">{dia?.label}</span>
+                      <span className="text-sm text-forest-500">
+                        {h.hora_inicio.slice(0, 5)} – {h.hora_fim.slice(0, 5)}
+                      </span>
+                    </div>
+                    <form action={removeIndispAction}>
+                      <input type="hidden" name="horario_id" value={h.id} />
+                      <button
+                        type="submit"
+                        className="p-1.5 rounded-lg text-rust hover:bg-rust/10 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </form>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <form action={addIndisponivelAction} className="border-t border-sand/30 pt-4 space-y-3">
+            <p className="text-sm font-medium text-forest">Adicionar horário indisponível</p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label className="label">Dia da semana</label>
+                <select name="dia_semana" required className="input-field">
+                  {DIAS_SEMANA.map((d) => (
+                    <option key={d.value} value={d.value}>{d.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Início</label>
+                <input name="hora_inicio" type="time" required className="input-field" defaultValue="07:00" />
+              </div>
+              <div>
+                <label className="label">Fim</label>
+                <input name="hora_fim" type="time" required className="input-field" defaultValue="21:00" />
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <button type="submit" className="btn-secondary text-sm px-8 border border-rust/30 text-rust hover:bg-rust/5">
+                Adicionar horário indisponível
+              </button>
+            </div>
+          </form>
+        </div>{/* /p-5 */}
+      </div>
+
       {/* ── Salvar alterações (abaixo dos horários) ── */}
-      <div className="mt-6">
+      <div className="mt-6 flex gap-3">
+        <Link
+          href="/profissionais"
+          className="btn-secondary flex-1 flex items-center justify-center gap-2"
+        >
+          Cancelar
+        </Link>
         <button
           type="submit"
           form="prof-edit-form"
-          className="btn-primary w-full flex items-center justify-center gap-2"
+          className="btn-primary flex-1 flex items-center justify-center gap-2"
         >
           Salvar alterações
         </button>

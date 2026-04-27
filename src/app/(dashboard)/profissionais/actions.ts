@@ -278,6 +278,19 @@ export async function cadastrarProfissionalCompleto(
     } catch { /* ignora JSON inválido */ }
   }
 
+  // Inserir horários indisponíveis, se houver
+  const horariosIndispJson = get("horarios_indisponiveis_json");
+  if (horariosIndispJson && profCriado?.id) {
+    try {
+      const horariosIndisp = JSON.parse(horariosIndispJson) as { dia_semana: number; hora_inicio: string; hora_fim: string }[];
+      if (horariosIndisp.length > 0) {
+        await supabase.from("horarios_indisponiveis").insert(
+          horariosIndisp.map(h => ({ profissional_id: profCriado.id, ...h }))
+        );
+      }
+    } catch { /* ignora JSON inválido */ }
+  }
+
   revalidatePath("/profissionais");
   revalidatePath("/dashboard");
   redirect("/profissionais");

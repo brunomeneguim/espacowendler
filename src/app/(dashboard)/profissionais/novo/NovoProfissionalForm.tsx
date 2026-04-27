@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Upload, X, Loader2, User, FileText, AlertCircle, ChevronDown, Check, Clock, Trash2, Stethoscope,
+  Upload, X, Loader2, User, FileText, AlertCircle, ChevronDown, Check, Clock, Trash2, Stethoscope, Ban,
 } from "lucide-react";
 import { cadastrarProfissionalCompleto, buscarDadosProfissionalPorProfile } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
@@ -164,6 +164,11 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   const [novoHoraDia, setNovoHoraDia] = useState(1);
   const [novoHoraInicio, setNovoHoraInicio] = useState("07:00");
   const [novoHoraFim, setNovoHoraFim] = useState("21:00");
+  // Horários indisponíveis
+  const [horariosIndisponiveis, setHorariosIndisponiveis] = useState<{ dia_semana: number; hora_inicio: string; hora_fim: string }[]>([]);
+  const [novoIndispDia, setNovoIndispDia] = useState(1);
+  const [novoIndispInicio, setNovoIndispInicio] = useState("07:00");
+  const [novoIndispFim, setNovoIndispFim] = useState("21:00");
 
   async function handleProfileChange(profileId: string) {
     if (!profileId) { setEmail(""); return; }
@@ -214,6 +219,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
     fd.set("foto_url", foto ?? "");
     fd.set("tempo_atendimento", String(tempoAtendimento));
     fd.set("horarios_json", JSON.stringify(horarios));
+    fd.set("horarios_indisponiveis_json", JSON.stringify(horariosIndisponiveis));
     setErro(null);
     startTransition(async () => {
       const res = await cadastrarProfissionalCompleto(fd);
@@ -229,6 +235,15 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
 
   function removerHorario(idx: number) {
     setHorarios(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  function adicionarIndisponivel() {
+    if (!novoIndispInicio || !novoIndispFim) return;
+    setHorariosIndisponiveis(prev => [...prev, { dia_semana: novoIndispDia, hora_inicio: novoIndispInicio, hora_fim: novoIndispFim }]);
+  }
+
+  function removerIndisponivel(idx: number) {
+    setHorariosIndisponiveis(prev => prev.filter((_, i) => i !== idx));
   }
 
   return (
@@ -270,6 +285,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
                 )}
               </div>
             )}
+          </div>
           <div>
             <label className="label">E-mail</label>
             <input
@@ -499,8 +515,95 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
           </div>
         </Section>
 
-        {/* Botão */}
+        {/* ── Horários indisponíveis ── */}
+        <Section icon={Ban} title="Horários indisponíveis">
+          <p className="text-sm text-forest-600">
+            Períodos em que este profissional não pode receber agendamentos, mesmo dentro do horário de atendimento.
+          </p>
+
+          {horariosIndisponiveis.length === 0 ? (
+            <p className="text-sm text-forest-400">Nenhum horário indisponível adicionado ainda.</p>
+          ) : (
+            <div className="space-y-2">
+              {horariosIndisponiveis.map((h, idx) => {
+                const DIAS_FULL = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+                return (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-rust/5 rounded-lg border border-rust/10">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-forest w-32 shrink-0">{DIAS_FULL[h.dia_semana]}</span>
+                      <span className="text-sm text-forest-500">{h.hora_inicio} – {h.hora_fim}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removerIndisponivel(idx)}
+                      className="p-1.5 rounded-lg text-rust hover:bg-rust/10 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="border-t border-sand/30 pt-4 space-y-3">
+            <p className="text-sm font-medium text-forest">Adicionar horário indisponível</p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label className="label">Dia da semana</label>
+                <select
+                  className="input-field"
+                  value={novoIndispDia}
+                  onChange={e => setNovoIndispDia(Number(e.target.value))}
+                >
+                  <option value={1}>Segunda-feira</option>
+                  <option value={2}>Terça-feira</option>
+                  <option value={3}>Quarta-feira</option>
+                  <option value={4}>Quinta-feira</option>
+                  <option value={5}>Sexta-feira</option>
+                  <option value={6}>Sábado</option>
+                  <option value={0}>Domingo</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Início</label>
+                <input
+                  type="time"
+                  className="input-field"
+                  value={novoIndispInicio}
+                  onChange={e => setNovoIndispInicio(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label">Fim</label>
+                <input
+                  type="time"
+                  className="input-field"
+                  value={novoIndispFim}
+                  onChange={e => setNovoIndispFim(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={adicionarIndisponivel}
+                className="btn-secondary text-sm px-8 border border-rust/30 text-rust hover:bg-rust/5"
+              >
+                Adicionar horário indisponível
+              </button>
+            </div>
+          </div>
+        </Section>
+
+        {/* Botões */}
         <div className="flex gap-3 pt-2">
+          <a
+            href="/profissionais"
+            className="btn-secondary flex-1 flex items-center justify-center gap-2"
+          >
+            Cancelar
+          </a>
           <button
             type="submit"
             disabled={isPending || profiles.length === 0}
