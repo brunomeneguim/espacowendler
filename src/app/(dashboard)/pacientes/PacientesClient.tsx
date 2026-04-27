@@ -11,7 +11,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import { excluirPaciente, excluirPacienteConfirmado, toggleAtivoPaciente, buscarAgendamentosPaciente, deletarAgendamento } from "./actions";
+import { excluirPacienteConfirmado, toggleAtivoPaciente, buscarAgendamentosPaciente, deletarAgendamento } from "./actions";
 
 interface Paciente {
   id: string;
@@ -33,21 +33,30 @@ interface Props {
 
 function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () => void }) {
   const [isPending, startTransition] = useTransition();
-  const [step, setStep] = useState<"checking" | "confirm" | "confirmWithConsultas">("checking");
-  const [count, setCount] = useState(0);
+  const [carregando, setCarregando] = useState(true);
+  const [agendamentos, setAgendamentos] = useState<AgendamentoPac[]>([]);
+  const [deletandoId, setDeletandoId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    startTransition(async () => {
-      const res = await excluirPaciente(paciente.id);
-      if (res.temConsultas) {
-        setCount(res.count);
-        setStep("confirmWithConsultas");
-      } else {
-        setStep("confirm");
-      }
+    buscarAgendamentosPaciente(paciente.id).then(res => {
+      setAgendamentos(res);
+      setCarregando(false);
     });
-  }, []);
+  }, [paciente.id]);
+
+  function handleDeletarAgendamento(agendamentoId: string) {
+    setDeletandoId(agendamentoId);
+    startTransition(async () => {
+      const res = await deletarAgendamento(agendamentoId);
+      if (res.error) {
+        setErro(res.error);
+      } else {
+        setAgendamentos(prev => prev.filter(a => a.id !== agendamentoId));
+      }
+      setDeletandoId(null);
+    });
+  }
 
   function handleConfirm() {
     startTransition(async () => {
@@ -57,50 +66,71 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
     });
   }
 
+  const temAgendamentos = agendamentos.length > 0;
+
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-          {step === "checking" ? (
-            <div className="flex items-center justify-center py-8">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-rust/10 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-rust" />
+            </div>
+            <div>
+              <p className="font-display text-lg text-forest">Excluir paciente</p>
+              <p className="text-sm text-forest-600 mt-1">
+                Tem certeza que deseja excluir <strong>{paciente.nome_completo}</strong>? Esta ação é irreversível.
+              </p>
+            </div>
+          </div>
+
+          {carregando ? (
+            <div className="flex items-center justify-center py-6">
               <Loader2 className="w-6 h-6 animate-spin text-forest-400" />
             </div>
-          ) : (
-            <>
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-rust/10 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-5 h-5 text-rust" />
-                </div>
-                <div>
-                  <p className="font-display text-lg text-forest">Excluir paciente</p>
-                  <p className="text-sm text-forest-600 mt-1">
-                    Tem certeza que deseja excluir <strong>{paciente.nome_completo}</strong>? Esta ação é irreversível.
-                  </p>
-                </div>
+          ) : temAgendamentos ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                <strong>Atenção:</strong> Este paciente possui {agendamentos.length} agendamento{agendamentos.length !== 1 ? "s" : ""} ativo{agendamentos.length !== 1 ? "s" : ""}. Exclua todos antes de continuar.
+              </p>
+              <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+                {agendamentos.map(a => (
+                  <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-cream rounded-lg border border-sand/30">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-forest truncate">{a.profissional ?? "Profissional"}</p>
+                      <p className="text-xs text-forest-500">{formatDataHoraPac(a.data_hora_inicio)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={deletandoId === a.id || isPending}
+                      onClick={() => handleDeletarAgendamento(a.id)}
+                      className="p-1.5 rounded-lg text-rust hover:bg-rust/10 transition-colors shrink-0 disabled:opacity-40"
+                      title="Excluir agendamento"
+                    >
+                      {deletandoId === a.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                ))}
               </div>
+            </div>
+          ) : null}
 
-              {step === "confirmWithConsultas" && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-                  <strong>Atenção:</strong> Este paciente possui <strong>{count}</strong> consulta{count !== 1 ? "s" : ""} agendada{count !== 1 ? "s" : ""}. Ao confirmar, as consultas também serão excluídas.
-                </div>
-              )}
+          {erro && <p className="text-sm text-rust">{erro}</p>}
 
-              {erro && <p className="text-sm text-rust">{erro}</p>}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={handleConfirm}
-                  disabled={isPending}
-                  className="flex-1 bg-rust text-cream px-4 py-2 rounded-xl text-sm font-medium hover:bg-rust/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  {isPending ? "Excluindo…" : "Sim, excluir"}
-                </button>
-                <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
-              </div>
-            </>
-          )}
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleConfirm}
+              disabled={isPending || carregando || temAgendamentos}
+              className="flex-1 bg-rust text-cream px-4 py-2 rounded-xl text-sm font-medium hover:bg-rust/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              {isPending ? "Excluindo…" : "Sim, excluir"}
+            </button>
+            <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+          </div>
         </div>
       </div>
     </>
