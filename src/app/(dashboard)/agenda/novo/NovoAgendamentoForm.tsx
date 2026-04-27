@@ -286,7 +286,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
               <Link href="/pacientes/novo?from=agenda" className="font-medium underline">Cadastrar paciente</Link>
             </div>
           ) : (
-            <div className="flex items-start gap-2">
+            <div className="flex items-stretch gap-2">
               <div className="flex-1">
                 <SearchableSelect
                   name="paciente_id"
@@ -297,7 +297,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
               </div>
               <Link
                 href="/pacientes/novo?from=agenda"
-                className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg border border-sand/40 hover:bg-forest/5 text-forest-500 hover:text-forest transition-colors"
+                className="shrink-0 flex items-center justify-center w-10 rounded-lg border border-sand/40 hover:bg-forest/5 text-forest-500 hover:text-forest transition-colors"
                 title="Cadastrar novo paciente"
               >
                 <UserPlus className="w-4 h-4" />
