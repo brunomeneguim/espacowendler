@@ -101,27 +101,26 @@ export async function gerenciarHorario(
     const dia_semana = parseInt(formData.get("dia_semana") as string);
     const hora_inicio = formData.get("hora_inicio") as string;
     const hora_fim = formData.get("hora_fim") as string;
+    const dias = dia_semana === 7 ? [0, 1, 2, 3, 4, 5, 6] : [dia_semana];
 
-    const { data: existing } = await supabase
-      .from("horarios_disponiveis")
-      .select("id")
-      .eq("profissional_id", profissionalId)
-      .eq("dia_semana", dia_semana)
-      .eq("hora_inicio", hora_inicio)
-      .maybeSingle();
+    for (const dia of dias) {
+      const { data: existing } = await supabase
+        .from("horarios_disponiveis")
+        .select("id")
+        .eq("profissional_id", profissionalId)
+        .eq("dia_semana", dia)
+        .eq("hora_inicio", hora_inicio)
+        .maybeSingle();
 
-    if (existing) {
-      return redirect(
-        `/profissionais/${profissionalId}/editar?error=${encodeURIComponent("Este horário já foi adicionado.")}`
-      );
+      if (!existing) {
+        await supabase.from("horarios_disponiveis").insert({
+          profissional_id: profissionalId,
+          dia_semana: dia,
+          hora_inicio,
+          hora_fim,
+        });
+      }
     }
-
-    await supabase.from("horarios_disponiveis").insert({
-      profissional_id: profissionalId,
-      dia_semana,
-      hora_inicio,
-      hora_fim,
-    });
   }
 
   revalidatePath(`/profissionais/${profissionalId}/editar`);
@@ -142,27 +141,26 @@ export async function gerenciarHorarioIndisponivel(
     const dia_semana = parseInt(formData.get("dia_semana") as string);
     const hora_inicio = formData.get("hora_inicio") as string;
     const hora_fim = formData.get("hora_fim") as string;
+    const dias = dia_semana === 7 ? [0, 1, 2, 3, 4, 5, 6] : [dia_semana];
 
-    const { data: existing } = await supabase
-      .from("horarios_indisponiveis")
-      .select("id")
-      .eq("profissional_id", profissionalId)
-      .eq("dia_semana", dia_semana)
-      .eq("hora_inicio", hora_inicio)
-      .maybeSingle();
+    for (const dia of dias) {
+      const { data: existing } = await supabase
+        .from("horarios_indisponiveis")
+        .select("id")
+        .eq("profissional_id", profissionalId)
+        .eq("dia_semana", dia)
+        .eq("hora_inicio", hora_inicio)
+        .maybeSingle();
 
-    if (existing) {
-      return redirect(
-        `/profissionais/${profissionalId}/editar?error=${encodeURIComponent("Este horário indisponível já foi adicionado.")}`
-      );
+      if (!existing) {
+        await supabase.from("horarios_indisponiveis").insert({
+          profissional_id: profissionalId,
+          dia_semana: dia,
+          hora_inicio,
+          hora_fim,
+        });
+      }
     }
-
-    await supabase.from("horarios_indisponiveis").insert({
-      profissional_id: profissionalId,
-      dia_semana,
-      hora_inicio,
-      hora_fim,
-    });
   }
 
   revalidatePath(`/profissionais/${profissionalId}/editar`);

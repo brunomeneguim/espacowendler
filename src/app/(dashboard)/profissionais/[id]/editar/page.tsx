@@ -8,6 +8,7 @@ import { editarProfissional, gerenciarHorario, gerenciarHorarioIndisponivel } fr
 import { EditarPerfilProfissionalForm } from "./EditarPerfilProfissionalForm";
 
 const DIAS_SEMANA = [
+  { value: 7, label: "Todos os dias" },
   { value: 1, label: "Segunda-feira" },
   { value: 2, label: "Terça-feira" },
   { value: 3, label: "Quarta-feira" },
@@ -260,12 +261,6 @@ export default async function EditarProfissionalPage({
 
       {/* ── Salvar alterações (abaixo dos horários) ── */}
       <div className="mt-6 flex gap-3">
-        <Link
-          href="/profissionais"
-          className="btn-secondary flex-1 flex items-center justify-center gap-2"
-        >
-          Cancelar
-        </Link>
         <button
           type="submit"
           form="prof-edit-form"
@@ -273,6 +268,12 @@ export default async function EditarProfissionalPage({
         >
           Salvar alterações
         </button>
+        <Link
+          href="/profissionais"
+          className="btn-secondary flex-1 flex items-center justify-center gap-2"
+        >
+          Cancelar
+        </Link>
       </div>
     </div>
   );

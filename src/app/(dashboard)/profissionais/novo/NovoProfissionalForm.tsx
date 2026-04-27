@@ -230,7 +230,12 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
 
   function adicionarHorario() {
     if (!novoHoraInicio || !novoHoraFim) return;
-    setHorarios(prev => [...prev, { dia_semana: novoHoraDia, hora_inicio: novoHoraInicio, hora_fim: novoHoraFim }]);
+    if (novoHoraDia === 7) {
+      const novos = [0, 1, 2, 3, 4, 5, 6].map(dia => ({ dia_semana: dia, hora_inicio: novoHoraInicio, hora_fim: novoHoraFim }));
+      setHorarios(prev => [...prev, ...novos]);
+    } else {
+      setHorarios(prev => [...prev, { dia_semana: novoHoraDia, hora_inicio: novoHoraInicio, hora_fim: novoHoraFim }]);
+    }
   }
 
   function removerHorario(idx: number) {
@@ -239,7 +244,12 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
 
   function adicionarIndisponivel() {
     if (!novoIndispInicio || !novoIndispFim) return;
-    setHorariosIndisponiveis(prev => [...prev, { dia_semana: novoIndispDia, hora_inicio: novoIndispInicio, hora_fim: novoIndispFim }]);
+    if (novoIndispDia === 7) {
+      const novos = [0, 1, 2, 3, 4, 5, 6].map(dia => ({ dia_semana: dia, hora_inicio: novoIndispInicio, hora_fim: novoIndispFim }));
+      setHorariosIndisponiveis(prev => [...prev, ...novos]);
+    } else {
+      setHorariosIndisponiveis(prev => [...prev, { dia_semana: novoIndispDia, hora_inicio: novoIndispInicio, hora_fim: novoIndispFim }]);
+    }
   }
 
   function removerIndisponivel(idx: number) {
@@ -475,6 +485,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
                   value={novoHoraDia}
                   onChange={e => setNovoHoraDia(Number(e.target.value))}
                 >
+                  <option value={7}>Todos os dias</option>
                   <option value={1}>Segunda-feira</option>
                   <option value={2}>Terça-feira</option>
                   <option value={3}>Quarta-feira</option>
@@ -556,6 +567,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
                   value={novoIndispDia}
                   onChange={e => setNovoIndispDia(Number(e.target.value))}
                 >
+                  <option value={7}>Todos os dias</option>
                   <option value={1}>Segunda-feira</option>
                   <option value={2}>Terça-feira</option>
                   <option value={3}>Quarta-feira</option>
@@ -598,12 +610,6 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
 
         {/* Botões */}
         <div className="flex gap-3 pt-2">
-          <a
-            href="/profissionais"
-            className="btn-secondary flex-1 flex items-center justify-center gap-2"
-          >
-            Cancelar
-          </a>
           <button
             type="submit"
             disabled={isPending || profiles.length === 0}
@@ -611,6 +617,12 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
           >
             {isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Cadastrando…</> : "Cadastrar profissional"}
           </button>
+          <a
+            href="/profissionais"
+            className="btn-secondary flex-1 flex items-center justify-center gap-2"
+          >
+            Cancelar
+          </a>
         </div>
       </form>
     </div>
