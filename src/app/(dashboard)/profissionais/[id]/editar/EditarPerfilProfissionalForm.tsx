@@ -365,12 +365,12 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Telefone 1</label>
-              <input name="telefone_1" type="text" className="input-field" placeholder="(00) 00000-0000 ou +XX XXXXXXXXX"
+              <input name="telefone_1" type="text" className="input-field" placeholder="(00) 00000-0000"
                 value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
             </div>
             <div>
               <label className="label">Telefone 2</label>
-              <input name="telefone_2" type="text" className="input-field" placeholder="(00) 00000-0000 ou +XX XXXXXXXXX"
+              <input name="telefone_2" type="text" className="input-field" placeholder="(00) 00000-0000"
                 value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
             </div>
           </div>
