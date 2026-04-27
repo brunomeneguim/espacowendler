@@ -271,19 +271,6 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
               </div>
             )}
           </div>
-          {email && (
-            <div>
-              <label className="label">E-mail</label>
-              <input
-                type="email"
-                className="input-field bg-sand/10 text-forest-500 cursor-not-allowed"
-                value={email}
-                disabled
-                readOnly
-              />
-              <p className="text-xs text-forest-400 mt-1">E-mail do usuário vinculado (não editável aqui).</p>
-            </div>
-          )}
         </Section>
 
         {/* ── Dados Gerais ── */}
@@ -319,6 +306,18 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
               <label className="label">Nome completo</label>
               <input name="nome_completo" type="text" className="input-field" placeholder="Nome completo do profissional"
                 value={nomeCompleto} onChange={e => setNomeCompleto(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">E-mail</label>
+              <input
+                type="email"
+                className="input-field opacity-60 cursor-not-allowed"
+                value={email}
+                placeholder="Selecione um usuário acima"
+                disabled
+                readOnly
+              />
+              <p className="text-xs text-forest-400 mt-1">O e-mail não pode ser alterado.</p>
             </div>
             <div>
               <label className="label">Data de nascimento <span className="text-rust">*</span></label>
