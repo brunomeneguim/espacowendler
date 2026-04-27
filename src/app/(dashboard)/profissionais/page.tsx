@@ -11,13 +11,14 @@ export default async function ProfissionaisPage() {
   const supabase = createClient();
   const profile = await getCurrentProfile();
   const canManage = ["admin", "supervisor"].includes(profile.role);
+  const canDelete = ["admin", "supervisor"].includes(profile.role);
 
   const [{ data: profissionais }, { data: especialidades }, { data: configsRaw }] =
     await Promise.all([
       supabase
         .from("profissionais")
         .select(
-          "id, registro_profissional, valor_consulta, valor_plano, ativo, foto_url, cor, data_nascimento, profile:profiles(nome_completo, email), especialidade:especialidades(nome)"
+          "id, registro_profissional, valor_plano, telefone_1, ativo, foto_url, cor, data_nascimento, profile:profiles(nome_completo, email), especialidade:especialidades(nome)"
         )
         .order("created_at", { ascending: false }),
       supabase.from("especialidades").select("id, nome").order("nome"),
@@ -48,6 +49,7 @@ export default async function ProfissionaisPage() {
       <ProfissionaisClient
         profissionais={(profissionais as any) ?? []}
         canManage={canManage}
+        canDelete={canDelete}
       />
     </div>
   );

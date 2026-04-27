@@ -16,7 +16,13 @@ export async function getCurrentProfile(): Promise<Profile> {
     .eq("id", user.id)
     .single();
 
-  if (error || !profile) redirect("/login");
+  if (error || !profile) {
+    // Encerra a sessão para quebrar o loop de redirect:
+    // middleware redireciona /login→/dashboard quando usuário está autenticado,
+    // mas sem perfil o dashboard voltaria a redirecionar para /login.
+    try { await supabase.auth.signOut(); } catch { /* ignora */ }
+    redirect("/login");
+  }
 
   return profile as Profile;
 }
