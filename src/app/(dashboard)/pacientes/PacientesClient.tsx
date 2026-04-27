@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useTransition, useEffect } from "react";
 import Link from "next/link";
-import { Search, Pencil, Users, Plus, Mail, Trash2, Loader2, AlertTriangle, ToggleLeft, ToggleRight, ChevronDown } from "lucide-react";
+import { Search, Pencil, Users, Plus, Mail, Trash2, Loader2, AlertTriangle, ToggleLeft, ToggleRight, ChevronDown, UserCog } from "lucide-react";
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -11,7 +11,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import { excluirPacienteConfirmado, toggleAtivoPaciente, buscarAgendamentosPaciente, deletarAgendamento } from "./actions";
+import { excluirPacienteConfirmado, toggleAtivoPaciente, buscarAgendamentosPaciente, deletarAgendamento, deletarTodosAgendamentosPaciente } from "./actions";
 
 interface Paciente {
   id: string;
@@ -36,6 +36,7 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
   const [carregando, setCarregando] = useState(true);
   const [agendamentos, setAgendamentos] = useState<AgendamentoPac[]>([]);
   const [deletandoId, setDeletandoId] = useState<string | null>(null);
+  const [deletandoTodos, setDeletandoTodos] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +56,16 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
         setAgendamentos(prev => prev.filter(a => a.id !== agendamentoId));
       }
       setDeletandoId(null);
+    });
+  }
+
+  function handleDeletarTodos() {
+    setDeletandoTodos(true);
+    startTransition(async () => {
+      const res = await deletarTodosAgendamentosPaciente(paciente.id);
+      if (res.error) setErro(res.error);
+      else setAgendamentos([]);
+      setDeletandoTodos(false);
     });
   }
 
@@ -94,7 +105,7 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
               <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                 <strong>Atenção:</strong> Este paciente possui {agendamentos.length} agendamento{agendamentos.length !== 1 ? "s" : ""} ativo{agendamentos.length !== 1 ? "s" : ""}. Exclua todos antes de continuar.
               </p>
-              <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+              <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
                 {agendamentos.map(a => (
                   <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-cream rounded-lg border border-sand/30">
                     <div className="min-w-0">
@@ -103,7 +114,7 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
                     </div>
                     <button
                       type="button"
-                      disabled={deletandoId === a.id || isPending}
+                      disabled={deletandoId === a.id || isPending || deletandoTodos}
                       onClick={() => handleDeletarAgendamento(a.id)}
                       className="p-1.5 rounded-lg text-rust hover:bg-rust/10 transition-colors shrink-0 disabled:opacity-40"
                       title="Excluir agendamento"
@@ -115,6 +126,15 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
                   </div>
                 ))}
               </div>
+              <button
+                type="button"
+                disabled={isPending || deletandoTodos}
+                onClick={handleDeletarTodos}
+                className="w-full flex items-center justify-center gap-2 text-sm text-rust border border-rust/30 rounded-lg px-3 py-2 hover:bg-rust/5 transition-colors disabled:opacity-40"
+              >
+                {deletandoTodos ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Excluir todos os agendamentos
+              </button>
             </div>
           ) : null}
 
@@ -149,6 +169,7 @@ function ModalConfirmarInativar({ pacienteId, nome, onConfirm, onClose }: { paci
   const [carregando, setCarregando] = useState(true);
   const [agendamentos, setAgendamentos] = useState<AgendamentoPac[]>([]);
   const [deletandoId, setDeletandoId] = useState<string | null>(null);
+  const [deletandoTodos, setDeletandoTodos] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -168,6 +189,16 @@ function ModalConfirmarInativar({ pacienteId, nome, onConfirm, onClose }: { paci
         setAgendamentos(prev => prev.filter(a => a.id !== agendamentoId));
       }
       setDeletandoId(null);
+    });
+  }
+
+  function handleDeletarTodos() {
+    setDeletandoTodos(true);
+    startTransition(async () => {
+      const res = await deletarTodosAgendamentosPaciente(pacienteId);
+      if (res.error) setErro(res.error);
+      else setAgendamentos([]);
+      setDeletandoTodos(false);
     });
   }
 
@@ -199,7 +230,7 @@ function ModalConfirmarInativar({ pacienteId, nome, onConfirm, onClose }: { paci
               <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                 <strong>Atenção:</strong> Este paciente possui {agendamentos.length} agendamento{agendamentos.length !== 1 ? "s" : ""} ativo{agendamentos.length !== 1 ? "s" : ""}. Exclua todos antes de continuar.
               </p>
-              <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+              <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
                 {agendamentos.map(a => (
                   <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-cream rounded-lg border border-sand/30">
                     <div className="min-w-0">
@@ -208,7 +239,7 @@ function ModalConfirmarInativar({ pacienteId, nome, onConfirm, onClose }: { paci
                     </div>
                     <button
                       type="button"
-                      disabled={deletandoId === a.id || isPending}
+                      disabled={deletandoId === a.id || isPending || deletandoTodos}
                       onClick={() => handleDeletarAgendamento(a.id)}
                       className="p-1.5 rounded-lg text-rust hover:bg-rust/10 transition-colors shrink-0 disabled:opacity-40"
                       title="Excluir agendamento"
@@ -220,6 +251,15 @@ function ModalConfirmarInativar({ pacienteId, nome, onConfirm, onClose }: { paci
                   </div>
                 ))}
               </div>
+              <button
+                type="button"
+                disabled={isPending || deletandoTodos}
+                onClick={handleDeletarTodos}
+                className="w-full flex items-center justify-center gap-2 text-sm text-rust border border-rust/30 rounded-lg px-3 py-2 hover:bg-rust/5 transition-colors disabled:opacity-40"
+              >
+                {deletandoTodos ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Excluir todos os agendamentos
+              </button>
             </div>
           ) : null}
 
@@ -359,6 +399,12 @@ export function PacientesClient({ pacientes, canEdit, profissionais = [], pacien
                     )}
                   </div>
                   <div className="flex flex-wrap gap-x-4 text-sm text-forest-600">
+                    {pacienteProfMap[p.id] && (
+                      <span className="inline-flex items-center gap-1 text-forest-500">
+                        <UserCog className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        {pacienteProfMap[p.id]}
+                      </span>
+                    )}
                     {p.telefone && (
                       <a
                         href={`https://wa.me/55${p.telefone.replace(/\D/g, "")}`}

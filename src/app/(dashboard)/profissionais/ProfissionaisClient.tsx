@@ -11,7 +11,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import { excluirProfissional, excluirProfissionalConfirmado, toggleAtivoProfissional, alterarCorProfissional, buscarAgendamentosProfissional, deletarAgendamentoProfissional } from "./actions";
+import { excluirProfissional, excluirProfissionalConfirmado, toggleAtivoProfissional, alterarCorProfissional, buscarAgendamentosProfissional, deletarAgendamentoProfissional, deletarTodosAgendamentosProfissional } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
 
 interface Profissional {
@@ -94,6 +94,7 @@ function ModalExcluir({ prof, onClose }: { prof: Profissional; onClose: () => vo
   const [carregando, setCarregando] = useState(true);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [deletandoId, setDeletandoId] = useState<string | null>(null);
+  const [deletandoTodos, setDeletandoTodos] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -113,6 +114,16 @@ function ModalExcluir({ prof, onClose }: { prof: Profissional; onClose: () => vo
         setAgendamentos(prev => prev.filter(a => a.id !== agendamentoId));
       }
       setDeletandoId(null);
+    });
+  }
+
+  function handleDeletarTodos() {
+    setDeletandoTodos(true);
+    startTransition(async () => {
+      const res = await deletarTodosAgendamentosProfissional(prof.id);
+      if (res.error) setErro(res.error);
+      else setAgendamentos([]);
+      setDeletandoTodos(false);
     });
   }
 
@@ -153,7 +164,7 @@ function ModalExcluir({ prof, onClose }: { prof: Profissional; onClose: () => vo
               <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                 <strong>Atenção:</strong> Este profissional possui {agendamentos.length} agendamento{agendamentos.length !== 1 ? "s" : ""} ativo{agendamentos.length !== 1 ? "s" : ""}. Exclua todos antes de continuar.
               </p>
-              <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+              <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
                 {agendamentos.map(a => (
                   <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-cream rounded-lg border border-sand/30">
                     <div className="min-w-0">
@@ -162,7 +173,7 @@ function ModalExcluir({ prof, onClose }: { prof: Profissional; onClose: () => vo
                     </div>
                     <button
                       type="button"
-                      disabled={deletandoId === a.id || isPending}
+                      disabled={deletandoId === a.id || isPending || deletandoTodos}
                       onClick={() => handleDeletarAgendamento(a.id)}
                       className="p-1.5 rounded-lg text-rust hover:bg-rust/10 transition-colors shrink-0 disabled:opacity-40"
                       title="Excluir agendamento"
@@ -174,6 +185,15 @@ function ModalExcluir({ prof, onClose }: { prof: Profissional; onClose: () => vo
                   </div>
                 ))}
               </div>
+              <button
+                type="button"
+                disabled={isPending || deletandoTodos}
+                onClick={handleDeletarTodos}
+                className="w-full flex items-center justify-center gap-2 text-sm text-rust border border-rust/30 rounded-lg px-3 py-2 hover:bg-rust/5 transition-colors disabled:opacity-40"
+              >
+                {deletandoTodos ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Excluir todos os agendamentos
+              </button>
             </div>
           ) : null}
 
@@ -201,6 +221,7 @@ function ModalConfirmarInativar({ prof, onConfirm, onClose }: { prof: Profission
   const [carregando, setCarregando] = useState(true);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [deletandoId, setDeletandoId] = useState<string | null>(null);
+  const [deletandoTodos, setDeletandoTodos] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -220,6 +241,16 @@ function ModalConfirmarInativar({ prof, onConfirm, onClose }: { prof: Profission
         setAgendamentos(prev => prev.filter(a => a.id !== agendamentoId));
       }
       setDeletandoId(null);
+    });
+  }
+
+  function handleDeletarTodos() {
+    setDeletandoTodos(true);
+    startTransition(async () => {
+      const res = await deletarTodosAgendamentosProfissional(prof.id);
+      if (res.error) setErro(res.error);
+      else setAgendamentos([]);
+      setDeletandoTodos(false);
     });
   }
 
@@ -252,7 +283,7 @@ function ModalConfirmarInativar({ prof, onConfirm, onClose }: { prof: Profission
               <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                 <strong>Atenção:</strong> Este profissional possui {agendamentos.length} agendamento{agendamentos.length !== 1 ? "s" : ""} ativo{agendamentos.length !== 1 ? "s" : ""}. Exclua todos antes de continuar.
               </p>
-              <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+              <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
                 {agendamentos.map(a => (
                   <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-cream rounded-lg border border-sand/30">
                     <div className="min-w-0">
@@ -261,7 +292,7 @@ function ModalConfirmarInativar({ prof, onConfirm, onClose }: { prof: Profission
                     </div>
                     <button
                       type="button"
-                      disabled={deletandoId === a.id || isPending}
+                      disabled={deletandoId === a.id || isPending || deletandoTodos}
                       onClick={() => handleDeletarAgendamento(a.id)}
                       className="p-1.5 rounded-lg text-rust hover:bg-rust/10 transition-colors shrink-0 disabled:opacity-40"
                       title="Excluir agendamento"
@@ -273,6 +304,15 @@ function ModalConfirmarInativar({ prof, onConfirm, onClose }: { prof: Profission
                   </div>
                 ))}
               </div>
+              <button
+                type="button"
+                disabled={isPending || deletandoTodos}
+                onClick={handleDeletarTodos}
+                className="w-full flex items-center justify-center gap-2 text-sm text-rust border border-rust/30 rounded-lg px-3 py-2 hover:bg-rust/5 transition-colors disabled:opacity-40"
+              >
+                {deletandoTodos ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Excluir todos os agendamentos
+              </button>
             </div>
           ) : null}
 

@@ -105,6 +105,16 @@ export async function deletarAgendamentoProfissional(
   return { error: null };
 }
 
+export async function deletarTodosAgendamentosProfissional(profissionalId: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from("agendamentos").delete().eq("profissional_id", profissionalId)
+    .not("status", "in", "(cancelado,faltou)");
+  if (error) return { error: error.message };
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function excluirProfissional(id: string): Promise<{ error: string | null; temConsultas: boolean; count: number }> {
   const supabase = createClient();
   const { data: consultas } = await supabase

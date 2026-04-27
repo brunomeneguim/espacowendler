@@ -11,11 +11,16 @@ export default async function NovoPacientePage({
 }) {
   const supabase = createClient();
 
-  const { data: configsRaw } = await supabase
-    .from("configuracoes_campos_paciente")
-    .select("campo, obrigatorio");
+  const [{ data: configsRaw }, { data: profissionaisRaw }] = await Promise.all([
+    supabase.from("configuracoes_campos_paciente").select("campo, obrigatorio"),
+    supabase.from("profissionais").select("id, profile:profiles(nome_completo)").eq("ativo", true).order("id"),
+  ]);
 
   const camposConfig = (configsRaw ?? []) as { campo: string; obrigatorio: boolean }[];
+  const profissionais = (profissionaisRaw ?? []).map((p: any) => ({
+    id: p.id,
+    nome_completo: p.profile?.nome_completo ?? "—",
+  }));
 
   const fromAgenda = searchParams.from === "agenda";
 
@@ -35,7 +40,7 @@ export default async function NovoPacientePage({
         description="Preencha os dados do paciente"
       />
 
-      <NovoPacienteForm camposConfig={camposConfig} fromAgenda={fromAgenda} />
+      <NovoPacienteForm camposConfig={camposConfig} profissionais={profissionais} fromAgenda={fromAgenda} />
     </div>
   );
 }

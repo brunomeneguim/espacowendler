@@ -246,8 +246,10 @@ export async function editarAgendamento(id: string, formData: FormData) {
   const status          = formData.get("status") as string;
   const observacoes     = (formData.get("observacoes") as string) || null;
   const editarGrupo     = formData.get("editar_grupo") === "true";
+  const tzOffset        = parseInt((formData.get("tz_offset") as string) || "0");
 
   const inicio = new Date(`${data}T${hora}:00`);
+  inicio.setMinutes(inicio.getMinutes() + tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
 

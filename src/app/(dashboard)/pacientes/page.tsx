@@ -12,7 +12,7 @@ export default async function PacientesPage() {
   const canEdit = ["admin", "supervisor", "secretaria"].includes(profile.role);
   const canConfig = ["admin", "supervisor"].includes(profile.role);
 
-  const [{ data: pacientes }, { data: configsRaw }, { data: profissionaisRaw }, { data: agProfRaw }] = await Promise.all([
+  const [{ data: pacientes }, { data: configsRaw }, { data: profissionaisRaw }, { data: vinculos }] = await Promise.all([
     supabase
       .from("pacientes")
       .select("id, nome_completo, email, telefone, cpf, data_nascimento, ativo")
@@ -25,22 +25,22 @@ export default async function PacientesPage() {
       .select("id, profile:profiles(nome_completo)")
       .eq("ativo", true)
       .order("id"),
-    // Mapeamento paciente → profissional mais recente
+    // Vínculos paciente → profissional(ais)
     supabase
-      .from("agendamentos")
-      .select("paciente_id, profissional_id")
-      .not("paciente_id", "is", null)
-      .order("data_hora_inicio", { ascending: false })
-      .limit(3000),
+      .from("paciente_profissional")
+      .select("paciente_id, profissional:profissionais(profile:profiles(nome_completo))"),
   ]);
 
   const camposConfig = (configsRaw ?? []) as { campo: string; obrigatorio: boolean }[];
 
-  // Mapa paciente_id → profissional_id (mais recente)
+  // Mapa paciente_id → nome(s) do(s) profissional(ais) vinculados
   const pacienteProfMap: Record<string, string> = {};
-  for (const ag of (agProfRaw ?? []) as any[]) {
-    if (ag.paciente_id && !pacienteProfMap[ag.paciente_id]) {
-      pacienteProfMap[ag.paciente_id] = ag.profissional_id;
+  for (const v of (vinculos ?? []) as any[]) {
+    const nome = v.profissional?.profile?.nome_completo;
+    if (v.paciente_id && nome) {
+      pacienteProfMap[v.paciente_id] = pacienteProfMap[v.paciente_id]
+        ? `${pacienteProfMap[v.paciente_id]}, ${nome}`
+        : nome;
     }
   }
 

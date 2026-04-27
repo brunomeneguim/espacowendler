@@ -31,9 +31,12 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
     ? new Date().getFullYear() - new Date(data_nascimento).getFullYear() < 18
     : false;
 
-  const { error } = await supabase.from("pacientes").insert({
+  const respFinMesmoPaciente = formData.get("resp_fin_mesmo_paciente") === "true";
+
+  const { data: novo, error } = await supabase.from("pacientes").insert({
     nome_completo:                  formData.get("nome_completo") as string,
     data_cadastro:                  new Date().toISOString().split("T")[0],
+    inicio_tratamento:              get("inicio_tratamento"),
     foto_url:                       get("foto_url"),
     data_nascimento,
     cpf:                            get("cpf_cnpj"),
@@ -77,18 +80,33 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
     parceiro_bairro:                get("parceiro_bairro"),
     parceiro_endereco:              get("parceiro_endereco"),
     parceiro_numero:                get("parceiro_numero"),
+    // Responsável Financeiro
+    resp_fin_mesmo_paciente:        respFinMesmoPaciente,
+    resp_fin_nome:                  respFinMesmoPaciente ? null : get("resp_fin_nome"),
+    resp_fin_email:                 respFinMesmoPaciente ? null : get("resp_fin_email"),
+    resp_fin_cpf:                   respFinMesmoPaciente ? null : get("resp_fin_cpf"),
+    resp_fin_parentesco:            respFinMesmoPaciente ? null : get("resp_fin_parentesco"),
+    resp_fin_telefone:              respFinMesmoPaciente ? null : get("resp_fin_telefone"),
+    resp_fin_ddi:                   respFinMesmoPaciente ? null : (get("resp_fin_ddi") || "+55"),
+    resp_fin_mesmo_endereco:        formData.get("resp_fin_mesmo_endereco") === "true",
+    resp_fin_cep:                   respFinMesmoPaciente ? null : get("resp_fin_cep"),
+    resp_fin_estado:                respFinMesmoPaciente ? null : get("resp_fin_estado"),
+    resp_fin_cidade:                respFinMesmoPaciente ? null : get("resp_fin_cidade"),
+    resp_fin_bairro:                respFinMesmoPaciente ? null : get("resp_fin_bairro"),
+    resp_fin_logradouro:            respFinMesmoPaciente ? null : get("resp_fin_logradouro"),
+    resp_fin_numero:                respFinMesmoPaciente ? null : get("resp_fin_numero"),
     ativo:                          true,
-  });
+  }).select("id").single();
 
   if (error) return { error: error.message, id: null };
 
-  // Buscar o id do paciente recém-criado
-  const { data: novo } = await supabase.from("pacientes")
-    .select("id")
-    .eq("nome_completo", formData.get("nome_completo") as string)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+  // Salvar vínculos com profissionais
+  const profissionalIds = formData.getAll("profissional_ids") as string[];
+  if (profissionalIds.length > 0 && novo?.id) {
+    await supabase.from("paciente_profissional").insert(
+      profissionalIds.map(pid => ({ paciente_id: novo.id, profissional_id: pid }))
+    );
+  }
 
   revalidatePath("/pacientes");
   return { error: null, id: novo?.id ?? null };
@@ -134,14 +152,43 @@ export async function buscarAgendamentosPaciente(
   }));
 }
 
-export async function deletarAgendamento(
-  agendamentoId: string
+export { deletarAgendamentoClient as deletarAgendamento } from "../agenda/actions";
+
+export async function deletarTodosAgendamentosPaciente(pacienteId: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from("agendamentos").delete().eq("paciente_id", pacienteId)
+    .not("status", "in", "(cancelado,faltou)");
+  if (error) return { error: error.message };
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
+export async function buscarProfissionaisPaciente(pacienteId: string): Promise<{ id: string; nome_completo: string }[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("paciente_profissional")
+    .select("profissional:profissionais(id, profile:profiles(nome_completo))")
+    .eq("paciente_id", pacienteId);
+  return (data ?? []).map((r: any) => ({
+    id: r.profissional?.id ?? "",
+    nome_completo: r.profissional?.profile?.nome_completo ?? "",
+  })).filter(p => p.id);
+}
+
+export async function salvarProfissionaisPaciente(
+  pacienteId: string,
+  profissionalIds: string[]
 ): Promise<{ error: string | null }> {
   const supabase = createClient();
-  const { error } = await supabase.from("agendamentos").delete().eq("id", agendamentoId);
-  if (error) return { error: error.message };
-  revalidatePath("/dashboard");
-  revalidatePath("/agenda");
+  await supabase.from("paciente_profissional").delete().eq("paciente_id", pacienteId);
+  if (profissionalIds.length > 0) {
+    const { error } = await supabase.from("paciente_profissional").insert(
+      profissionalIds.map(pid => ({ paciente_id: pacienteId, profissional_id: pid }))
+    );
+    if (error) return { error: error.message };
+  }
+  revalidatePath("/pacientes");
   return { error: null };
 }
 

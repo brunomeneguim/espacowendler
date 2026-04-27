@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { editarAgendamento, excluirAgendamento } from "../../actions";
+import { TzOffsetInput } from "./TzOffsetInput";
 
 export default async function EditarAgendamentoPage({
   params,
@@ -75,6 +76,7 @@ export default async function EditarAgendamentoPage({
       )}
 
       <form action={editAction} className="card space-y-5">
+        <TzOffsetInput />
         <div>
           <label htmlFor="profissional_id" className="label">Profissional</label>
           <select id="profissional_id" name="profissional_id" required className="input-field" defaultValue={ag.profissional_id}>

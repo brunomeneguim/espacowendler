@@ -101,3 +101,15 @@ export async function excluirPostit(id: string): Promise<{ error: string | null 
   revalidatePath("/tarefas");
   return { error: null };
 }
+
+// ── Lembretes de aniversário ─────────────────────────────────────
+export async function concluirLembreteAniversario(id: number, concluida: boolean): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from("lembretes_aniversario").update({
+    concluida,
+    concluida_em: concluida ? new Date().toISOString() : null,
+  }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/tarefas");
+  return { error: null };
+}

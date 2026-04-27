@@ -735,7 +735,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
       const db = new Date(b.data_nascimento + "T12:00:00").getDate();
       return da - db;
     });
+  // Contador mostra apenas pacientes ativos (não profissionais) que fazem aniversário hoje
   const aniversariantesHoje = aniversariantesMes.filter(a => {
+    if (a.tipo === "profissional") return false;
     const nasc = new Date(a.data_nascimento + "T12:00:00");
     return nasc.getDate() === diaAtual;
   });

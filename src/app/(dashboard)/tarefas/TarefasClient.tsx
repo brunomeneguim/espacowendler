@@ -7,9 +7,9 @@ import { ptBR } from "date-fns/locale";
 import {
   Plus, Check, Trash2, X, Loader2, Clock,
   Flag, StickyNote, CheckSquare, ChevronDown, ChevronUp,
-  Pencil, RepeatIcon, Save,
+  Pencil, RepeatIcon, Save, Cake, Gift,
 } from "lucide-react";
-import { criarTarefa, atualizarTarefa, alternarTarefa, excluirTarefa, criarPostit, atualizarPostit, excluirPostit } from "./actions";
+import { criarTarefa, atualizarTarefa, alternarTarefa, excluirTarefa, criarPostit, atualizarPostit, excluirPostit, concluirLembreteAniversario } from "./actions";
 
 // ── Tipos ─────────────────────────────────────────────────────────
 interface Tarefa {
@@ -38,6 +38,16 @@ interface Postit {
 }
 
 interface Profile { id: string; nome_completo: string; role?: string }
+
+interface LembreteAniversario {
+  id: number;
+  paciente_id: string;
+  ano: number;
+  concluida: boolean;
+  concluida_em?: string | null;
+  diasRestantes: number;
+  paciente?: { id: string; nome_completo: string; data_nascimento: string } | null;
+}
 
 // ── Cores dos post-its ────────────────────────────────────────────
 const POSTIT_CORES: Record<string, { bg: string; border: string; label: string }> = {
@@ -342,17 +352,19 @@ interface Props {
   profiles: Profile[];
   currentUserId: string;
   currentRole: string;
+  lembretes: LembreteAniversario[];
 }
 
-export function TarefasClient({ tarefas, postits, profiles, currentUserId, currentRole }: Props) {
+export function TarefasClient({ tarefas, postits, profiles, currentUserId, currentRole, lembretes }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pendingAnivId, setPendingAnivId] = useState<number | null>(null);
   const [showModalTarefa, setShowModalTarefa] = useState(false);
   const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
   const [showModalPostit, setShowModalPostit] = useState(false);
   const [editingPostit, setEditingPostit] = useState<Postit | null>(null);
-  const [filtro, setFiltro] = useState<"todas" | "minhas" | "concluidas">("todas");
+  const [filtro, setFiltro] = useState<"todas" | "minhas" | "aniversarios" | "concluidas">("todas");
 
   function refresh() { router.refresh(); }
 
@@ -383,6 +395,15 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
     });
   }
 
+  async function handleToggleAniversario(id: number, concluida: boolean) {
+    setPendingAnivId(id);
+    startTransition(async () => {
+      await concluirLembreteAniversario(id, concluida);
+      setPendingAnivId(null);
+      refresh();
+    });
+  }
+
   const tarefasFiltradas = tarefas
     .filter(t => {
       if (filtro === "minhas") return (t.atribuido_para === currentUserId || t.criado_por === currentUserId) && !t.concluida;
@@ -393,6 +414,7 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
 
   const pendentes = tarefas.filter(t => !t.concluida).length;
   const minhas = tarefas.filter(t => !t.concluida && (t.atribuido_para === currentUserId || t.criado_por === currentUserId)).length;
+  const aniversariosCount = lembretes.filter(l => !l.concluida).length;
 
   return (
     <div className="p-6 md:p-10 max-w-7xl">
@@ -415,10 +437,11 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
           </button>
 
           {/* Filtros */}
-          <div className="flex gap-1 p-1 bg-sand/20 rounded-xl text-sm">
+          <div className="flex gap-1 p-1 bg-sand/20 rounded-xl text-sm flex-wrap">
             {([
               ["todas", `Pendentes (${pendentes})`],
               ["minhas", `Minhas (${minhas})`],
+              ["aniversarios", `Aniversários${aniversariosCount > 0 ? ` (${aniversariosCount})` : ""}`],
               ["concluidas", "Concluídas"],
             ] as const).map(([id, label]) => (
               <button
@@ -432,7 +455,55 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
           </div>
 
           {/* Lista */}
-          {tarefasFiltradas.length === 0 ? (
+          {filtro === "aniversarios" ? (
+            lembretes.length === 0 ? (
+              <div className="text-center py-16 text-forest-400">
+                <Cake className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Nenhum aniversário nos próximos 7 dias.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {lembretes.map(l => {
+                  const nome = l.paciente?.nome_completo ?? "Paciente";
+                  const nasc = l.paciente?.data_nascimento
+                    ? new Date(l.paciente.data_nascimento + "T12:00:00")
+                    : null;
+                  const dataFmt = nasc
+                    ? nasc.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })
+                    : "";
+                  const isHoje = l.diasRestantes === 0;
+                  const pending = pendingAnivId === l.id;
+                  return (
+                    <div key={l.id} className={`group rounded-xl border transition-all ${l.concluida ? "bg-gray-50 border-gray-200 opacity-60" : "bg-white border-sand/40 hover:border-forest/20"} ${pending ? "opacity-50 pointer-events-none" : ""}`}>
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <button
+                          onClick={() => handleToggleAniversario(l.id, !l.concluida)}
+                          className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${l.concluida ? "bg-forest border-forest text-cream" : "border-gray-300 hover:border-forest"}`}
+                        >
+                          {l.concluida && <Check className="w-3 h-3" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Gift className="w-4 h-4 text-rust shrink-0" />
+                            <span className={`text-sm font-medium truncate ${l.concluida ? "line-through text-gray-400" : "text-forest"}`}>
+                              Aniversário de {nome}
+                            </span>
+                            {isHoje && (
+                              <span className="text-xs bg-rust/10 text-rust px-2 py-0.5 rounded-full shrink-0 font-medium">Hoje! 🎂</span>
+                            )}
+                          </div>
+                          <p className={`text-xs mt-0.5 ${l.concluida ? "text-gray-400" : "text-forest-500"}`}>
+                            {dataFmt} · {isHoje ? "Hoje é o dia!" : `Em ${l.diasRestantes} dia${l.diasRestantes !== 1 ? "s" : ""}`} · Não esqueça de comprar um presente 🎁
+                          </p>
+                        </div>
+                        {pending && <Loader2 className="w-4 h-4 animate-spin text-forest-400 shrink-0" />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : tarefasFiltradas.length === 0 ? (
             <div className="text-center py-16 text-forest-400">
               <CheckSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="text-sm">Nenhuma tarefa {filtro === "concluidas" ? "concluída" : "pendente"}.</p>
