@@ -151,7 +151,7 @@ function gerarDatas(inicio: Date, recorrencia: string, meses: number, mensal_tip
 }
 
 // ── Criar agendamento ─────────────────────────────────────────────
-export async function criarAgendamento(formData: FormData): Promise<{ error: string | null } | void> {
+export async function criarAgendamento(formData: FormData): Promise<{ error: string; ignoradas?: never } | { error: null; ignoradas: number }> {
   const supabase = createClient();
 
   const profissional_id = formData.get("profissional_id") as string;
@@ -203,12 +203,13 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
   if (error) return { error: error.message };
 
   // Inserir recorrências
+  let ignoradas = 0;
   if (recorrencia !== "nenhuma") {
     const datas = gerarDatas(inicio, recorrencia, meses, mensal_tipo);
     for (const d of datas) {
       const fimRec = new Date(d.getTime() + duracao * 60_000);
       const c = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, d, fimRec);
-      if (c) continue;
+      if (c) { ignoradas++; continue; }
       await supabase.from("agendamentos").insert({
         ...base,
         data_hora_inicio: d.toISOString(),
@@ -219,12 +220,12 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
-  redirect("/dashboard");
+  return { error: null, ignoradas };
 }
 
 export async function atualizarStatusAgendamento(
   id: string,
-  status: "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou" | "ausencia"
+  status: "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou"
 ) {
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").update({ status }).eq("id", id);
@@ -365,16 +366,9 @@ export async function deletarAgendamentoClient(id: string): Promise<{ error: str
   return { error: null };
 }
 
-export async function deletarAgendamentosPaciente(pacienteNome: string): Promise<{ error: string | null }> {
+export async function deletarAgendamentosPaciente(pacienteId: string): Promise<{ error: string | null }> {
   const supabase = createClient();
-  // Busca o id do paciente pelo nome
-  const { data: pac } = await supabase
-    .from("pacientes")
-    .select("id")
-    .eq("nome_completo", pacienteNome)
-    .maybeSingle();
-  if (!pac) return { error: "Paciente não encontrado." };
-  const { error } = await supabase.from("agendamentos").delete().eq("paciente_id", pac.id);
+  const { error } = await supabase.from("agendamentos").delete().eq("paciente_id", pacienteId);
   if (error) return { error: error.message };
   revalidatePath("/agenda");
   revalidatePath("/dashboard");

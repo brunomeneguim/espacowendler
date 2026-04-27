@@ -144,6 +144,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
   const [mensal_tipo, setMensalTipo] = useState<"dia_semana" | "dia_mes">("dia_semana");
   const [meses, setMeses] = useState("3");
   const [submitError, setSubmitError] = useState(error ?? "");
+  const [ignoradasAviso, setIgnoradasAviso] = useState(0);
   const [tzOffset, setTzOffset] = useState(0);
   const [avisoPendente, setAvisoPendente] = useState(false);
   const fdRef = useRef<FormData | null>(null);
@@ -194,7 +195,9 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
 
     startTransition(async () => {
       const res = await criarAgendamento(fd);
-      if (res && "error" in res && res.error) setSubmitError(res.error);
+      if (res.error) { setSubmitError(res.error); return; }
+      if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); return; }
+      router.push("/dashboard");
     });
   }
 
@@ -205,12 +208,40 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
     setAvisoPendente(false);
     startTransition(async () => {
       const res = await criarAgendamento(fd);
-      if (res && "error" in res && res.error) setSubmitError(res.error);
+      if (res.error) { setSubmitError(res.error); return; }
+      if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); return; }
+      router.push("/dashboard");
     });
   }
 
   return (
     <>
+    {/* Modal de aviso — recorrências ignoradas por conflito */}
+    {ignoradasAviso > 0 && (
+      <>
+        <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="font-display text-base text-forest">Sessões com conflito</h3>
+                <p className="text-sm text-forest-600 mt-1">
+                  O agendamento foi criado, mas <strong>{ignoradasAviso}</strong> sessão{ignoradasAviso !== 1 ? "ões" : ""} recorrente{ignoradasAviso !== 1 ? "s" : ""} {ignoradasAviso !== 1 ? "foram ignoradas" : "foi ignorada"} por conflito de horário.
+                </p>
+              </div>
+            </div>
+            <button type="button" onClick={() => { setIgnoradasAviso(0); router.push("/dashboard"); }}
+              className="btn-primary w-full">
+              Entendido
+            </button>
+          </div>
+        </div>
+      </>
+    )}
+
     {/* Modal de aviso — horário indisponível */}
     {avisoPendente && (
       <>

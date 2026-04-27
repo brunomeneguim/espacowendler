@@ -29,16 +29,13 @@ export interface Profissional {
   id: string;
   profile_id: string;
   registro_profissional: string | null;
-  especialidade_id: string | null;
-  bio: string | null;
   valor_consulta: number | null;
-  duracao_padrao_min: number;
   ativo: boolean;
   created_at: string;
   updated_at: string;
   // Joined
   profile?: Profile;
-  especialidade?: Especialidade;
+  especialidades?: Especialidade[]; // via profissional_especialidades
 }
 
 export interface HorarioDisponivel {

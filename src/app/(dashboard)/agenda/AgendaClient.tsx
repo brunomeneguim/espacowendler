@@ -25,7 +25,7 @@ interface Agendamento {
   data_hora_fim: string;
   status: string;
   observacoes?: string | null;
-  paciente: { nome_completo: string; telefone?: string } | null;
+  paciente: { id: string; nome_completo: string; telefone?: string } | null;
   profissional: { id: string; profile: { nome_completo: string } | null } | null;
 }
 interface Profissional { id: string; profile: { nome_completo: string } | null }
@@ -51,8 +51,8 @@ function ModalExcluir({ agendamento, onClose, onDeleted }: ModalProps) {
   function handleConfirm() {
     startTransition(async () => {
       setErro(null);
-      if (todosDoP && pacienteNome) {
-        const res = await deletarAgendamentosPaciente(pacienteNome);
+      if (todosDoP && agendamento.paciente?.id) {
+        const res = await deletarAgendamentosPaciente(agendamento.paciente.id);
         if (res.error) { setErro(res.error); return; }
         onDeleted(agendamento.id, true, pacienteNome);
       } else {

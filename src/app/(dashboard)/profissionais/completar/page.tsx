@@ -11,13 +11,25 @@ export default async function CompletarPerfilPage() {
     await Promise.all([
       supabase
         .from("profissionais")
-        .select("id, foto_url, data_nascimento, sexo, cpf, cnpj, horario_inicio, horario_fim, tempo_atendimento, observacoes, registro_profissional, especialidade_id, perfil_completo, cor, valor_consulta")
+        .select("id, foto_url, data_nascimento, sexo, cpf, cnpj, horario_inicio, horario_fim, tempo_atendimento, observacoes, registro_profissional, perfil_completo, cor, valor_consulta")
         .eq("profile_id", profile.id)
         .maybeSingle(),
       supabase.from("especialidades").select("id, nome").order("nome"),
       supabase.from("configuracoes_campos_profissional").select("campo, obrigatorio"),
       supabase.from("profissionais").select("cor").not("cor", "is", null).neq("profile_id", profile.id),
     ]);
+
+  // Buscar especialidade atual da junction table
+  let especialidadeAtualId: number | null = null;
+  if ((profReg as any)?.id) {
+    const { data: espRow } = await supabase
+      .from("profissional_especialidades")
+      .select("especialidade_id")
+      .eq("profissional_id", (profReg as any).id)
+      .limit(1)
+      .maybeSingle();
+    especialidadeAtualId = espRow?.especialidade_id ?? null;
+  }
 
   const camposConfig = (configsRaw ?? []) as { campo: string; obrigatorio: boolean }[];
   const coresUsadas = (coresRaw ?? []).map((r: any) => r.cor).filter(Boolean) as string[];
@@ -31,7 +43,7 @@ export default async function CompletarPerfilPage() {
       />
       <CompletarPerfilForm
         profile={profile}
-        profReg={profReg as any}
+        profReg={{ ...(profReg as any), especialidade_id: especialidadeAtualId }}
         especialidades={especialidades ?? []}
         camposConfig={camposConfig}
         coresUsadas={coresUsadas}

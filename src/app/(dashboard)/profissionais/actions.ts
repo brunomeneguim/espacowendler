@@ -8,16 +8,13 @@ export async function cadastrarProfissional(formData: FormData) {
   const supabase = createClient();
 
   const profile_id = formData.get("profile_id") as string;
-  const especialidade_id = (formData.get("especialidade_id") as string) || null;
   const registro_profissional = (formData.get("registro_profissional") as string) || null;
   const valorRaw = formData.get("valor_consulta") as string;
   const valor_consulta = valorRaw ? parseFloat(valorRaw) : null;
-
   const cor = (formData.get("cor") as string) || null;
 
   const { error } = await supabase.from("profissionais").insert({
     profile_id,
-    especialidade_id: especialidade_id ? parseInt(especialidade_id) : null,
     registro_profissional,
     valor_consulta,
     cor,
@@ -168,7 +165,6 @@ export async function completarPerfilProfissional(
     .eq("profile_id", user.id)
     .single();
 
-  const especialidadeId = get("especialidade_id");
   const profData = {
     foto_url:           get("foto_url"),
     data_nascimento:    get("data_nascimento"),
@@ -183,20 +179,39 @@ export async function completarPerfilProfissional(
     telefone_1:         get("telefone_1"),
     telefone_2:         get("telefone_2"),
     registro_profissional: get("registro_profissional"),
-    especialidade_id:   especialidadeId ? parseInt(especialidadeId) : null,
     data_cadastro:      new Date().toISOString().split("T")[0],
     perfil_completo:    true,
     ativo:              true,
   };
 
+  let profId: string | undefined;
   let error;
   if (existing) {
     ({ error } = await supabase.from("profissionais").update(profData).eq("id", existing.id));
+    profId = existing.id;
   } else {
-    ({ error } = await supabase.from("profissionais").insert({ ...profData, profile_id: user.id }));
+    const { data: novo, error: insErr } = await supabase
+      .from("profissionais")
+      .insert({ ...profData, profile_id: user.id })
+      .select("id")
+      .single();
+    error = insErr;
+    profId = novo?.id;
   }
 
   if (error) return { error: error.message };
+
+  // Atualizar especialidades na junction table
+  const especialidadeId = get("especialidade_id");
+  if (profId) {
+    await supabase.from("profissional_especialidades").delete().eq("profissional_id", profId);
+    if (especialidadeId) {
+      await supabase.from("profissional_especialidades").insert({
+        profissional_id: profId,
+        especialidade_id: parseInt(especialidadeId),
+      });
+    }
+  }
 
   // Alterar senha se preenchida
   const novaSenha = get("nova_senha");

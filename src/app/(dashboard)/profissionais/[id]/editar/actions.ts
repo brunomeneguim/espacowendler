@@ -9,7 +9,6 @@ export async function editarProfissional(profissionalId: string, profileId: stri
   const supabase = createClient();
 
   const nome_completo = formData.get("nome_completo") as string;
-  const especialidade_id = formData.get("especialidade_id") as string;
   const registro_profissional = (formData.get("registro_profissional") as string) || null;
   const valor_consulta = formData.get("valor_consulta") as string;
   const ativo = formData.get("ativo") === "true";
@@ -17,7 +16,6 @@ export async function editarProfissional(profissionalId: string, profileId: stri
   const [r1, r2] = await Promise.all([
     supabase.from("profiles").update({ nome_completo }).eq("id", profileId),
     supabase.from("profissionais").update({
-      especialidade_id: especialidade_id ? parseInt(especialidade_id) : null,
       registro_profissional,
       valor_consulta: valor_consulta ? parseFloat(valor_consulta) : null,
       ativo,
