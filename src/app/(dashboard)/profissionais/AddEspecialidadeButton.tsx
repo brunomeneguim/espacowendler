@@ -71,7 +71,7 @@ export function AddEspecialidadeButton({ onAdded }: Props) {
                   >
                     {isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Adicionando…</> : "Adicionar"}
                   </button>
-                  <button type="button" onClick={handleClose} className="btn-ghost flex-1">
+                  <button type="button" onClick={handleClose} className="btn-secondary flex-1">
                     Cancelar
                   </button>
                 </div>

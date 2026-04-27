@@ -433,7 +433,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {isPending ? "Agendando…" : tipoAg === "ausencia" ? "Registrar ausência" : repetir ? "Agendar sessões" : "Agendar sessão"}
         </button>
-        <Link href="/dashboard" className="btn-ghost">Cancelar</Link>
+        <Link href="/dashboard" className="btn-secondary flex-1">Cancelar</Link>
       </div>
     </form>
     </>

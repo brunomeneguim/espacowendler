@@ -154,7 +154,7 @@ function ModalTarefa({
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : tarefa ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 {isPending ? "Salvando…" : tarefa ? "Salvar alterações" : "Criar tarefa"}
               </button>
-              <button type="button" onClick={onClose} className="btn-ghost">Cancelar</button>
+              <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
             </div>
           </form>
         </div>
@@ -216,7 +216,7 @@ function ModalPostit({
                 {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : postit ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
                 {postit ? "Salvar" : "Adicionar"}
               </button>
-              <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancelar</button>
+              <button type="button" onClick={onClose} className="inline-flex items-center justify-center px-4 py-1.5 bg-peach text-rust text-sm font-medium rounded-full hover:bg-peach-600 transition-all">Cancelar</button>
             </div>
           </form>
         </div>

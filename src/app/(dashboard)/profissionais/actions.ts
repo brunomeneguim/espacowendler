@@ -80,6 +80,34 @@ export async function alterarCorProfissional(id: string, cor: string): Promise<{
   return { error: null };
 }
 
+export async function buscarAgendamentosProfissional(
+  id: string
+): Promise<{ id: string; paciente: string | null; data_hora_inicio: string; status: string }[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("agendamentos")
+    .select("id, data_hora_inicio, status, paciente:pacientes(nome_completo)")
+    .eq("profissional_id", id)
+    .not("status", "in", "(cancelado,faltou)")
+    .order("data_hora_inicio");
+  return (data ?? []).map((a: any) => ({
+    id: a.id,
+    paciente: a.paciente?.nome_completo ?? null,
+    data_hora_inicio: a.data_hora_inicio,
+    status: a.status,
+  }));
+}
+
+export async function deletarAgendamentoProfissional(
+  agendamentoId: string
+): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from("agendamentos").delete().eq("id", agendamentoId);
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function excluirProfissional(id: string): Promise<{ error: string | null; temConsultas: boolean; count: number }> {
   const supabase = createClient();
   const { data: consultas } = await supabase

@@ -642,7 +642,7 @@ export function NovoPacienteForm({ camposConfig, fromAgenda }: Props) {
           <button type="submit" disabled={isPending} className="btn-primary flex-1 flex items-center justify-center gap-2">
             {isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</> : "Cadastrar paciente"}
           </button>
-          <Link href="/pacientes" className="btn-ghost">Cancelar</Link>
+          <Link href="/pacientes" className="btn-secondary flex-1">Cancelar</Link>
         </div>
       </form>
 
@@ -665,7 +665,7 @@ export function NovoPacienteForm({ camposConfig, fromAgenda }: Props) {
                 <button onClick={capturePhoto} className="btn-primary flex-1 flex items-center justify-center gap-2">
                   <Camera className="w-4 h-4" /> Capturar
                 </button>
-                <button onClick={stopWebcam} className="btn-ghost">Cancelar</button>
+                <button onClick={stopWebcam} className="btn-secondary">Cancelar</button>
               </div>
             </div>
           </div>

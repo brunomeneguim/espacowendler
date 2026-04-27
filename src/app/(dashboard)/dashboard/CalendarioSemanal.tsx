@@ -323,7 +323,7 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
             {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {isPending ? "Salvando…" : "Salvar"}
           </button>
-          <button type="button" onClick={onClose} className="btn-ghost">Cancelar</button>
+          <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
         </div>
       </div>
     </>

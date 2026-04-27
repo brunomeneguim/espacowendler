@@ -97,7 +97,7 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
                   {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   {isPending ? "Excluindo…" : "Sim, excluir"}
                 </button>
-                <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+                <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
               </div>
             </>
           )}
@@ -132,7 +132,7 @@ function ModalConfirmarInativar({ nome, onConfirm, onClose }: { nome: string; on
               <ToggleLeft className="w-4 h-4" />
               Sim, desativar
             </button>
-            <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+            <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
           </div>
         </div>
       </div>

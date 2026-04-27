@@ -74,7 +74,7 @@ function ModalExcluir({ profile, onClose }: { profile: Profile; onClose: () => v
               {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               {isPending ? "Excluindo…" : "Sim, excluir"}
             </button>
-            <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+            <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
           </div>
         </div>
       </div>
@@ -155,7 +155,7 @@ function ModalNovoUsuario({ onClose }: { onClose: () => void }) {
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                 {isPending ? "Criando…" : "Criar usuário"}
               </button>
-              <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+              <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
             </div>
           </form>
         </div>
@@ -229,7 +229,7 @@ function ModalEditarUsuario({ profile, onClose }: { profile: Profile; onClose: (
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
                 {isPending ? "Salvando…" : "Salvar alterações"}
               </button>
-              <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+              <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
             </div>
           </form>
         </div>

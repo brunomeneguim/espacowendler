@@ -217,7 +217,7 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
                   Adicionar à lista
                 </button>
                 <button type="button" onClick={() => { setShowForm(false); setErro(null); }}
-                  className="px-4 py-1.5 text-sm text-forest-500 hover:text-forest transition-colors">
+                  className="inline-flex items-center justify-center px-4 py-1.5 bg-peach text-rust text-sm font-medium rounded-full hover:bg-peach-600 transition-all">
                   Cancelar
                 </button>
               </div>
@@ -270,7 +270,7 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
                           Salvar
                         </button>
                         <button onClick={cancelarEdicao}
-                          className="flex items-center gap-1 px-3 py-1 text-xs text-forest-500 hover:text-forest transition-colors">
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-peach text-rust text-xs font-medium rounded-full hover:bg-peach-600 transition-all">
                           <X className="w-3 h-3" /> Cancelar
                         </button>
                       </div>

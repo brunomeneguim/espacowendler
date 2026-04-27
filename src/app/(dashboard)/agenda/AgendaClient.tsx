@@ -107,7 +107,7 @@ function ModalExcluir({ agendamento, onClose, onDeleted }: ModalProps) {
               {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               {isPending ? "Excluindo…" : todosDoP ? "Excluir todos" : "Sim, excluir"}
             </button>
-            <button onClick={onClose} disabled={isPending} className="btn-ghost flex-1">Cancelar</button>
+            <button onClick={onClose} disabled={isPending} className="btn-secondary flex-1">Cancelar</button>
           </div>
         </div>
       </div>
