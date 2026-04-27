@@ -8,7 +8,7 @@ import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
-  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope, Users,
+  DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope, Users, AlertTriangle,
 } from "lucide-react";
 
 const Users2Icon = Users;
@@ -20,7 +20,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient } from "../agenda/actions";
+import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient, verificarHorarioIndisponivel } from "../agenda/actions";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
 
 // ── Constantes ───────────────────────────────────────────────────
@@ -141,34 +141,97 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string|null>(null);
   const [tipoAg, setTipoAg] = useState(ag.tipo_agendamento ?? "consulta_avulsa");
+  const [avisoPendente, setAvisoPendente] = useState(false);
   const tzOffset = typeof window !== "undefined" ? new Date().getTimezoneOffset() : 0;
   const isAusencia = tipoAg === "ausencia";
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    setErro(null);
+  type PendingArgs = Parameters<typeof atualizarAgendamento>;
+  const pendingArgsRef = useRef<PendingArgs | null>(null);
+
+  function executarAtualizar(args: PendingArgs) {
     startTransition(async () => {
-      const res = await atualizarAgendamento(
-        ag.id,
-        fd.get("profissional_id") as string,
-        isAusencia ? null : fd.get("paciente_id") as string,
-        fd.get("sala_id") as string || null,
-        fd.get("data") as string,
-        fd.get("hora") as string,
-        parseInt(fd.get("duracao") as string || "60"),
-        isAusencia ? "ausencia" : fd.get("status") as string,
-        fd.get("observacoes") as string || null,
-        tzOffset,
-        tipoAg,
-      );
+      const res = await atualizarAgendamento(...args);
       if (res.error) { setErro(res.error); }
       else { onSaved(); onClose(); }
     });
   }
 
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setErro(null);
+
+    const profissionalId = fd.get("profissional_id") as string;
+    const data           = fd.get("data") as string;
+    const hora           = fd.get("hora") as string;
+    const duracao        = parseInt(fd.get("duracao") as string || "60");
+    const status         = isAusencia ? "ausencia" : fd.get("status") as string;
+    const observacoes    = fd.get("observacoes") as string || null;
+    const pacienteId     = isAusencia ? null : fd.get("paciente_id") as string;
+    const salaId         = fd.get("sala_id") as string || null;
+
+    const args: PendingArgs = [ag.id, profissionalId, pacienteId, salaId, data, hora, duracao, status, observacoes, tzOffset, tipoAg];
+
+    // Verificar horário indisponível (apenas para consultas/planos)
+    if (!isAusencia) {
+      const { conflito } = await verificarHorarioIndisponivel(profissionalId, data, hora);
+      if (conflito) {
+        pendingArgsRef.current = args;
+        setAvisoPendente(true);
+        return;
+      }
+    }
+
+    executarAtualizar(args);
+  }
+
   return (
     <>
+      {/* Modal aviso horário indisponível */}
+      {avisoPendente && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm" />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="font-display text-base text-forest">Horário indisponível</h3>
+                  <p className="text-sm text-forest-600 mt-1">
+                    Este profissional não pode atender pacientes nesse horário. Agendar mesmo assim?
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => {
+                    const args = pendingArgsRef.current;
+                    if (!args) return;
+                    pendingArgsRef.current = null;
+                    setAvisoPendente(false);
+                    executarAtualizar(args);
+                  }}
+                  className="btn-primary flex-1 flex items-center justify-center gap-2"
+                >
+                  {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Sim, agendar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAvisoPendente(false); pendingArgsRef.current = null; }}
+                  className="btn-secondary flex-1"
+                >
+                  Não, cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
       <div className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white z-50 shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30 bg-cream/60">

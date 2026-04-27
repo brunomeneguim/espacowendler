@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RepeatIcon, Loader2, UserPlus } from "lucide-react";
-import { criarAgendamento } from "../actions";
+import { RepeatIcon, Loader2, UserPlus, AlertTriangle } from "lucide-react";
+import { criarAgendamento, verificarHorarioIndisponivel } from "../actions";
 
 interface Prof  { id: string; nome: string; especialidade?: string }
 interface Pac   { id: string; nome_completo: string; telefone?: string }
@@ -31,19 +31,42 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
   const [meses, setMeses] = useState("3");
   const [submitError, setSubmitError] = useState(error ?? "");
   const [tzOffset, setTzOffset] = useState(0);
+  const [avisoPendente, setAvisoPendente] = useState(false);
+  const fdRef = useRef<FormData | null>(null);
   useEffect(() => { setTzOffset(new Date().getTimezoneOffset()); }, []);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     fd.set("tipo_agendamento", tipoAg);
-    if (!repetir || tipoAg === "ausencia") {
-      fd.set("recorrencia", "nenhuma");
-    }
-    if (recorrencia === "mensal") {
-      fd.set("mensal_tipo", mensal_tipo);
-    }
+    if (!repetir || tipoAg === "ausencia") fd.set("recorrencia", "nenhuma");
+    if (recorrencia === "mensal") fd.set("mensal_tipo", mensal_tipo);
     setSubmitError("");
+
+    // Verificar horário indisponível (apenas para consultas/planos, não ausência)
+    if (tipoAg !== "ausencia") {
+      const profissionalId = fd.get("profissional_id") as string;
+      const data = fd.get("data") as string;
+      const hora = fd.get("hora") as string;
+      const { conflito } = await verificarHorarioIndisponivel(profissionalId, data, hora);
+      if (conflito) {
+        fdRef.current = fd;
+        setAvisoPendente(true);
+        return;
+      }
+    }
+
+    startTransition(async () => {
+      const res = await criarAgendamento(fd);
+      if (res && "error" in res && res.error) setSubmitError(res.error);
+    });
+  }
+
+  function confirmarAgendamento() {
+    const fd = fdRef.current;
+    if (!fd) return;
+    fdRef.current = null;
+    setAvisoPendente(false);
     startTransition(async () => {
       const res = await criarAgendamento(fd);
       if (res && "error" in res && res.error) setSubmitError(res.error);
@@ -51,6 +74,46 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
   }
 
   return (
+    <>
+    {/* Modal de aviso — horário indisponível */}
+    {avisoPendente && (
+      <>
+        <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="font-display text-base text-forest">Horário indisponível</h3>
+                <p className="text-sm text-forest-600 mt-1">
+                  Este profissional não pode atender pacientes nesse horário. Agendar mesmo assim?
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={confirmarAgendamento}
+                disabled={isPending}
+                className="btn-primary flex-1 flex items-center justify-center gap-2"
+              >
+                {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                Sim, agendar
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAvisoPendente(false); fdRef.current = null; }}
+                className="btn-secondary flex-1"
+              >
+                Não, cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    )}
     <form onSubmit={handleSubmit} className="card space-y-5">
       <input type="hidden" name="tz_offset" value={tzOffset} />
       {submitError && (
@@ -246,5 +309,6 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
         <Link href="/dashboard" className="btn-ghost">Cancelar</Link>
       </div>
     </form>
+    </>
   );
 }

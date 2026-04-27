@@ -5,6 +5,42 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 
+// ── Verificar horário indisponível (exportado para uso nos forms) ──
+export async function verificarHorarioIndisponivel(
+  profissionalId: string,
+  data: string,   // "YYYY-MM-DD"
+  hora: string    // "HH:MM"
+): Promise<{ conflito: boolean }> {
+  if (!profissionalId || !data || !hora) return { conflito: false };
+  const supabase = createClient();
+
+  // Calcular dia da semana a partir da string de data (evita problemas de timezone)
+  const [year, month, day] = data.split("-").map(Number);
+  const diaSemana = new Date(year, month - 1, day).getDay(); // 0=Dom … 6=Sáb
+
+  const { data: horarios } = await supabase
+    .from("horarios_indisponiveis")
+    .select("hora_inicio, hora_fim")
+    .eq("profissional_id", profissionalId)
+    .eq("dia_semana", diaSemana);
+
+  if (!horarios || horarios.length === 0) return { conflito: false };
+
+  const toMin = (hhmm: string) => {
+    const [h, m] = hhmm.slice(0, 5).split(":").map(Number);
+    return h * 60 + m;
+  };
+  const horaMin = toMin(hora);
+
+  const conflito = horarios.some(h => {
+    const ini = toMin(h.hora_inicio as string);
+    const fim = toMin(h.hora_fim as string);
+    return horaMin >= ini && horaMin < fim;
+  });
+
+  return { conflito };
+}
+
 // ── Verificar horário de atendimento do profissional ─────────────
 // horaLocal = "HH:MM" no horário local do usuário (não UTC)
 // duracaoMin = duração em minutos
