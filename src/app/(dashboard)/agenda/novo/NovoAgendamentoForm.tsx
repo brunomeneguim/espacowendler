@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RepeatIcon, Loader2, UserPlus, AlertTriangle } from "lucide-react";
+import { RepeatIcon, Loader2, UserPlus, AlertTriangle, Search, X } from "lucide-react";
 import { criarAgendamento, verificarHorarioIndisponivel } from "../actions";
 
 interface Prof  { id: string; nome: string; especialidade?: string }
@@ -21,6 +21,120 @@ interface Props {
   error?: string;
 }
 
+// ── Componente de busca com autocomplete ───────────────────────────
+interface SearchItem { id: string; label: string; sub?: string }
+
+function SearchableSelect({
+  name,
+  items,
+  placeholder,
+  defaultId,
+}: {
+  name: string;
+  items: SearchItem[];
+  placeholder: string;
+  defaultId?: string;
+}) {
+  const defaultItem = items.find(i => i.id === defaultId);
+  const [selectedId, setSelectedId]       = useState(defaultId ?? "");
+  const [selectedLabel, setSelectedLabel] = useState(defaultItem?.label ?? "");
+  const [query, setQuery]                 = useState("");
+  const [open, setOpen]                   = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const filtered = query.trim()
+    ? items.filter(i =>
+        i.label.toLowerCase().includes(query.toLowerCase()) ||
+        (i.sub && i.sub.toLowerCase().includes(query.toLowerCase()))
+      )
+    : items;
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        if (!selectedId) setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [selectedId]);
+
+  function clear() {
+    setSelectedId("");
+    setSelectedLabel("");
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Valor real enviado ao form */}
+      <input type="hidden" name={name} value={selectedId} />
+
+      {selectedId ? (
+        /* Item selecionado — exibe nome + botão limpar */
+        <div className="input-field flex items-center gap-2 cursor-default">
+          <span className="flex-1 text-sm text-forest truncate">{selectedLabel}</span>
+          <button
+            type="button"
+            onClick={clear}
+            className="shrink-0 text-forest-400 hover:text-rust transition-colors"
+            title="Limpar seleção"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        /* Campo de busca */
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-forest-400 pointer-events-none" />
+          <input
+            type="text"
+            className="input-field pl-9"
+            placeholder={placeholder}
+            value={query}
+            autoComplete="off"
+            onChange={e => { setQuery(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+          />
+        </div>
+      )}
+
+      {/* Dropdown de resultados */}
+      {open && !selectedId && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-sand/40 rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-forest-400 text-center">
+              Nenhum resultado para &ldquo;{query}&rdquo;
+            </p>
+          ) : (
+            filtered.map(item => (
+              <button
+                key={item.id}
+                type="button"
+                className="w-full text-left px-4 py-2.5 hover:bg-sand/20 transition-colors border-b border-sand/10 last:border-b-0"
+                onMouseDown={e => {
+                  e.preventDefault(); // evita blur antes do click
+                  setSelectedId(item.id);
+                  setSelectedLabel(item.label);
+                  setQuery("");
+                  setOpen(false);
+                }}
+              >
+                <p className="text-sm font-medium text-forest">{item.label}</p>
+                {item.sub && <p className="text-xs text-forest-400 mt-0.5">{item.sub}</p>}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Formulário principal ───────────────────────────────────────────
 export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHora, defaultSalaId, defaultPacienteId, error }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -35,6 +149,18 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
   const fdRef = useRef<FormData | null>(null);
   useEffect(() => { setTzOffset(new Date().getTimezoneOffset()); }, []);
 
+  // Dados formatados para o SearchableSelect
+  const profsItems: SearchItem[] = profs.map(p => ({
+    id: p.id,
+    label: p.nome,
+    sub: p.especialidade,
+  }));
+  const pacsItems: SearchItem[] = pacs.map(p => ({
+    id: p.id,
+    label: p.nome_completo,
+    sub: p.telefone,
+  }));
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -43,7 +169,17 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
     if (recorrencia === "mensal") fd.set("mensal_tipo", mensal_tipo);
     setSubmitError("");
 
-    // Verificar horário indisponível (apenas para consultas/planos, não ausência)
+    // Validação manual (hidden inputs não disparam o required nativo)
+    if (!fd.get("profissional_id")) {
+      setSubmitError("Selecione um profissional.");
+      return;
+    }
+    if (tipoAg !== "ausencia" && !fd.get("paciente_id")) {
+      setSubmitError("Selecione um paciente.");
+      return;
+    }
+
+    // Verificar horário indisponível
     if (tipoAg !== "ausencia") {
       const profissionalId = fd.get("profissional_id") as string;
       const data = fd.get("data") as string;
@@ -93,20 +229,13 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
               </div>
             </div>
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={confirmarAgendamento}
-                disabled={isPending}
-                className="btn-primary flex-1 flex items-center justify-center gap-2"
-              >
+              <button type="button" onClick={confirmarAgendamento} disabled={isPending}
+                className="btn-primary flex-1 flex items-center justify-center gap-2">
                 {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Sim, agendar
               </button>
-              <button
-                type="button"
-                onClick={() => { setAvisoPendente(false); fdRef.current = null; }}
-                className="btn-secondary flex-1"
-              >
+              <button type="button" onClick={() => { setAvisoPendente(false); fdRef.current = null; }}
+                className="btn-secondary flex-1">
                 Não, cancelar
               </button>
             </div>
@@ -114,6 +243,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
         </div>
       </>
     )}
+
     <form onSubmit={handleSubmit} className="card space-y-5">
       <input type="hidden" name="tz_offset" value={tzOffset} />
       {submitError && (
@@ -124,13 +254,8 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
 
       {/* Tipo de Agendamento */}
       <div>
-        <label htmlFor="tipo_agendamento" className="label">Tipo de Agendamento</label>
-        <select
-          id="tipo_agendamento"
-          value={tipoAg}
-          onChange={e => setTipoAg(e.target.value as typeof tipoAg)}
-          className="input-field"
-        >
+        <label className="label">Tipo de Agendamento</label>
+        <select value={tipoAg} onChange={e => setTipoAg(e.target.value as typeof tipoAg)} className="input-field">
           <option value="consulta_avulsa">Consulta Avulsa</option>
           <option value="plano_mensal">Plano Mensal</option>
           <option value="ausencia">Ausência</option>
@@ -139,33 +264,37 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
 
       {/* Profissional */}
       <div>
-        <label htmlFor="profissional_id" className="label">Profissional <span className="text-rust">*</span></label>
-        <select id="profissional_id" name="profissional_id" required className="input-field" defaultValue="">
-          <option value="" disabled>Selecione um profissional</option>
-          {profs.map(p => (
-            <option key={p.id} value={p.id}>{p.nome}</option>
-          ))}
-        </select>
-        {profs.length === 0 && <p className="text-xs text-rust mt-1">Nenhum profissional ativo encontrado.</p>}
+        <label className="label">Profissional <span className="text-rust">*</span></label>
+        {profs.length === 0 ? (
+          <p className="text-xs text-rust mt-1">Nenhum profissional ativo encontrado.</p>
+        ) : (
+          <SearchableSelect
+            name="profissional_id"
+            items={profsItems}
+            placeholder="Digite o nome do profissional…"
+          />
+        )}
       </div>
 
       {/* Paciente */}
       {tipoAg !== "ausencia" && (
         <div>
-          <label htmlFor="paciente_id" className="label">Paciente <span className="text-rust">*</span></label>
+          <label className="label">Paciente <span className="text-rust">*</span></label>
           {pacs.length === 0 ? (
             <div className="p-4 bg-peach/10 border border-peach/30 rounded-xl text-sm text-rust">
               Nenhum paciente cadastrado.{" "}
               <Link href="/pacientes/novo?from=agenda" className="font-medium underline">Cadastrar paciente</Link>
             </div>
           ) : (
-            <div className="flex items-stretch gap-2">
-              <select id="paciente_id" name="paciente_id" required className="input-field flex-1" defaultValue={defaultPacienteId ?? ""}>
-                <option value="" disabled>Selecione um paciente</option>
-                {pacs.map(p => (
-                  <option key={p.id} value={p.id}>{p.nome_completo}</option>
-                ))}
-              </select>
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <SearchableSelect
+                  name="paciente_id"
+                  items={pacsItems}
+                  placeholder="Digite o nome do paciente…"
+                  defaultId={defaultPacienteId}
+                />
+              </div>
               <Link
                 href="/pacientes/novo?from=agenda"
                 className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg border border-sand/40 hover:bg-forest/5 text-forest-500 hover:text-forest transition-colors"
@@ -203,96 +332,90 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
         </div>
       </div>
 
-      {/* Repetição — oculto para ausência */}
+      {/* Repetição */}
       {tipoAg === "ausencia" && (
         <div className="p-3 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500">
           Ausência registrada — sem paciente nem recorrência.
         </div>
       )}
-      {tipoAg !== "ausencia" && <div className="rounded-xl border border-sand/40">
-        <button
-          type="button"
-          onClick={() => setRepetir(v => !v)}
-          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${repetir ? "bg-forest/5 rounded-b-none" : "hover:bg-sand/10"}`}
-        >
-          <div className="flex items-center gap-2">
-            <RepeatIcon className={`w-4 h-4 ${repetir ? "text-forest" : "text-forest-400"}`} />
-            <span className={`text-sm font-medium ${repetir ? "text-forest" : "text-forest-500"}`}>
-              Repetir Agendamento
-            </span>
-            {repetir && (
-              <span className="text-xs bg-forest/10 text-forest px-2 py-0.5 rounded-full">Ativo</span>
-            )}
-          </div>
-          <div className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${repetir ? "bg-forest" : "bg-gray-200"}`}>
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${repetir ? "translate-x-5" : "translate-x-0"}`} />
-          </div>
-        </button>
+      {tipoAg !== "ausencia" && (
+        <div className="rounded-xl border border-sand/40">
+          <button
+            type="button"
+            onClick={() => setRepetir(v => !v)}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${repetir ? "bg-forest/5 rounded-b-none" : "hover:bg-sand/10"}`}
+          >
+            <div className="flex items-center gap-2">
+              <RepeatIcon className={`w-4 h-4 ${repetir ? "text-forest" : "text-forest-400"}`} />
+              <span className={`text-sm font-medium ${repetir ? "text-forest" : "text-forest-500"}`}>
+                Repetir Agendamento
+              </span>
+              {repetir && <span className="text-xs bg-forest/10 text-forest px-2 py-0.5 rounded-full">Ativo</span>}
+            </div>
+            <div className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${repetir ? "bg-forest" : "bg-gray-200"}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${repetir ? "translate-x-5" : "translate-x-0"}`} />
+            </div>
+          </button>
 
-        {repetir && (
-          <div className="px-4 pb-4 pt-3 border-t border-sand/30 grid sm:grid-cols-2 gap-4 bg-forest/[0.02] rounded-b-xl">
-            <input type="hidden" name="recorrencia" value={recorrencia} />
-            <input type="hidden" name="meses_recorrencia" value={meses} />
-            <input type="hidden" name="mensal_tipo" value={mensal_tipo} />
-            <div>
-              <label className="label">Frequência</label>
-              <div className="flex rounded-xl border border-sand/40 overflow-hidden text-sm">
-                {([
-                  ["semanal", "Semanal"],
-                  ["quinzenal", "Quinzenal"],
-                  ["mensal", "Mensal"],
-                ] as const).map(([v, l]) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setRecorrencia(v)}
-                    className={`flex-1 py-2 text-sm transition-colors border-r border-sand/40 last:border-r-0 ${recorrencia === v ? "bg-forest text-cream font-medium" : "hover:bg-sand/20 text-forest-600"}`}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-
-              {/* Sub-opções mensais */}
-              {recorrencia === "mensal" && (
-                <div className="mt-3 space-y-2">
-                  <label className="text-xs font-medium text-forest-500 uppercase tracking-wider">Critério mensal</label>
-                  <label className="flex items-center gap-2.5 cursor-pointer" onClick={() => setMensalTipo("dia_semana")}>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_semana" ? "border-forest" : "border-sand/60"}`}>
-                      {mensal_tipo === "dia_semana" && <div className="w-2 h-2 rounded-full bg-forest" />}
-                    </div>
-                    <span className="text-sm text-forest-700">Considerar dia da semana</span>
-                  </label>
-                  <label className="flex items-center gap-2.5 cursor-pointer" onClick={() => setMensalTipo("dia_mes")}>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_mes" ? "border-forest" : "border-sand/60"}`}>
-                      {mensal_tipo === "dia_mes" && <div className="w-2 h-2 rounded-full bg-forest" />}
-                    </div>
-                    <span className="text-sm text-forest-700">Considerar dia do mês</span>
-                  </label>
+          {repetir && (
+            <div className="px-4 pb-4 pt-3 border-t border-sand/30 grid sm:grid-cols-2 gap-4 bg-forest/[0.02] rounded-b-xl">
+              <input type="hidden" name="recorrencia" value={recorrencia} />
+              <input type="hidden" name="meses_recorrencia" value={meses} />
+              <input type="hidden" name="mensal_tipo" value={mensal_tipo} />
+              <div>
+                <label className="label">Frequência</label>
+                <div className="flex rounded-xl border border-sand/40 overflow-hidden text-sm">
+                  {([
+                    ["semanal", "Semanal"],
+                    ["quinzenal", "Quinzenal"],
+                    ["mensal", "Mensal"],
+                  ] as const).map(([v, l]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setRecorrencia(v)}
+                      className={`flex-1 py-2 text-sm transition-colors border-r border-sand/40 last:border-r-0 ${recorrencia === v ? "bg-forest text-cream font-medium" : "hover:bg-sand/20 text-forest-600"}`}
+                    >
+                      {l}
+                    </button>
+                  ))}
                 </div>
-              )}
+                {recorrencia === "mensal" && (
+                  <div className="mt-3 space-y-2">
+                    <label className="text-xs font-medium text-forest-500 uppercase tracking-wider">Critério mensal</label>
+                    <label className="flex items-center gap-2.5 cursor-pointer" onClick={() => setMensalTipo("dia_semana")}>
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_semana" ? "border-forest" : "border-sand/60"}`}>
+                        {mensal_tipo === "dia_semana" && <div className="w-2 h-2 rounded-full bg-forest" />}
+                      </div>
+                      <span className="text-sm text-forest-700">Considerar dia da semana</span>
+                    </label>
+                    <label className="flex items-center gap-2.5 cursor-pointer" onClick={() => setMensalTipo("dia_mes")}>
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${mensal_tipo === "dia_mes" ? "border-forest" : "border-sand/60"}`}>
+                        {mensal_tipo === "dia_mes" && <div className="w-2 h-2 rounded-full bg-forest" />}
+                      </div>
+                      <span className="text-sm text-forest-700">Considerar dia do mês</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="label">Repetir por</label>
+                <select value={meses} onChange={e => setMeses(e.target.value)} className="input-field">
+                  <option value="1">1 mês</option>
+                  <option value="3">3 meses</option>
+                  <option value="6">6 meses</option>
+                  <option value="12">12 meses</option>
+                </select>
+                <p className="text-xs text-forest-400 mt-1.5">
+                  {recorrencia === "semanal"   && `${parseInt(meses) * 4} sessões no total`}
+                  {recorrencia === "quinzenal" && `${parseInt(meses) * 2} sessões no total`}
+                  {recorrencia === "mensal"    && `${meses} sessões no total`}
+                </p>
+              </div>
             </div>
-            <div>
-              <label className="label">Repetir por</label>
-              <select
-                value={meses}
-                onChange={e => setMeses(e.target.value)}
-                className="input-field"
-              >
-                <option value="1">1 mês</option>
-                <option value="3">3 meses</option>
-                <option value="6">6 meses</option>
-                <option value="12">12 meses</option>
-              </select>
-              <p className="text-xs text-forest-400 mt-1.5">
-                {recorrencia === "semanal"   && `${parseInt(meses) * 4} sessões no total`}
-                {recorrencia === "quinzenal" && `${parseInt(meses) * 2} sessões no total`}
-                {recorrencia === "mensal"    && `${meses} sessões no total`}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>}
+          )}
+        </div>
+      )}
 
       {/* Observações */}
       <div>
@@ -302,7 +425,11 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button type="submit" disabled={isPending || (tipoAg !== "ausencia" && pacs.length === 0)} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={isPending || (tipoAg !== "ausencia" && pacs.length === 0)}
+          className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+        >
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {isPending ? "Agendando…" : tipoAg === "ausencia" ? "Registrar ausência" : repetir ? "Agendar sessões" : "Agendar sessão"}
         </button>
