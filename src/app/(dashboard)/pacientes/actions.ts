@@ -152,7 +152,14 @@ export async function buscarAgendamentosPaciente(
   }));
 }
 
-export { deletarAgendamentoClient as deletarAgendamento } from "../agenda/actions";
+export async function deletarAgendamento(agendamentoId: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase.from("agendamentos").delete().eq("id", agendamentoId);
+  if (error) return { error: error.message };
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
 
 export async function deletarTodosAgendamentosPaciente(pacienteId: string): Promise<{ error: string | null }> {
   const supabase = createClient();
