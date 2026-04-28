@@ -233,10 +233,80 @@ export async function atualizarStatusAgendamento(
   status: "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou" | "ausencia"
 ) {
   const supabase = createClient();
-  const { error } = await supabase.from("agendamentos").update({ status }).eq("id", id);
+
+  const update: Record<string, unknown> = { status };
+
+  if (status === "realizado" || status === "finalizado") {
+    const { data: ag } = await supabase
+      .from("agendamentos")
+      .select("profissional_id, tipo_agendamento")
+      .eq("id", id)
+      .single();
+
+    if (ag && ag.tipo_agendamento !== "ausencia") {
+      const { data: prof } = await supabase
+        .from("profissionais")
+        .select("valor_consulta, valor_aluguel_sala")
+        .eq("id", ag.profissional_id)
+        .single();
+
+      if (prof) {
+        update.aluguel_cobrado = true;
+        update.aluguel_valor   = prof.valor_aluguel_sala ?? 50;
+        update.valor_sessao    = prof.valor_consulta ?? null;
+      }
+    }
+  }
+
+  if (status === "faltou") {
+    update.falta_marcada_em = new Date().toISOString();
+    const { data: ag } = await supabase
+      .from("agendamentos")
+      .select("profissional_id, tipo_agendamento")
+      .eq("id", id)
+      .single();
+
+    if (ag && ag.tipo_agendamento !== "ausencia") {
+      const { data: prof } = await supabase
+        .from("profissionais")
+        .select("valor_aluguel_sala")
+        .eq("id", ag.profissional_id)
+        .single();
+
+      if (prof) {
+        update.aluguel_cobrado = true;
+        update.aluguel_valor   = prof.valor_aluguel_sala ?? 50;
+      }
+    }
+  }
+
+  if (status === "cancelado") {
+    update.falta_marcada_em = new Date().toISOString();
+    update.aluguel_cobrado  = false;
+    update.aluguel_valor    = null;
+  }
+
+  const { error } = await supabase.from("agendamentos").update(update).eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
+  revalidatePath("/financeiro");
+}
+
+export async function marcarPagamentoAgendamento(
+  id: string,
+  pago: boolean,
+  forma_pagamento: string | null
+): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("agendamentos")
+    .update({ pago, forma_pagamento: pago ? forma_pagamento : null })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/agenda");
+  revalidatePath("/financeiro");
+  return { error: null };
 }
 
 export async function editarAgendamento(id: string, formData: FormData) {

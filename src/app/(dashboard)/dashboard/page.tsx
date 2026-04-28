@@ -35,7 +35,7 @@ export default async function DashboardPage({
   fetchEnd.setDate(fetchEnd.getDate() + 1);
 
   const agendamentosSelect =
-    "id, data_hora_inicio, data_hora_fim, status, observacoes, tipo_agendamento, paciente:pacientes(id, nome_completo, telefone), profissional:profissionais(id, profile:profiles(nome_completo)), sala:salas(id, nome)";
+    "id, data_hora_inicio, data_hora_fim, status, observacoes, tipo_agendamento, pago, forma_pagamento, paciente:pacientes(id, nome_completo, telefone), profissional:profissionais(id, profile:profiles(nome_completo)), sala:salas(id, nome)";
 
   const [
     { data: agendamentos },

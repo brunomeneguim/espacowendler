@@ -20,7 +20,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient, verificarHorarioIndisponivel } from "../agenda/actions";
+import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient, verificarHorarioIndisponivel, marcarPagamentoAgendamento } from "../agenda/actions";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
 
 // ── Constantes ───────────────────────────────────────────────────
@@ -40,6 +40,8 @@ interface Agendamento {
   status: Status;
   observacoes?: string | null;
   tipo_agendamento?: string | null;
+  pago?: boolean;
+  forma_pagamento?: string | null;
   paciente: { id: string; nome_completo: string; telefone?: string } | null;
   profissional: { id: string; profile: { nome_completo: string } | null } | null;
   sala: { id: number; nome: string } | null;
@@ -331,6 +333,12 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
 }
 
 // ── Card de agendamento ───────────────────────────────────────────
+const FORMA_LABELS: Record<string, string> = {
+  dinheiro: "Dinheiro", pix: "PIX",
+  cartao_credito: "Cartão crédito", cartao_debito: "Cartão débito",
+  transferencia: "Transferência", outros: "Outros",
+};
+
 interface CardProps {
   ag: Agendamento;
   style: React.CSSProperties;
@@ -339,6 +347,7 @@ interface CardProps {
   onEdit: () => void;
   onDelete: () => void;
   onStatus: (s: Status) => void;
+  onPayment: (id: string, forma: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
@@ -346,7 +355,34 @@ interface CardProps {
   onExpand: () => void;
 }
 
-function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, onResizeStart, pending, canEdit, expanded, onExpand }: CardProps) {
+function PaymentForm({ agId, onConfirm }: { agId: string; onConfirm: (forma: string) => void }) {
+  const [forma, setForma] = useState("pix");
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1.5" onClick={e => e.stopPropagation()}>
+      <select
+        value={forma}
+        onChange={e => setForma(e.target.value)}
+        className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-forest/30"
+      >
+        <option value="pix">PIX</option>
+        <option value="dinheiro">Dinheiro</option>
+        <option value="cartao_credito">Cartão crédito</option>
+        <option value="cartao_debito">Cartão débito</option>
+        <option value="transferencia">Transferência</option>
+        <option value="outros">Outros</option>
+      </select>
+      <button
+        type="button"
+        onClick={() => onConfirm(forma)}
+        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors whitespace-nowrap"
+      >
+        <Check className="w-3 h-3" /> Receber
+      </button>
+    </div>
+  );
+}
+
+function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, expanded, onExpand }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
   const cardRef = useRef<HTMLDivElement>(null);
@@ -424,6 +460,20 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
               </button>
             )}
 
+            {/* Pagamento */}
+            {(ag.status === "realizado" || ag.status === "finalizado") && (
+              <div className="border-t border-gray-100 mt-0.5 pt-1">
+                {ag.pago ? (
+                  <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-green-700">
+                    <Check className="w-4 h-4 shrink-0 text-green-500" />
+                    <span>Pago{ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}</span>
+                  </div>
+                ) : (
+                  <PaymentForm agId={ag.id} onConfirm={(forma) => onPayment(ag.id, forma)} />
+                )}
+              </div>
+            )}
+
             {canEdit && (
               <div className="flex gap-1 pt-1 border-t border-gray-100 mt-0.5">
                 <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-forest/10 text-forest hover:bg-forest/20 transition-colors">
@@ -486,6 +536,7 @@ interface ColunaProps {
   onEdit: (ag: Agendamento) => void;
   onDelete: (id: string) => void;
   onStatus: (id: string, s: Status) => void;
+  onPayment: (id: string, forma: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
@@ -494,7 +545,7 @@ interface ColunaProps {
   onExpand: (id: string | null) => void;
 }
 
-function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, onResizeStart, pending, canEdit, salaId, expandedId, onExpand }: ColunaProps) {
+function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, salaId, expandedId, onExpand }: ColunaProps) {
   const colMap = calcularColunas(ags);
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
   const slotsOcupados = new Set(
@@ -536,6 +587,7 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
             onEdit={() => onEdit(ag)}
             onDelete={() => onDelete(ag.id)}
             onStatus={s => onStatus(ag.id, s)}
+            onPayment={onPayment}
             onResizeStart={onResizeStart}
             pending={pending}
             canEdit={canEdit}
@@ -705,6 +757,13 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
       if (novoStatus === "finalizado") {
         router.push("/dashboard");
       }
+    });
+  }
+
+  function handlePayment(id: string, forma: string) {
+    startTransition(async () => {
+      await marcarPagamentoAgendamento(id, true, forma);
+      router.refresh();
     });
   }
 
@@ -1037,7 +1096,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                     </div>
                   </div>
                   <div className="relative px-0.5">
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} />
+                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} />
                   </div>
                 </div>
               );
@@ -1079,6 +1138,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                   onEdit={setEditingAg}
                   onDelete={handleDelete}
                   onStatus={handleStatus}
+                  onPayment={handlePayment}
                   onResizeStart={handleResizeStart}
                   pending={isPending}
                   canEdit={canEdit}

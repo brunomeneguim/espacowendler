@@ -23,7 +23,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
 const ROLE_ACCESS: Record<UserRole, string[]> = {
   admin:       ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/equipe", "/salas", "/financeiro", "/relatorios"],
   supervisor:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
-  profissional:["/dashboard", "/pacientes", "/tarefas"],
+  profissional:["/dashboard", "/pacientes", "/tarefas", "/financeiro", "/relatorios"],
   secretaria:  ["/dashboard", "/pacientes", "/tarefas", "/financeiro"],
 };
 

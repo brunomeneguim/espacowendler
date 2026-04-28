@@ -10,9 +10,21 @@ export default async function RelatoriosPage({
   searchParams: { inicio?: string; fim?: string };
 }) {
   const profile = await getCurrentProfile();
-  if (!["admin", "supervisor"].includes(profile.role)) redirect("/dashboard");
+  if (!["admin", "supervisor", "profissional"].includes(profile.role)) redirect("/dashboard");
 
   const supabase = createClient();
+
+  // Profissional: filtrar pelos próprios atendimentos
+  let profissionalId: string | null = null;
+  if (profile.role === "profissional") {
+    const { data: prof } = await supabase
+      .from("profissionais")
+      .select("id")
+      .eq("profile_id", profile.id)
+      .single();
+    if (!prof) redirect("/dashboard");
+    profissionalId = prof.id;
+  }
 
   // ── Período padrão: últimos 30 dias ──
   const hoje = new Date();
@@ -26,25 +38,33 @@ export default async function RelatoriosPage({
   };
 
   // ── Buscar dados ──
+  let agQuery = supabase
+    .from("agendamentos")
+    .select(`
+      id, status, data_hora_inicio, data_hora_fim,
+      profissional:profissionais(id, valor_consulta, profile:profiles(nome_completo)),
+      sala:salas(id, nome)
+    `)
+    .gte("data_hora_inicio", `${periodo.inicio}T00:00:00.000Z`)
+    .lte("data_hora_inicio", `${periodo.fim}T23:59:59.999Z`)
+    .neq("status", "ausencia");
+
+  if (profissionalId) {
+    agQuery = agQuery.eq("profissional_id", profissionalId);
+  }
+
   const [
     { data: agendamentos },
     { data: pacientesNovos },
   ] = await Promise.all([
-    supabase
-      .from("agendamentos")
-      .select(`
-        id, status, data_hora_inicio, data_hora_fim,
-        profissional:profissionais(id, valor_consulta, profile:profiles(nome_completo)),
-        sala:salas(id, nome)
-      `)
-      .gte("data_hora_inicio", `${periodo.inicio}T00:00:00.000Z`)
-      .lte("data_hora_inicio", `${periodo.fim}T23:59:59.999Z`)
-      .neq("status", "ausencia"),
-    supabase
-      .from("pacientes")
-      .select("id, created_at")
-      .gte("created_at", `${periodo.inicio}T00:00:00.000Z`)
-      .lte("created_at", `${periodo.fim}T23:59:59.999Z`),
+    agQuery,
+    profissionalId
+      ? Promise.resolve({ data: [] })
+      : supabase
+          .from("pacientes")
+          .select("id, created_at")
+          .gte("created_at", `${periodo.inicio}T00:00:00.000Z`)
+          .lte("created_at", `${periodo.fim}T23:59:59.999Z`),
   ]);
 
   const ags = (agendamentos ?? []) as any[];
@@ -83,11 +103,10 @@ export default async function RelatoriosPage({
   // ── Pacientes novos por mês ──
   const mesMap = new Map<string, number>();
   for (const p of (pacientesNovos ?? []) as any[]) {
-    const mes = (p.created_at as string).slice(0, 7); // "YYYY-MM"
+    const mes = (p.created_at as string).slice(0, 7);
     mesMap.set(mes, (mesMap.get(mes) ?? 0) + 1);
   }
 
-  // Garantir que todos os meses do período apareçam
   const mesStart = new Date(periodo.inicio + "T12:00:00");
   const mesEnd   = new Date(periodo.fim   + "T12:00:00");
   const mesesLabels: { mes: string; label: string; pacientes: number }[] = [];
@@ -119,14 +138,17 @@ export default async function RelatoriosPage({
       <PageHeader
         eyebrow="Análises"
         title="Relatórios"
-        description="Indicadores de atendimento, faturamento e ocupação"
+        description={profissionalId
+          ? "Seus indicadores de atendimento no período"
+          : "Indicadores de atendimento, faturamento e ocupação"}
       />
       <RelatoriosClient
         periodo={periodo}
         resumo={{ total, realizados, faltas, cancelados: ags.filter(a => a.status === "cancelado").length, taxa }}
-        porProfissional={porProfissional}
-        pacientesPorMes={mesesLabels}
-        porSala={porSala}
+        porProfissional={profissionalId ? [] : porProfissional}
+        pacientesPorMes={profissionalId ? [] : mesesLabels}
+        porSala={profissionalId ? [] : porSala}
+        meuResumo={profissionalId ? (porProfissional[0] ?? null) : null}
       />
     </div>
   );

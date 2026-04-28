@@ -9,20 +9,30 @@ export default async function SalasPage() {
   if (!["admin", "supervisor"].includes(profile.role)) redirect("/dashboard");
 
   const supabase = createClient();
-  const { data: salas } = await supabase
-    .from("salas")
-    .select("id, nome, ativo")
-    .order("ativo", { ascending: false })
-    .order("nome");
+  const [{ data: salas }, { data: profissionais }] = await Promise.all([
+    supabase
+      .from("salas")
+      .select("id, nome, ativo")
+      .order("ativo", { ascending: false })
+      .order("nome"),
+    supabase
+      .from("profissionais")
+      .select("id, valor_aluguel_sala, profile:profiles(nome_completo)")
+      .eq("ativo", true)
+      .order("id"),
+  ]);
 
   return (
     <div className="p-6 md:p-10 max-w-2xl">
       <PageHeader
         eyebrow="Configurações"
         title="Salas de atendimento"
-        description="Gerencie as salas disponíveis para agendamento"
+        description="Gerencie as salas disponíveis e o valor de aluguel por profissional"
       />
-      <SalasClient salas={(salas ?? []) as any} />
+      <SalasClient
+        salas={(salas ?? []) as any}
+        profissionais={(profissionais ?? []) as any}
+      />
     </div>
   );
 }
