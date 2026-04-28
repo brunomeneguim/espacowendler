@@ -52,7 +52,7 @@ export default async function RelatoriosPage({
   // ── Resumo geral ──
   const total       = ags.filter(a => a.status !== "cancelado").length;
   const realizados  = ags.filter(a => ["realizado", "finalizado"].includes(a.status)).length;
-  const faltas      = ags.filter(a => ["faltou", "cancelado"].includes(a.status)).length;
+  const faltas      = ags.filter(a => a.status === "faltou").length;
   const taxa        = total > 0 ? Math.round((realizados / total) * 100) : 0;
 
   // ── Por profissional ──
