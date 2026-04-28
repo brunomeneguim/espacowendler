@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { FileDown } from "lucide-react";
 
 interface ProfRow {
   nome: string;
@@ -71,20 +72,43 @@ export function RelatoriosClient({ periodo, resumo, porProfissional, pacientesPo
   const maxSessoes = Math.max(...porProfissional.map(p => p.total), 1);
   const maxPacientes = Math.max(...pacientesPorMes.map(m => m.pacientes), 1);
 
+  const periodoLabel = `${new Date(periodo.inicio + "T12:00:00").toLocaleDateString("pt-BR")} – ${new Date(periodo.fim + "T12:00:00").toLocaleDateString("pt-BR")}`;
+
   return (
     <div className="space-y-8">
-      {/* Filtro de período */}
-      <form onSubmit={applyPeriod} className="flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="label text-xs">De</label>
-          <input type="date" name="inicio" defaultValue={periodo.inicio} className="input-field py-1.5 text-sm" />
-        </div>
-        <div>
-          <label className="label text-xs">Até</label>
-          <input type="date" name="fim" defaultValue={periodo.fim} className="input-field py-1.5 text-sm" />
-        </div>
-        <button type="submit" className="btn-primary py-1.5 text-sm">Aplicar</button>
-      </form>
+      {/* Cabeçalho visível apenas na impressão */}
+      <div className="hidden print:block mb-6">
+        <p className="text-xl font-display font-semibold text-forest">espaço wendler</p>
+        <p className="text-base font-medium mt-1">Relatório de atendimentos</p>
+        <p className="text-sm text-forest-500 mt-0.5">Período: {periodoLabel}</p>
+        <p className="text-xs text-forest-400 mt-0.5">
+          Gerado em {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+        </p>
+        <hr className="mt-4 border-forest/20" />
+      </div>
+
+      {/* Filtro de período + botão exportar */}
+      <div className="print-hidden flex flex-wrap gap-3 items-end justify-between">
+        <form onSubmit={applyPeriod} className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="label text-xs">De</label>
+            <input type="date" name="inicio" defaultValue={periodo.inicio} className="input-field py-1.5 text-sm" />
+          </div>
+          <div>
+            <label className="label text-xs">Até</label>
+            <input type="date" name="fim" defaultValue={periodo.fim} className="input-field py-1.5 text-sm" />
+          </div>
+          <button type="submit" className="btn-primary py-1.5 text-sm">Aplicar</button>
+        </form>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="btn-secondary py-1.5 text-sm flex items-center gap-1.5 shrink-0"
+        >
+          <FileDown className="w-4 h-4" />
+          Exportar PDF
+        </button>
+      </div>
 
       {/* Resumo de atendimentos */}
       <section>

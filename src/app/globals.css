@@ -2,6 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+
+  /* Esconder sidebar e elementos de UI */
+  aside,
+  .print-hidden {
+    display: none !important;
+  }
+
+  /* Conteúdo principal ocupa a largura toda */
+  main {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Remover backgrounds coloridos que desperdiçam tinta */
+  body {
+    background: white !important;
+  }
+
+  /* Garantir que cards e tabelas imprimam com bordas visíveis */
+  .card {
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  table {
+    break-inside: auto;
+  }
+
+  tr {
+    break-inside: avoid;
+    break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+}
+
 :root {
   --forest: #2f5d50;
   --cream: #faf0e8;
