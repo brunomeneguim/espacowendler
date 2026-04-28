@@ -138,12 +138,14 @@ export function NovoPacienteForm({ camposConfig, profissionais, fromAgenda }: Pr
 
   // Profissionais vinculados
   const [profSearch, setProfSearch] = useState("");
+  const [profSearchOpen, setProfSearchOpen] = useState(false);
   const [profVinculados, setProfVinculados] = useState<ProfissionalOpt[]>([]);
-  const profSearchResults = profissionais.filter(
-    p => profSearch.length >= 1 &&
-      p.nome_completo.toLowerCase().includes(profSearch.toLowerCase()) &&
-      !profVinculados.find(v => v.id === p.id)
-  );
+  const profSearchResults = profSearchOpen
+    ? profissionais.filter(
+        p => p.nome_completo.toLowerCase().includes(profSearch.toLowerCase()) &&
+          !profVinculados.find(v => v.id === p.id)
+      )
+    : [];
 
   // Responsável financeiro
   const [respFinMesmoPaciente, setRespFinMesmoPaciente] = useState(false);
@@ -282,9 +284,11 @@ export function NovoPacienteForm({ camposConfig, profissionais, fromAgenda }: Pr
               <Search className="w-4 h-4 text-forest-400 shrink-0" />
               <input
                 type="text"
-                placeholder="Digite o nome do profissional…"
+                placeholder="Clique para ver ou digite para filtrar…"
                 value={profSearch}
                 onChange={e => setProfSearch(e.target.value)}
+                onFocus={() => setProfSearchOpen(true)}
+                onBlur={() => setTimeout(() => setProfSearchOpen(false), 150)}
                 className="flex-1 text-sm focus:outline-none bg-transparent"
               />
             </div>
@@ -294,7 +298,7 @@ export function NovoPacienteForm({ camposConfig, profissionais, fromAgenda }: Pr
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => { setProfVinculados(prev => [...prev, p]); setProfSearch(""); }}
+                    onClick={() => { setProfVinculados(prev => [...prev, p]); setProfSearch(""); setProfSearchOpen(false); }}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-sand/20 transition-colors text-forest"
                   >
                     <UserCog className="w-4 h-4 text-forest-400 shrink-0" />
