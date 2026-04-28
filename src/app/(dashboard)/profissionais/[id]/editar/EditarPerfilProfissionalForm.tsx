@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import {
-  Upload, X, Loader2, User, ChevronDown, Check, Eye, EyeOff, KeyRound, Stethoscope,
+  Upload, X, Loader2, User, ChevronDown, Check, Eye, EyeOff, KeyRound, Stethoscope, Clock,
 } from "lucide-react";
 import { editarProfissionalCompleto } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
@@ -147,6 +147,7 @@ interface Props {
     registro_profissional?: string | null;
     cor?: string | null; telefone_1?: string | null; telefone_2?: string | null;
     valor_consulta?: number | null; valor_plano?: number | null;
+    horario_inicio?: string | null; horario_fim?: string | null;
     ativo?: boolean;
   };
   especialidades: Especialidade[];
@@ -410,6 +411,36 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
               <MoneyInput name="valor_plano" defaultValue={prof.valor_plano} />
             </div>
           </div>
+        </Section>
+
+        {/* ── Janela de agendamento ── */}
+        <Section icon={Clock} title="Janela de agendamento">
+          <p className="text-sm text-forest-500">
+            Define o horário diário dentro do qual este profissional pode receber atendimentos. Agendamentos fora deste intervalo serão bloqueados.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Horário de início</label>
+              <input
+                name="horario_inicio"
+                type="time"
+                className="input-field"
+                defaultValue={prof.horario_inicio?.slice(0, 5) ?? ""}
+              />
+            </div>
+            <div>
+              <label className="label">Horário de término</label>
+              <input
+                name="horario_fim"
+                type="time"
+                className="input-field"
+                defaultValue={prof.horario_fim?.slice(0, 5) ?? ""}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-forest-400">
+            Deixe em branco para não aplicar restrição de horário.
+          </p>
         </Section>
 
       </form>

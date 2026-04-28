@@ -116,6 +116,7 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
   const [ddi2, setDdi2] = useState(paciente.ddi_telefone_2 ?? "+55");
   const [cep, setCep] = useState(paciente.cep ?? "");
   const [cepLoading, setCepLoading] = useState(false);
+  const [cepErro, setCepErro] = useState<string | null>(null);
   const [endereco, setEndereco] = useState({
     estado: paciente.estado ?? "",
     cidade: paciente.cidade ?? "",
@@ -134,6 +135,7 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
   const [mesmoEndereco, setMesmoEndereco] = useState(paciente.parceiro_mesmo_endereco !== false);
   const [parceiroCep, setParceiroCep] = useState(paciente.parceiro_cep ?? "");
   const [parceiroCepLoading, setParceiroCepLoading] = useState(false);
+  const [parceiroCepErro, setParceiroCepErro] = useState<string | null>(null);
   const [parceiroEnd, setParceiroEnd] = useState({
     estado: paciente.parceiro_estado ?? "",
     cidade: paciente.parceiro_cidade ?? "",
@@ -167,6 +169,7 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
   const [respFinMesmoEnd, setRespFinMesmoEnd] = useState(paciente.resp_fin_mesmo_endereco === true);
   const [respFinCep, setRespFinCep] = useState(paciente.resp_fin_cep ?? "");
   const [respFinCepLoading, setRespFinCepLoading] = useState(false);
+  const [respFinCepErro, setRespFinCepErro] = useState<string | null>(null);
   const [respFinEnd, setRespFinEnd] = useState({
     estado: paciente.resp_fin_estado ?? "",
     cidade: paciente.resp_fin_cidade ?? "",
@@ -217,15 +220,29 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
     reader.readAsDataURL(file);
   }
 
-  async function fetchCep(v: string, setter: (e: { estado: string; cidade: string; bairro: string; logradouro: string }) => void, setLoading: (b: boolean) => void) {
+  async function fetchCep(
+    v: string,
+    setter: (e: { estado: string; cidade: string; bairro: string; logradouro: string }) => void,
+    setLoading: (b: boolean) => void,
+    setErro: (e: string | null) => void,
+  ) {
     const digits = v.replace(/\D/g, "");
     if (digits.length !== 8) return;
+    setErro(null);
     setLoading(true);
     try {
       const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       const data = await res.json();
-      if (!data.erro) setter({ estado: data.uf, cidade: data.localidade, bairro: data.bairro, logradouro: data.logradouro });
-    } catch { /* ignore */ } finally { setLoading(false); }
+      if (data.erro) {
+        setErro("CEP não encontrado.");
+      } else {
+        setter({ estado: data.uf, cidade: data.localidade, bairro: data.bairro, logradouro: data.logradouro });
+      }
+    } catch {
+      setErro("Não foi possível consultar o CEP. Verifique sua conexão.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -472,16 +489,18 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
             <div>
               {req("CEP", "cep")}
               <div className="relative">
-                <input name="cep" type="text" className="input-field pr-8" required={isReq("cep")}
+                <input name="cep" type="text" className={`input-field pr-8 ${cepErro ? "border-rust focus:ring-rust/30" : ""}`} required={isReq("cep")}
                   placeholder="00000-000" value={cep}
                   onChange={e => {
                     const val = maskCep(e.target.value);
                     setCep(val);
+                    setCepErro(null);
                     if (!val.replace(/\D/g, "")) setEndereco({ estado: "", cidade: "", bairro: "", logradouro: "" });
                   }}
-                  onBlur={e => fetchCep(e.target.value, setEndereco, setCepLoading)} />
+                  onBlur={e => fetchCep(e.target.value, setEndereco, setCepLoading, setCepErro)} />
                 {cepLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-forest-400" />}
               </div>
+              {cepErro && <p className="text-xs text-rust mt-1">{cepErro}</p>}
             </div>
             <div>
               {req("Estado", "estado")}
@@ -570,17 +589,19 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
                   <div>
                     <label className="label">CEP</label>
                     <div className="relative">
-                      <input name="parceiro_cep" type="text" className="input-field pr-8" placeholder="00000-000"
+                      <input name="parceiro_cep" type="text" className={`input-field pr-8 ${parceiroCepErro ? "border-rust focus:ring-rust/30" : ""}`} placeholder="00000-000"
                         value={parceiroCep}
                         onChange={e => {
                           const v = maskCep(e.target.value);
                           setParceiroCep(v);
+                          setParceiroCepErro(null);
                           if (!v.replace(/\D/g, "")) setParceiroEnd({ estado: "", cidade: "", bairro: "", logradouro: "" });
                         }}
-                        onBlur={e => fetchCep(e.target.value, setParceiroEnd, setParceiroCepLoading)}
+                        onBlur={e => fetchCep(e.target.value, setParceiroEnd, setParceiroCepLoading, setParceiroCepErro)}
                       />
                       {parceiroCepLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-forest-400" />}
                     </div>
+                    {parceiroCepErro && <p className="text-xs text-rust mt-1">{parceiroCepErro}</p>}
                   </div>
                   <div>
                     <label className="label">Estado</label>
@@ -740,13 +761,14 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
                     <div>
                       <label className="label">CEP</label>
                       <div className="relative">
-                        <input name="resp_fin_cep" type="text" className="input-field pr-8" placeholder="00000-000"
+                        <input name="resp_fin_cep" type="text" className={`input-field pr-8 ${respFinCepErro ? "border-rust focus:ring-rust/30" : ""}`} placeholder="00000-000"
                           value={respFinCep}
-                          onChange={e => { const v = maskCep(e.target.value); setRespFinCep(v); if (!v.replace(/\D/g, "")) setRespFinEnd({ estado: "", cidade: "", bairro: "", logradouro: "" }); }}
-                          onBlur={e => fetchCep(e.target.value, setRespFinEnd, setRespFinCepLoading)}
+                          onChange={e => { const v = maskCep(e.target.value); setRespFinCep(v); setRespFinCepErro(null); if (!v.replace(/\D/g, "")) setRespFinEnd({ estado: "", cidade: "", bairro: "", logradouro: "" }); }}
+                          onBlur={e => fetchCep(e.target.value, setRespFinEnd, setRespFinCepLoading, setRespFinCepErro)}
                         />
                         {respFinCepLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-forest-400" />}
                       </div>
+                      {respFinCepErro && <p className="text-xs text-rust mt-1">{respFinCepErro}</p>}
                     </div>
                     <div>
                       <label className="label">Estado</label>

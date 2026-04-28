@@ -33,7 +33,7 @@ export default async function EditarProfissionalPage({
     supabase
       .from("profissionais")
       .select(
-        "id, profile_id, registro_profissional, valor_consulta, valor_plano, ativo, cor, foto_url, data_nascimento, sexo, cpf, cnpj, tempo_atendimento, observacoes, telefone_1, telefone_2, profile:profiles(id, nome_completo, email)"
+        "id, profile_id, registro_profissional, valor_consulta, valor_plano, ativo, cor, foto_url, data_nascimento, sexo, cpf, cnpj, tempo_atendimento, observacoes, telefone_1, telefone_2, horario_inicio, horario_fim, profile:profiles(id, nome_completo, email)"
       )
       .eq("id", params.id)
       .single(),
