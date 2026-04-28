@@ -18,12 +18,36 @@ export default async function EditarPacientePage({
 
   const supabase = createClient();
 
-  const [{ data: pac }, { data: camposConfig }] = await Promise.all([
+  const [
+    { data: pac },
+    { data: camposConfig },
+    { data: profissionaisRaw },
+    { data: vinculosRaw },
+  ] = await Promise.all([
     supabase.from("pacientes").select("*").eq("id", params.id).single(),
     supabase.from("configuracoes_campos_paciente").select("campo, obrigatorio"),
+    supabase
+      .from("profissionais")
+      .select("id, profile:profiles(nome_completo)")
+      .eq("ativo", true)
+      .order("id"),
+    supabase
+      .from("paciente_profissional")
+      .select("profissional:profissionais(id, profile:profiles(nome_completo))")
+      .eq("paciente_id", params.id),
   ]);
 
   if (!pac) notFound();
+
+  const profissionais = (profissionaisRaw ?? []).map((p: any) => ({
+    id: p.id,
+    nome_completo: p.profile?.nome_completo ?? "",
+  }));
+
+  const profissionaisVinculados = (vinculosRaw ?? []).map((v: any) => ({
+    id: v.profissional?.id ?? "",
+    nome_completo: v.profissional?.profile?.nome_completo ?? "",
+  })).filter((p: any) => p.id);
 
   return (
     <div className="p-6 md:p-10 max-w-4xl">
@@ -44,6 +68,8 @@ export default async function EditarPacientePage({
       <EditarPacienteForm
         paciente={pac}
         camposConfig={camposConfig ?? []}
+        profissionais={profissionais}
+        profissionaisVinculados={profissionaisVinculados}
       />
     </div>
   );

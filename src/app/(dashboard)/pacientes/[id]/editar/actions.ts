@@ -16,12 +16,15 @@ export async function atualizarPacienteCompleto(
     ? new Date().getFullYear() - new Date(data_nascimento).getFullYear() < 18
     : false;
 
+  const respFinMesmoPaciente = formData.get("resp_fin_mesmo_paciente") === "true";
+
   const { error } = await supabase
     .from("pacientes")
     .update({
       nome_completo:               formData.get("nome_completo") as string,
       foto_url:                    get("foto_url"),
       data_nascimento,
+      inicio_tratamento:           get("inicio_tratamento"),
       cpf:                         get("cpf_cnpj"),
       rg:                          get("rg"),
       sexo:                        get("sexo"),
@@ -29,6 +32,7 @@ export async function atualizarPacienteCompleto(
       responsavel_nome:            isMinor ? get("responsavel_nome") : null,
       responsavel_relacao:         isMinor ? get("responsavel_relacao") : null,
       responsavel_telefone:        isMinor ? get("responsavel_telefone") : null,
+      responsavel_ddi:             isMinor ? (get("responsavel_ddi") || "+55") : null,
       responsavel_data_nascimento: isMinor ? get("responsavel_data_nascimento") : null,
       responsavel_cpf:             isMinor ? get("responsavel_cpf") : null,
       cep:                         get("cep"),
@@ -55,6 +59,7 @@ export async function atualizarPacienteCompleto(
       parceiro_cpf:                get("parceiro_cpf"),
       parceiro_data_nascimento:    get("parceiro_data_nascimento"),
       parceiro_telefone:           get("parceiro_telefone"),
+      parceiro_ddi:                get("parceiro_ddi") || "+55",
       parceiro_email:              get("parceiro_email"),
       parceiro_mesmo_endereco:     formData.get("parceiro_mesmo_endereco") !== "false",
       parceiro_cep:                get("parceiro_cep"),
@@ -63,10 +68,35 @@ export async function atualizarPacienteCompleto(
       parceiro_bairro:             get("parceiro_bairro"),
       parceiro_endereco:           get("parceiro_endereco"),
       parceiro_numero:             get("parceiro_numero"),
+      // Responsável Financeiro
+      resp_fin_mesmo_paciente:     respFinMesmoPaciente,
+      resp_fin_nome:               respFinMesmoPaciente ? null : get("resp_fin_nome"),
+      resp_fin_email:              respFinMesmoPaciente ? null : get("resp_fin_email"),
+      resp_fin_cpf:                respFinMesmoPaciente ? null : get("resp_fin_cpf"),
+      resp_fin_parentesco:         respFinMesmoPaciente ? null : get("resp_fin_parentesco"),
+      resp_fin_telefone:           respFinMesmoPaciente ? null : get("resp_fin_telefone"),
+      resp_fin_ddi:                respFinMesmoPaciente ? null : (get("resp_fin_ddi") || "+55"),
+      resp_fin_mesmo_endereco:     formData.get("resp_fin_mesmo_endereco") === "true",
+      resp_fin_cep:                respFinMesmoPaciente ? null : get("resp_fin_cep"),
+      resp_fin_estado:             respFinMesmoPaciente ? null : get("resp_fin_estado"),
+      resp_fin_cidade:             respFinMesmoPaciente ? null : get("resp_fin_cidade"),
+      resp_fin_bairro:             respFinMesmoPaciente ? null : get("resp_fin_bairro"),
+      resp_fin_logradouro:         respFinMesmoPaciente ? null : get("resp_fin_logradouro"),
+      resp_fin_numero:             respFinMesmoPaciente ? null : get("resp_fin_numero"),
     })
     .eq("id", id);
 
   if (error) return { error: error.message };
+
+  // Atualizar vínculos com profissionais
+  const profissionalIds = formData.getAll("profissional_ids") as string[];
+  await supabase.from("paciente_profissional").delete().eq("paciente_id", id);
+  if (profissionalIds.length > 0) {
+    await supabase.from("paciente_profissional").insert(
+      profissionalIds.map(pid => ({ paciente_id: id, profissional_id: pid }))
+    );
+  }
+
   revalidatePath("/pacientes");
   revalidatePath("/dashboard");
   return { error: null };
