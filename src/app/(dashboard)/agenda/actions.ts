@@ -176,11 +176,11 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
   // Verificar horário de atendimento do profissional (usa hora local, não UTC)
   const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, hora, duracao);
-  if (erroHorario) return { error: erroHorario, ignoradas: 0 };
+  if (erroHorario) return { error: erroHorario, ignoradas: 0, datasIgnoradas: [] };
 
   // Verificar conflito do agendamento principal
   const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim);
-  if (conflito) return { error: conflito, ignoradas: 0 };
+  if (conflito) return { error: conflito, ignoradas: 0, datasIgnoradas: [] };
 
   // Grupo para recorrências
   const grupo_id = recorrencia !== "nenhuma" ? randomUUID() : null;
