@@ -50,10 +50,10 @@ function calcAge(dob: string) {
   return age;
 }
 
-function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
+function Section({ icon: Icon, title, children, allowOverflow }: { icon: React.ElementType; title: string; children: React.ReactNode; allowOverflow?: boolean }) {
   return (
-    <div className="card p-0 overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-3 bg-forest/5 border-b border-sand/30">
+    <div className={`card p-0 ${allowOverflow ? "overflow-visible" : "overflow-hidden"}`}>
+      <div className="flex items-center gap-3 px-5 py-3 bg-forest/5 border-b border-sand/30 rounded-t-[inherit]">
         <Icon className="w-4 h-4 text-forest" />
         <h2 className="font-display text-base text-forest">{title}</h2>
       </div>
@@ -284,7 +284,7 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
         </div>
 
         {/* ── Profissional Responsável ── */}
-        <Section icon={UserCog} title="Profissional Responsável">
+        <Section icon={UserCog} title="Profissional Responsável" allowOverflow>
           <p className="text-sm text-forest-500">Vincule um ou mais profissionais responsáveis por este paciente.</p>
           <div className="relative">
             <div className="flex items-center gap-2 border border-sand/40 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-forest/20">
