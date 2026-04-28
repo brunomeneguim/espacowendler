@@ -30,7 +30,7 @@ export default async function EditarAgendamentoPage({
       .single(),
     supabase
       .from("profissionais")
-      .select("id, profile:profiles(nome_completo), especialidade:especialidades(nome)")
+      .select("id, profile:profiles(nome_completo, role), profissional_especialidades(especialidade:especialidades(nome))")
       .eq("ativo", true),
     supabase
       .from("pacientes")
@@ -80,7 +80,7 @@ export default async function EditarAgendamentoPage({
         <div>
           <label htmlFor="profissional_id" className="label">Profissional</label>
           <select id="profissional_id" name="profissional_id" required className="input-field" defaultValue={ag.profissional_id}>
-            {(profs ?? []).map((p: any) => (
+            {(profs ?? []).filter((p: any) => p.profile?.role !== "secretaria").map((p: any) => (
               <option key={p.id} value={p.id}>{p.profile?.nome_completo}</option>
             ))}
           </select>
