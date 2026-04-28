@@ -151,7 +151,7 @@ function gerarDatas(inicio: Date, recorrencia: string, meses: number, mensal_tip
 }
 
 // ── Criar agendamento ─────────────────────────────────────────────
-export async function criarAgendamento(formData: FormData): Promise<{ error: string | null; ignoradas: number }> {
+export async function criarAgendamento(formData: FormData): Promise<{ error: string | null; ignoradas: number; datasIgnoradas: string[] }> {
   const supabase = createClient();
 
   const profissional_id = formData.get("profissional_id") as string;
@@ -200,16 +200,17 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
     data_hora_inicio: inicio.toISOString(),
     data_hora_fim:    fim.toISOString(),
   });
-  if (error) return { error: error.message, ignoradas: 0 };
+  if (error) return { error: error.message, ignoradas: 0, datasIgnoradas: [] };
 
   // Inserir recorrências
   let ignoradas = 0;
+  const datasIgnoradas: string[] = [];
   if (recorrencia !== "nenhuma") {
     const datas = gerarDatas(inicio, recorrencia, meses, mensal_tipo);
     for (const d of datas) {
       const fimRec = new Date(d.getTime() + duracao * 60_000);
       const c = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, d, fimRec);
-      if (c) { ignoradas++; continue; }
+      if (c) { ignoradas++; datasIgnoradas.push(d.toISOString()); continue; }
       await supabase.from("agendamentos").insert({
         ...base,
         data_hora_inicio: d.toISOString(),
@@ -220,7 +221,7 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
-  return { error: null, ignoradas };
+  return { error: null, ignoradas, datasIgnoradas };
 }
 
 export async function atualizarStatusAgendamento(

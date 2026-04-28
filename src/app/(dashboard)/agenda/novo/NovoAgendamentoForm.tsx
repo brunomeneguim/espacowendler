@@ -145,6 +145,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
   const [meses, setMeses] = useState("3");
   const [submitError, setSubmitError] = useState(error ?? "");
   const [ignoradasAviso, setIgnoradasAviso] = useState(0);
+  const [datasIgnoradas, setDatasIgnoradas] = useState<string[]>([]);
   const [tzOffset, setTzOffset] = useState(0);
   const [avisoPendente, setAvisoPendente] = useState(false);
   const fdRef = useRef<FormData | null>(null);
@@ -196,7 +197,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
     startTransition(async () => {
       const res = await criarAgendamento(fd);
       if (res.error) { setSubmitError(res.error); return; }
-      if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); return; }
+      if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
       router.push("/dashboard");
     });
   }
@@ -209,7 +210,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
     startTransition(async () => {
       const res = await criarAgendamento(fd);
       if (res.error) { setSubmitError(res.error); return; }
-      if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); return; }
+      if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
       router.push("/dashboard");
     });
   }
@@ -229,11 +230,26 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
               <div>
                 <h3 className="font-display text-base text-forest">Sessões com conflito</h3>
                 <p className="text-sm text-forest-600 mt-1">
-                  O agendamento foi criado, mas <strong>{ignoradasAviso}</strong> sessão{ignoradasAviso !== 1 ? "ões" : ""} recorrente{ignoradasAviso !== 1 ? "s" : ""} {ignoradasAviso !== 1 ? "foram ignoradas" : "foi ignorada"} por conflito de horário.
+                  O agendamento foi criado, mas <strong>{ignoradasAviso}</strong> sessão{ignoradasAviso !== 1 ? "ões" : ""} recorrente{ignoradasAviso !== 1 ? "s" : ""} {ignoradasAviso !== 1 ? "foram ignoradas" : "foi ignorada"} por conflito de horário:
                 </p>
+                {datasIgnoradas.length > 0 && (
+                  <ul className="mt-2 max-h-36 overflow-y-auto space-y-1 text-sm">
+                    {datasIgnoradas.map((iso, i) => {
+                      const d = new Date(iso);
+                      return (
+                        <li key={i} className="flex items-center gap-2 text-forest-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                          {d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}
+                          {" às "}
+                          {d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             </div>
-            <button type="button" onClick={() => { setIgnoradasAviso(0); router.push("/dashboard"); }}
+            <button type="button" onClick={() => { setIgnoradasAviso(0); setDatasIgnoradas([]); router.push("/dashboard"); }}
               className="btn-primary w-full">
               Entendido
             </button>

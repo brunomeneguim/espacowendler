@@ -7,6 +7,7 @@ import {
   Calendar, Users, UserCircle, LogOut, Leaf,
   Stethoscope, CheckSquare, Settings2, Check,
   ChevronUp, ChevronDown, X, Pencil, Building2,
+  DollarSign, BarChart2,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
 import { signOut } from "@/app/(auth)/actions";
@@ -15,15 +16,15 @@ import type { MenuItem } from "@/app/(dashboard)/menuConfigActions";
 
 // ── Mapeamento de ícones (string → componente) ────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
-  Calendar, Users, UserCircle, Stethoscope, CheckSquare, Building2,
+  Calendar, Users, UserCircle, Stethoscope, CheckSquare, Building2, DollarSign, BarChart2,
 };
 
 // ── Quais hrefs cada role pode ver ───────────────────────────────
 const ROLE_ACCESS: Record<UserRole, string[]> = {
-  admin:       ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/equipe", "/salas"],
-  supervisor:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas"],
+  admin:       ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/equipe", "/salas", "/financeiro", "/relatorios"],
+  supervisor:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
   profissional:["/dashboard", "/pacientes", "/tarefas"],
-  secretaria:  ["/dashboard", "/pacientes", "/tarefas"],
+  secretaria:  ["/dashboard", "/pacientes", "/tarefas", "/financeiro"],
 };
 
 // Label customizada por role para /dashboard e /pacientes
