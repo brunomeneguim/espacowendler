@@ -225,7 +225,7 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
 export async function atualizarStatusAgendamento(
   id: string,
-  status: "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou"
+  status: "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou" | "ausencia"
 ) {
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").update({ status }).eq("id", id);
