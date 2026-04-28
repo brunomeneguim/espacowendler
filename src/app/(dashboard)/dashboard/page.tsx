@@ -26,6 +26,14 @@ export default async function DashboardPage({
     weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   }
 
+  // Janela de busca: semana atual ± 1 dia de buffer para timezone
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const fetchStart = new Date(weekStart);
+  fetchStart.setDate(fetchStart.getDate() - 1);
+  const fetchEnd = new Date(weekEnd);
+  fetchEnd.setDate(fetchEnd.getDate() + 1);
+
   const agendamentosSelect =
     "id, data_hora_inicio, data_hora_fim, status, observacoes, tipo_agendamento, paciente:pacientes(id, nome_completo, telefone), profissional:profissionais(id, profile:profiles(nome_completo)), sala:salas(id, nome)";
 
@@ -43,6 +51,8 @@ export default async function DashboardPage({
     supabase
       .from("agendamentos")
       .select(agendamentosSelect)
+      .gte("data_hora_inicio", fetchStart.toISOString())
+      .lt("data_hora_inicio", fetchEnd.toISOString())
       .order("data_hora_inicio", { ascending: true }),
     supabase
       .from("profissionais")

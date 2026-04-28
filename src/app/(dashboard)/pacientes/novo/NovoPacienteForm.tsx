@@ -15,6 +15,32 @@ interface CampoConfig { campo: string; obrigatorio: boolean }
 interface ContatoEmergencia { nome: string; relacao: string; telefone: string; ddi: string }
 interface ProfissionalOpt { id: string; nome_completo: string }
 
+// ── Validação CPF / CNPJ ──────────────────────────────────────────
+function validarCpf(raw: string): boolean {
+  const n = raw.replace(/\D/g, "");
+  if (n.length !== 11 || /^(\d)\1+$/.test(n)) return false;
+  const calc = (len: number) => {
+    let s = 0;
+    for (let i = 0; i < len; i++) s += parseInt(n[i]) * (len + 1 - i);
+    const r = (s * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return calc(9) === parseInt(n[9]) && calc(10) === parseInt(n[10]);
+}
+function validarCnpj(raw: string): boolean {
+  const n = raw.replace(/\D/g, "");
+  if (n.length !== 14 || /^(\d)\1+$/.test(n)) return false;
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const w2 = [6, ...w1];
+  const calc = (w: number[]) => {
+    let s = 0;
+    w.forEach((wt, i) => { s += parseInt(n[i]) * wt; });
+    const r = s % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  return calc(w1) === parseInt(n[12]) && calc(w2) === parseInt(n[13]);
+}
+
 // ── Masks ─────────────────────────────────────────────────────────
 function maskCpfCnpj(v: string) {
   v = v.replace(/\D/g, "");
@@ -171,7 +197,13 @@ export function NovoPacienteForm({ camposConfig, profissionais, fromAgenda }: Pr
       streamRef.current = stream;
       setShowWebcam(true);
       setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 100);
-    } catch { alert("Não foi possível acessar a câmera."); }
+    } catch (err: any) {
+      setShowWebcam(false);
+      const negado = err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError";
+      setErro(negado
+        ? "Permissão de câmera negada. Verifique as configurações do seu navegador."
+        : "Não foi possível acessar a câmera.");
+    }
   }
   function stopWebcam() {
     streamRef.current?.getTracks().forEach(t => t.stop());
@@ -242,6 +274,19 @@ export function NovoPacienteForm({ camposConfig, profissionais, fromAgenda }: Pr
       }
     }
     setRespErro(null);
+
+    // Validação CPF / CNPJ
+    if (cpfCnpj) {
+      const digits = cpfCnpj.replace(/\D/g, "");
+      if (digits.length === 11 && !validarCpf(cpfCnpj)) {
+        setErro("CPF inválido. Verifique os dígitos informados.");
+        return;
+      }
+      if (digits.length === 14 && !validarCnpj(cpfCnpj)) {
+        setErro("CNPJ inválido. Verifique os dígitos informados.");
+        return;
+      }
+    }
 
     const fd = new FormData(e.currentTarget);
     fd.set("foto_url", foto ?? "");

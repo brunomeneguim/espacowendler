@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { editarAgendamento, excluirAgendamento } from "../../actions";
 import { TzOffsetInput } from "./TzOffsetInput";
+import { SubmitButton } from "./SubmitButton";
 
 export default async function EditarAgendamentoPage({
   params,
@@ -140,7 +141,7 @@ export default async function EditarAgendamentoPage({
         </div>
 
         <div className="flex gap-3 pt-2">
-          <button type="submit" className="btn-primary flex-1">Salvar alterações</button>
+          <SubmitButton />
           <Link href="/dashboard" className="btn-secondary flex-1">Cancelar</Link>
         </div>
       </form>

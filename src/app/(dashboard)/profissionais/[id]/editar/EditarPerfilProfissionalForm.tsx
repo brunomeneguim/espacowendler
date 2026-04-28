@@ -65,6 +65,32 @@ function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; 
   );
 }
 
+// ── Validação CPF / CNPJ ───────────────────────────────────────────
+function validarCpf(raw: string): boolean {
+  const n = raw.replace(/\D/g, "");
+  if (n.length !== 11 || /^(\d)\1+$/.test(n)) return false;
+  const calc = (len: number) => {
+    let s = 0;
+    for (let i = 0; i < len; i++) s += parseInt(n[i]) * (len + 1 - i);
+    const r = (s * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return calc(9) === parseInt(n[9]) && calc(10) === parseInt(n[10]);
+}
+function validarCnpj(raw: string): boolean {
+  const n = raw.replace(/\D/g, "");
+  if (n.length !== 14 || /^(\d)\1+$/.test(n)) return false;
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const w2 = [6, ...w1];
+  const calc = (w: number[]) => {
+    let s = 0;
+    w.forEach((wt, i) => { s += parseInt(n[i]) * wt; });
+    const r = s % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  return calc(w1) === parseInt(n[12]) && calc(w2) === parseInt(n[13]);
+}
+
 // ── Máscara telefone ────────────────────────────────────────────
 function maskPhone(v: string) {
   const raw = v.replace(/[^\d+]/g, "");
@@ -203,6 +229,14 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
     }
     if (novaSenha && novaSenha.length < 6) {
       setErro("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (cpf && !validarCpf(cpf)) {
+      setErro("CPF inválido. Verifique os dígitos informados.");
+      return;
+    }
+    if (cnpj && cnpj.replace(/\D/g, "").length === 14 && !validarCnpj(cnpj)) {
+      setErro("CNPJ inválido. Verifique os dígitos informados.");
       return;
     }
     const fd = new FormData(e.currentTarget);

@@ -405,7 +405,7 @@ export function PacientesClient({ pacientes, canEdit, profissionais = [], pacien
                         {pacienteProfMap[p.id]}
                       </span>
                     )}
-                    {p.telefone && (
+                    {p.telefone && p.telefone.replace(/\D/g, "").length >= 8 && (
                       <a
                         href={`https://wa.me/55${p.telefone.replace(/\D/g, "")}`}
                         target="_blank"
