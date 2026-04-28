@@ -69,13 +69,13 @@ export async function editarLancamento(id: string, fd: FormData): Promise<{ erro
   return { error: null };
 }
 
-export async function excluirLancamento(id: string): Promise<{ error: string | null }> {
+export async function excluirLancamento(id: string): Promise<void> {
   await requireAccess();
   const supabase = createClient();
   const { error } = await supabase.from("lancamentos").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) throw new Error(error.message);
   revalidatePath("/financeiro");
-  return { error: null };
+  redirect("/financeiro");
 }
 
 export async function marcarComoPago(id: string, forma_pagamento: string): Promise<{ error: string | null }> {
