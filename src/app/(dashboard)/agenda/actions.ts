@@ -78,7 +78,7 @@ async function verificarHorarioProfissional(
 async function verificarConflito(
   supabase: ReturnType<typeof createClient>,
   profissional_id: string,
-  paciente_id: string,
+  paciente_id: string | null,
   sala_id: number | null,
   inicio: Date,
   fim: Date,
@@ -154,16 +154,18 @@ function gerarDatas(inicio: Date, recorrencia: string, meses: number, mensal_tip
 export async function criarAgendamento(formData: FormData): Promise<{ error: string | null; ignoradas: number; datasIgnoradas: string[] }> {
   const supabase = createClient();
 
-  const profissional_id = formData.get("profissional_id") as string;
-  const paciente_id     = formData.get("paciente_id") as string;
-  const sala_id         = formData.get("sala_id") as string;
-  const data            = formData.get("data") as string;
-  const hora            = formData.get("hora") as string;
-  const duracao         = parseInt((formData.get("duracao") as string) || "60", 10);
-  const observacoes     = (formData.get("observacoes") as string) || null;
-  const recorrencia     = (formData.get("recorrencia") as string) || "nenhuma";
-  const meses           = parseInt((formData.get("meses_recorrencia") as string) || "3", 10);
-  const mensal_tipo     = (formData.get("mensal_tipo") as string) || "dia_mes";
+  const profissional_id   = formData.get("profissional_id") as string;
+  const tipo_agendamento  = (formData.get("tipo_agendamento") as string) || "consulta_avulsa";
+  const isAusencia        = tipo_agendamento === "ausencia";
+  const paciente_id       = isAusencia ? null : (formData.get("paciente_id") as string);
+  const sala_id           = formData.get("sala_id") as string;
+  const data              = formData.get("data") as string;
+  const hora              = formData.get("hora") as string;
+  const duracao           = parseInt((formData.get("duracao") as string) || "60", 10);
+  const observacoes       = (formData.get("observacoes") as string) || null;
+  const recorrencia       = isAusencia ? "nenhuma" : ((formData.get("recorrencia") as string) || "nenhuma");
+  const meses             = parseInt((formData.get("meses_recorrencia") as string) || "3", 10);
+  const mensal_tipo       = (formData.get("mensal_tipo") as string) || "dia_mes";
 
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -174,22 +176,24 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
 
-  // Verificar horário de atendimento do profissional (usa hora local, não UTC)
-  const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, hora, duracao);
-  if (erroHorario) return { error: erroHorario, ignoradas: 0, datasIgnoradas: [] };
+  if (!isAusencia) {
+    // Verificar horário de atendimento do profissional
+    const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, hora, duracao);
+    if (erroHorario) return { error: erroHorario, ignoradas: 0, datasIgnoradas: [] };
+  }
 
-  // Verificar conflito do agendamento principal
+  // Verificar conflito (ausência também bloqueia o profissional)
   const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim);
   if (conflito) return { error: conflito, ignoradas: 0, datasIgnoradas: [] };
 
-  // Grupo para recorrências
   const grupo_id = recorrencia !== "nenhuma" ? randomUUID() : null;
 
   const base = {
     profissional_id,
     paciente_id,
     sala_id: salaIdNum,
-    status: "agendado",
+    status: isAusencia ? "ausencia" : "agendado",
+    tipo_agendamento,
     observacoes,
     created_by: user?.id,
     recorrencia_grupo_id: grupo_id,
@@ -202,7 +206,7 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
   });
   if (error) return { error: error.message, ignoradas: 0, datasIgnoradas: [] };
 
-  // Inserir recorrências
+  // Inserir recorrências (ausência não tem recorrência)
   let ignoradas = 0;
   const datasIgnoradas: string[] = [];
   if (recorrencia !== "nenhuma") {
@@ -238,24 +242,28 @@ export async function atualizarStatusAgendamento(
 export async function editarAgendamento(id: string, formData: FormData) {
   const supabase = createClient();
 
-  const profissional_id = formData.get("profissional_id") as string;
-  const paciente_id     = formData.get("paciente_id") as string;
-  const sala_id         = formData.get("sala_id") as string;
-  const data            = formData.get("data") as string;
-  const hora            = formData.get("hora") as string;
-  const duracao         = parseInt((formData.get("duracao") as string) || "60", 10);
-  const status          = formData.get("status") as string;
-  const observacoes     = (formData.get("observacoes") as string) || null;
-  const editarGrupo     = formData.get("editar_grupo") === "true";
-  const tzOffset        = parseInt((formData.get("tz_offset") as string) || "0");
+  const profissional_id  = formData.get("profissional_id") as string;
+  const tipo_agendamento = (formData.get("tipo_agendamento") as string) || "consulta_avulsa";
+  const isAusencia       = tipo_agendamento === "ausencia";
+  const paciente_id      = isAusencia ? null : (formData.get("paciente_id") as string);
+  const sala_id          = formData.get("sala_id") as string;
+  const data             = formData.get("data") as string;
+  const hora             = formData.get("hora") as string;
+  const duracao          = parseInt((formData.get("duracao") as string) || "60", 10);
+  const status           = isAusencia ? "ausencia" : (formData.get("status") as string);
+  const observacoes      = (formData.get("observacoes") as string) || null;
+  const editarGrupo      = formData.get("editar_grupo") === "true";
+  const tzOffset         = parseInt((formData.get("tz_offset") as string) || "0");
 
   const inicio = new Date(`${data}T${hora}:00`);
   inicio.setMinutes(inicio.getMinutes() + tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
 
-  const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, hora, duracao);
-  if (erroHorario) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(erroHorario)}`);
+  if (!isAusencia) {
+    const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, hora, duracao);
+    if (erroHorario) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(erroHorario)}`);
+  }
 
   const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim, id);
   if (conflito) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(conflito)}`);
@@ -267,6 +275,7 @@ export async function editarAgendamento(id: string, formData: FormData) {
     data_hora_inicio: inicio.toISOString(),
     data_hora_fim:    fim.toISOString(),
     status,
+    tipo_agendamento,
     observacoes,
   };
 

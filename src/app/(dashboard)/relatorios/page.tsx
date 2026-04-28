@@ -38,7 +38,8 @@ export default async function RelatoriosPage({
         sala:salas(id, nome)
       `)
       .gte("data_hora_inicio", `${periodo.inicio}T00:00:00.000Z`)
-      .lte("data_hora_inicio", `${periodo.fim}T23:59:59.999Z`),
+      .lte("data_hora_inicio", `${periodo.fim}T23:59:59.999Z`)
+      .neq("status", "ausencia"),
     supabase
       .from("pacientes")
       .select("id, created_at")

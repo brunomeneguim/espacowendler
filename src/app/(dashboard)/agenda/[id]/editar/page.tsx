@@ -26,7 +26,7 @@ export default async function EditarAgendamentoPage({
   const [{ data: ag }, { data: profs }, { data: pacs }, { data: salas }] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, data_hora_inicio, data_hora_fim, status, observacoes, profissional_id, paciente_id, sala_id")
+      .select("id, data_hora_inicio, data_hora_fim, status, observacoes, profissional_id, paciente_id, sala_id, tipo_agendamento")
       .eq("id", params.id)
       .single(),
     supabase
@@ -78,6 +78,14 @@ export default async function EditarAgendamentoPage({
 
       <form action={editAction} className="card space-y-5">
         <TzOffsetInput />
+        <input type="hidden" name="tipo_agendamento" value={ag.tipo_agendamento ?? "consulta_avulsa"} />
+
+        {ag.tipo_agendamento === "ausencia" && (
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
+            Este agendamento é uma <strong>ausência</strong> — o profissional não estará disponível neste horário.
+          </div>
+        )}
         <div>
           <label htmlFor="profissional_id" className="label">Profissional</label>
           <select id="profissional_id" name="profissional_id" required className="input-field" defaultValue={ag.profissional_id}>
@@ -87,14 +95,16 @@ export default async function EditarAgendamentoPage({
           </select>
         </div>
 
-        <div>
-          <label htmlFor="paciente_id" className="label">Paciente</label>
-          <select id="paciente_id" name="paciente_id" required className="input-field" defaultValue={ag.paciente_id}>
-            {(pacs ?? []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.nome_completo}</option>
-            ))}
-          </select>
-        </div>
+        {ag.tipo_agendamento !== "ausencia" && (
+          <div>
+            <label htmlFor="paciente_id" className="label">Paciente</label>
+            <select id="paciente_id" name="paciente_id" required className="input-field" defaultValue={ag.paciente_id ?? ""}>
+              {(pacs ?? []).map((p: any) => (
+                <option key={p.id} value={p.id}>{p.nome_completo}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label htmlFor="sala_id" className="label">Sala de atendimento</label>
