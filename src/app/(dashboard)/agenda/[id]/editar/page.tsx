@@ -97,12 +97,11 @@ export default async function EditarAgendamentoPage({
 
         {ag.tipo_agendamento !== "ausencia" && (
           <div>
-            <label htmlFor="paciente_id" className="label">Paciente</label>
-            <select id="paciente_id" name="paciente_id" required className="input-field" defaultValue={ag.paciente_id ?? ""}>
-              {(pacs ?? []).map((p: any) => (
-                <option key={p.id} value={p.id}>{p.nome_completo}</option>
-              ))}
-            </select>
+            <label className="label">Paciente</label>
+            <div className="input-field bg-sand/10 text-forest-700 cursor-default select-none">
+              {(pacs ?? []).find((p: any) => p.id === ag.paciente_id)?.nome_completo ?? "—"}
+            </div>
+            <input type="hidden" name="paciente_id" value={ag.paciente_id ?? ""} />
           </div>
         )}
 

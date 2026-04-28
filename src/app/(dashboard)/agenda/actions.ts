@@ -97,7 +97,7 @@ async function verificarConflito(
   if (!conflitos || conflitos.length === 0) return null;
 
   for (const c of conflitos as any[]) {
-    const h = new Date(c.data_hora_inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const h = new Date(c.data_hora_inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 
     // Mesmo profissional + mesmo paciente
     if (c.profissional_id === profissional_id && c.paciente_id === paciente_id) {

@@ -89,7 +89,7 @@ export function SalasClient({ salas: initialSalas }: { salas: Sala[] }) {
             <button
               type="button"
               onClick={() => setCriando(true)}
-              className="flex items-center gap-1.5 text-sm text-forest hover:text-forest/80 font-medium transition-colors"
+              className="btn-primary py-1.5 px-4 text-sm flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" /> Nova sala
             </button>
