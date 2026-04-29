@@ -6,7 +6,9 @@ import { SalasClient } from "./SalasClient";
 
 export default async function SalasPage() {
   const profile = await getCurrentProfile();
-  if (!["admin", "supervisor"].includes(profile.role)) redirect("/dashboard");
+  if (!["admin", "supervisor", "secretaria", "profissional"].includes(profile.role)) redirect("/dashboard");
+
+  const canManage = ["admin", "supervisor"].includes(profile.role);
 
   const supabase = createClient();
   const [{ data: salas }, { data: profissionais }] = await Promise.all([
@@ -27,11 +29,14 @@ export default async function SalasPage() {
       <PageHeader
         eyebrow="Configurações"
         title="Salas de atendimento"
-        description="Gerencie as salas disponíveis e o valor de aluguel por profissional"
+        description={canManage
+          ? "Gerencie as salas disponíveis e o valor de aluguel por profissional"
+          : "Salas de atendimento disponíveis na clínica"}
       />
       <SalasClient
         salas={(salas ?? []) as any}
         profissionais={(profissionais ?? []) as any}
+        canManage={canManage}
       />
     </div>
   );

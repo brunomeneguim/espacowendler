@@ -10,9 +10,11 @@ interface Profissional { id: string; valor_aluguel_sala: number; profile: { nome
 export function SalasClient({
   salas: initialSalas,
   profissionais: initialProfissionais,
+  canManage = false,
 }: {
   salas: Sala[];
   profissionais: Profissional[];
+  canManage?: boolean;
 }) {
   const [salas, setSalas] = useState<Sala[]>(initialSalas);
   const [profissionais, setProfissionais] = useState<Profissional[]>(initialProfissionais);
@@ -117,7 +119,7 @@ export function SalasClient({
             <h2 className="font-display text-base text-forest">Salas ativas</h2>
             <span className="text-xs bg-forest/10 text-forest px-2 py-0.5 rounded-full">{ativas.length}</span>
           </div>
-          {!criando && (
+          {canManage && !criando && (
             <button
               type="button"
               onClick={() => setCriando(true)}
@@ -153,53 +155,55 @@ export function SalasClient({
                 <span className="flex-1 text-sm text-forest">{sala.nome}</span>
               )}
 
-              <div className="flex items-center gap-1 shrink-0">
-                {editandoId === sala.id ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleSalvarEdicao(sala.id)}
-                      disabled={isPending}
-                      className="p-1.5 rounded-lg text-forest hover:bg-forest/10 transition-colors"
-                      title="Salvar"
-                    >
-                      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelarEdicao}
-                      className="p-1.5 rounded-lg text-forest-400 hover:bg-sand/20 transition-colors"
-                      title="Cancelar"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => iniciarEdicao(sala)}
-                      className="p-1.5 rounded-lg text-forest-400 hover:text-forest hover:bg-sand/20 transition-colors"
-                      title="Renomear"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggle(sala.id)}
-                      disabled={isPending}
-                      className="text-xs px-2.5 py-1 rounded-lg border border-sand/40 text-forest-500 hover:bg-rust/5 hover:text-rust hover:border-rust/30 transition-colors disabled:opacity-50"
-                    >
-                      Desativar
-                    </button>
-                  </>
-                )}
-              </div>
+              {canManage && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {editandoId === sala.id ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleSalvarEdicao(sala.id)}
+                        disabled={isPending}
+                        className="p-1.5 rounded-lg text-forest hover:bg-forest/10 transition-colors"
+                        title="Salvar"
+                      >
+                        {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelarEdicao}
+                        className="p-1.5 rounded-lg text-forest-400 hover:bg-sand/20 transition-colors"
+                        title="Cancelar"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => iniciarEdicao(sala)}
+                        className="p-1.5 rounded-lg text-forest-400 hover:text-forest hover:bg-sand/20 transition-colors"
+                        title="Renomear"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggle(sala.id)}
+                        disabled={isPending}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-sand/40 text-forest-500 hover:bg-rust/5 hover:text-rust hover:border-rust/30 transition-colors disabled:opacity-50"
+                      >
+                        Desativar
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           ))}
 
           {/* Form nova sala */}
-          {criando && (
+          {canManage && criando && (
             <div className="flex items-center gap-3 px-5 py-3 bg-forest/5">
               <div className="w-2 h-2 rounded-full bg-sand/40 shrink-0" />
               <input
@@ -251,14 +255,16 @@ export function SalasClient({
               <div key={sala.id} className="flex items-center gap-3 px-5 py-3 opacity-60">
                 <div className="w-2 h-2 rounded-full bg-sand/40 shrink-0" />
                 <span className="flex-1 text-sm text-forest-400 line-through">{sala.nome}</span>
-                <button
-                  type="button"
-                  onClick={() => handleToggle(sala.id)}
-                  disabled={isPending}
-                  className="text-xs px-2.5 py-1 rounded-lg border border-sand/40 text-forest-500 hover:bg-forest/5 hover:text-forest hover:border-forest/30 transition-colors disabled:opacity-50"
-                >
-                  Reativar
-                </button>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(sala.id)}
+                    disabled={isPending}
+                    className="text-xs px-2.5 py-1 rounded-lg border border-sand/40 text-forest-500 hover:bg-forest/5 hover:text-forest hover:border-forest/30 transition-colors disabled:opacity-50"
+                  >
+                    Reativar
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -284,7 +290,7 @@ export function SalasClient({
               <div key={prof.id} className="flex items-center gap-3 px-5 py-3">
                 <span className="flex-1 text-sm text-forest">{prof.profile?.nome_completo ?? "—"}</span>
 
-                {editandoAluguelId === prof.id ? (
+                {canManage && editandoAluguelId === prof.id ? (
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="text-sm text-forest-500">R$</span>
                     <input
@@ -322,14 +328,16 @@ export function SalasClient({
                     <span className="text-sm font-medium text-forest">
                       {Number(prof.valor_aluguel_sala ?? 50).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => iniciarEdicaoAluguel(prof)}
-                      className="p-1.5 rounded-lg text-forest-400 hover:text-forest hover:bg-sand/20 transition-colors"
-                      title="Editar valor"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={() => iniciarEdicaoAluguel(prof)}
+                        className="p-1.5 rounded-lg text-forest-400 hover:text-forest hover:bg-sand/20 transition-colors"
+                        title="Editar valor"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

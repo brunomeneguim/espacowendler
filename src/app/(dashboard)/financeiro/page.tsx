@@ -10,7 +10,7 @@ import { FinanceiroProfissionalClient } from "./FinanceiroProfissionalClient";
 export default async function FinanceiroPage({
   searchParams,
 }: {
-  searchParams: { periodo_inicio?: string; periodo_fim?: string; tipo?: string; status?: string };
+  searchParams: { periodo_inicio?: string; periodo_fim?: string; tipo?: string; status?: string; profissional_id?: string };
 }) {
   const profile = await getCurrentProfile();
 
@@ -19,16 +19,8 @@ export default async function FinanceiroPage({
     return FinanceiroProfissionalPage({ profile, searchParams });
   }
 
-  // Secretaria: acesso apenas se secretaria_ver_financeiro = true
-  if (profile.role === "secretaria") {
-    const supabase = createClient();
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("secretaria_ver_financeiro")
-      .eq("id", profile.id)
-      .single();
-    if (!prof?.secretaria_ver_financeiro) redirect("/dashboard");
-  } else if (!["admin", "supervisor"].includes(profile.role)) {
+  // Apenas roles que não são profissional chegam aqui; todos têm acesso
+  if (!["admin", "supervisor", "secretaria"].includes(profile.role)) {
     redirect("/dashboard");
   }
 
@@ -45,6 +37,7 @@ export default async function FinanceiroPage({
     periodo_fim:    searchParams.periodo_fim    || defaultFim,
     tipo:           searchParams.tipo           || "",
     status:         searchParams.status         || "",
+    profissional_id: searchParams.profissional_id || "",
   };
 
   let q = supabase
@@ -57,16 +50,27 @@ export default async function FinanceiroPage({
   if (filtros.tipo)   q = q.eq("tipo", filtros.tipo);
   if (filtros.status) q = q.eq("status", filtros.status);
 
-  const { data: lancamentos } = await q;
-
   const mesInicio = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
   const mesFim    = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  const { data: todosMes } = await supabase
-    .from("lancamentos")
-    .select("tipo, valor, status, data_vencimento")
-    .gte("data_lancamento", mesInicio)
-    .lte("data_lancamento", mesFim);
+  // ── Buscar todos os dados em paralelo ──
+  const [
+    { data: lancamentos },
+    { data: todosMes },
+    { data: profissionaisList },
+  ] = await Promise.all([
+    q,
+    supabase
+      .from("lancamentos")
+      .select("tipo, valor, status, data_vencimento")
+      .gte("data_lancamento", mesInicio)
+      .lte("data_lancamento", mesFim),
+    supabase
+      .from("profissionais")
+      .select("id, valor_consulta, valor_aluguel_sala, profile:profiles(nome_completo)")
+      .eq("ativo", true)
+      .order("id"),
+  ]);
 
   const totaisMes = (todosMes ?? []).reduce(
     (acc: { receitaPaga: number; pendente: number; inadimplente: number; despesasMes: number }, l: any) => {
@@ -82,6 +86,37 @@ export default async function FinanceiroPage({
     },
     { receitaPaga: 0, pendente: 0, inadimplente: 0, despesasMes: 0 }
   );
+
+  // ── Atendimentos do profissional selecionado ──
+  let profAgendamentos: any[] = [];
+  let profSelecionado: any = null;
+  let profTotais = { totalSessoes: 0, totalReceita: 0, totalAluguel: 0, totalLiquido: 0 };
+
+  if (filtros.profissional_id) {
+    profSelecionado = (profissionaisList ?? []).find((p: any) => p.id === filtros.profissional_id) ?? null;
+
+    const { data: ags } = await supabase
+      .from("agendamentos")
+      .select("id, data_hora_inicio, status, pago, forma_pagamento, valor_sessao, aluguel_cobrado, aluguel_valor, paciente:pacientes(nome_completo)")
+      .eq("profissional_id", filtros.profissional_id)
+      .in("status", ["realizado", "finalizado", "faltou"])
+      .gte("data_hora_inicio", `${filtros.periodo_inicio}T00:00:00.000Z`)
+      .lte("data_hora_inicio", `${filtros.periodo_fim}T23:59:59.999Z`)
+      .order("data_hora_inicio", { ascending: false });
+
+    profAgendamentos = (ags ?? []) as any[];
+
+    const valorConsulta = profSelecionado?.valor_consulta ?? null;
+    const valorAluguelSala = profSelecionado?.valor_aluguel_sala ?? null;
+
+    profTotais = {
+      totalSessoes: profAgendamentos.length,
+      totalReceita: profAgendamentos.reduce((s, a) => s + Number(a.valor_sessao ?? valorConsulta ?? 0), 0),
+      totalAluguel: profAgendamentos.filter(a => a.aluguel_cobrado).reduce((s, a) => s + Number(a.aluguel_valor ?? valorAluguelSala ?? 50), 0),
+      totalLiquido: 0,
+    };
+    profTotais.totalLiquido = profTotais.totalReceita - profTotais.totalAluguel;
+  }
 
   return (
     <div className="p-6 md:p-10 max-w-7xl">
@@ -100,6 +135,10 @@ export default async function FinanceiroPage({
         totaisMes={totaisMes}
         filtros={filtros}
         isAdmin={profile.role === "admin"}
+        profissionais={(profissionaisList as any) ?? []}
+        profAgendamentos={profAgendamentos}
+        profSelecionado={profSelecionado}
+        profTotais={profTotais}
       />
     </div>
   );

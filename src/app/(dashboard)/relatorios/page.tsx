@@ -10,7 +10,7 @@ export default async function RelatoriosPage({
   searchParams: { inicio?: string; fim?: string };
 }) {
   const profile = await getCurrentProfile();
-  if (!["admin", "supervisor", "profissional"].includes(profile.role)) redirect("/dashboard");
+  if (!["admin", "supervisor", "secretaria", "profissional"].includes(profile.role)) redirect("/dashboard");
 
   const supabase = createClient();
 
