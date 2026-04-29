@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Calendar, Users, UserCircle, LogOut, Leaf,
   Stethoscope, CheckSquare, Settings2, Check,
-  ChevronUp, ChevronDown, X, Pencil, Building2,
+  ChevronUp, ChevronDown, X, Pencil, Building2, GripVertical,
   DollarSign, BarChart2, Eye, EyeOff, ShieldCheck, CreditCard,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
@@ -54,6 +54,7 @@ export function Sidebar({
   const [editItems, setEditItems] = useState<MenuItem[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const dragIndexRef = useRef<number | null>(null);
 
   const { privacyMode, setPrivacyMode } = usePrivacyMode();
 
@@ -79,14 +80,24 @@ export function Sidebar({
     setEditMode(true);
   }
 
-  function moveItem(idx: number, dir: -1 | 1) {
+  function handleDragStart(idx: number) {
+    dragIndexRef.current = idx;
+  }
+
+  function handleDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault();
+    const from = dragIndexRef.current;
+    if (from === null || from === idx) return;
     const next = [...editItems];
-    const target = idx + dir;
-    if (target < 0 || target >= next.length) return;
-    [next[idx], next[target]] = [next[target], next[idx]];
-    // Update ordem values
+    const [removed] = next.splice(from, 1);
+    next.splice(idx, 0, removed);
     next.forEach((item, i) => { item.ordem = i; });
+    dragIndexRef.current = idx;
     setEditItems(next);
+  }
+
+  function handleDragEnd() {
+    dragIndexRef.current = null;
   }
 
   function renameItem(id: number, label: string) {
@@ -155,29 +166,19 @@ export function Sidebar({
           // ── Edit mode (admin) ──
           <div className="space-y-1.5">
             <p className="text-xs text-cream/40 uppercase tracking-wider px-2 mb-3">
-              Arrastar para reordenar
+              Arraste para reordenar
             </p>
             {editItems.map((item, idx) => (
-              <div key={item.id} className="bg-cream/5 rounded-xl px-2 py-2 flex items-center gap-2">
-                {/* Up/Down */}
-                <div className="flex flex-col gap-0.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => moveItem(idx, -1)}
-                    disabled={idx === 0}
-                    className="p-0.5 rounded hover:bg-cream/10 text-cream/50 hover:text-cream disabled:opacity-20 transition-colors"
-                  >
-                    <ChevronUp className="w-3 h-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveItem(idx, 1)}
-                    disabled={idx === editItems.length - 1}
-                    className="p-0.5 rounded hover:bg-cream/10 text-cream/50 hover:text-cream disabled:opacity-20 transition-colors"
-                  >
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-                </div>
+              <div
+                key={item.id}
+                draggable
+                onDragStart={() => handleDragStart(idx)}
+                onDragOver={e => handleDragOver(e, idx)}
+                onDragEnd={handleDragEnd}
+                className="bg-cream/5 rounded-xl px-2 py-2 flex items-center gap-2 cursor-grab active:cursor-grabbing"
+              >
+                {/* Drag handle */}
+                <GripVertical className="w-3.5 h-3.5 text-cream/40 shrink-0" />
                 {/* Icon */}
                 {(() => { const Icon = ICON_MAP[item.icon_name] ?? Calendar; return <Icon className="w-3.5 h-3.5 text-cream/50 shrink-0" strokeWidth={1.5} />; })()}
                 {/* Label input */}
@@ -245,8 +246,8 @@ export function Sidebar({
                     : "text-cream/70 hover:text-cream hover:bg-cream/5"
                 }`}
               >
-                {privacyMode ? <EyeOff className="w-4 h-4" strokeWidth={1.5} /> : <Eye className="w-4 h-4" strokeWidth={1.5} />}
-                {privacyMode ? "Exibir informações" : "Ocultar informações"}
+                {privacyMode ? <Eye className="w-4 h-4" strokeWidth={1.5} /> : <EyeOff className="w-4 h-4" strokeWidth={1.5} />}
+                {privacyMode ? "Mostrar informações" : "Ocultar informações"}
               </button>
 
               <Link

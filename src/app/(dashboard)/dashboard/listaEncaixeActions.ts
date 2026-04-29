@@ -5,20 +5,22 @@ import { revalidatePath } from "next/cache";
 
 export async function adicionarEncaixeDireto(
   paciente_nome: string,
-  profissional_id: string | null
-): Promise<{ error: string | null }> {
+  profissional_id: string | null,
+  telefone?: string | null
+): Promise<{ error: string | null; id: string | null }> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!paciente_nome.trim()) return { error: "Nome do paciente é obrigatório." };
-  const { error } = await supabase.from("lista_encaixe").insert({
+  if (!paciente_nome.trim()) return { error: "Nome do paciente é obrigatório.", id: null };
+  const { data, error } = await supabase.from("lista_encaixe").insert({
     paciente_nome: paciente_nome.trim(),
     profissional_id: profissional_id || null,
+    telefone: telefone || null,
     created_by: user?.id,
     ativo: true,
-  });
-  if (error) return { error: error.message };
+  }).select("id").single();
+  if (error) return { error: error.message, id: null };
   revalidatePath("/dashboard");
-  return { error: null };
+  return { error: null, id: data?.id ?? null };
 }
 
 export async function adicionarEncaixe(formData: FormData): Promise<{ error: string | null }> {

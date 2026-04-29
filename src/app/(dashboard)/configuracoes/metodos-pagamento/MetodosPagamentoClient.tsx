@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Pencil, Check, X, ChevronUp, ChevronDown, Loader2, CreditCard, ToggleLeft, ToggleRight } from "lucide-react";
-import { criarMetodo, atualizarMetodo, reordenarMetodos } from "./actions";
+import { useState, useTransition, useRef } from "react";
+import { Plus, Pencil, Check, X, Loader2, CreditCard, ToggleLeft, ToggleRight, GripVertical, Trash2 } from "lucide-react";
+import { criarMetodo, atualizarMetodo, reordenarMetodos, excluirMetodo } from "./actions";
 
 interface Metodo {
   id: number;
@@ -18,6 +18,7 @@ export function MetodosPagamentoClient({ metodosIniciais }: { metodosIniciais: M
     [...metodosIniciais].sort((a, b) => a.ordem - b.ordem)
   );
   const [erro, setErro] = useState<string | null>(null);
+  const dragIndexRef = useRef<number | null>(null);
 
   // ── Novo método ──
   const [showForm, setShowForm] = useState(false);
@@ -73,15 +74,35 @@ export function MetodosPagamentoClient({ metodosIniciais }: { metodosIniciais: M
     });
   }
 
-  function move(idx: number, dir: -1 | 1) {
+  function handleDragStart(idx: number) {
+    dragIndexRef.current = idx;
+  }
+
+  function handleDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault();
+    const from = dragIndexRef.current;
+    if (from === null || from === idx) return;
     const next = [...metodos];
-    const target = idx + dir;
-    if (target < 0 || target >= next.length) return;
-    [next[idx], next[target]] = [next[target], next[idx]];
+    const [removed] = next.splice(from, 1);
+    next.splice(idx, 0, removed);
     next.forEach((m, i) => { m.ordem = i; });
+    dragIndexRef.current = idx;
     setMetodos(next);
+  }
+
+  function handleDragEnd() {
+    dragIndexRef.current = null;
     startTransition(async () => {
-      await reordenarMetodos(next.map(m => m.id));
+      await reordenarMetodos(metodos.map(m => m.id));
+    });
+  }
+
+  function handleExcluir(m: Metodo) {
+    if (!confirm(`Excluir o método "${m.label}"? Esta ação não pode ser desfeita.`)) return;
+    startTransition(async () => {
+      const res = await excluirMetodo(m.id);
+      if (res.error) { setErro(res.error); return; }
+      setMetodos(prev => prev.filter(x => x.id !== m.id));
     });
   }
 
@@ -167,26 +188,16 @@ export function MetodosPagamentoClient({ metodosIniciais }: { metodosIniciais: M
             </li>
           )}
           {metodos.map((m, idx) => (
-            <li key={m.id} className={`flex items-center gap-3 px-5 py-3 hover:bg-cream/30 transition-colors ${!m.ativo ? "opacity-50" : ""}`}>
-              {/* Reorder */}
-              <div className="flex flex-col gap-0.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => move(idx, -1)}
-                  disabled={idx === 0 || isPending}
-                  className="p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 disabled:opacity-20 transition-colors"
-                >
-                  <ChevronUp className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => move(idx, 1)}
-                  disabled={idx === metodos.length - 1 || isPending}
-                  className="p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 disabled:opacity-20 transition-colors"
-                >
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-              </div>
+            <li
+              key={m.id}
+              draggable
+              onDragStart={() => handleDragStart(idx)}
+              onDragOver={e => handleDragOver(e, idx)}
+              onDragEnd={handleDragEnd}
+              className={`flex items-center gap-3 px-5 py-3 hover:bg-cream/30 transition-colors cursor-grab active:cursor-grabbing ${!m.ativo ? "opacity-50" : ""}`}
+            >
+              {/* Drag handle */}
+              <GripVertical className="w-4 h-4 text-gray-400 shrink-0" />
 
               {/* Icon */}
               <div className="w-8 h-8 rounded-full bg-forest/10 flex items-center justify-center shrink-0">
@@ -247,6 +258,15 @@ export function MetodosPagamentoClient({ metodosIniciais }: { metodosIniciais: M
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExcluir(m)}
+                      disabled={isPending}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                      title="Excluir método"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </>
               )}
@@ -256,7 +276,7 @@ export function MetodosPagamentoClient({ metodosIniciais }: { metodosIniciais: M
       </div>
 
       <p className="text-xs text-forest-400">
-        Os métodos ativos aparecerão nos formulários de pagamento da agenda. Reordene arrastando com as setas.
+        Os métodos ativos aparecerão nos formulários de pagamento da agenda. Arraste para reordenar.
       </p>
     </div>
   );

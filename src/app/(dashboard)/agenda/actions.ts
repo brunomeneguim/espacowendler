@@ -331,7 +331,7 @@ export async function marcarPagamentoAgendamento(
       }
     }
 
-    // Forma "outros": registrar descrição nas observações
+    // Forma "outros": registrar descrição nas observações (sempre no início)
     if (forma_pagamento === "outros" && outrosDesc?.trim()) {
       const { data: agObs } = await supabase
         .from("agendamentos")
@@ -340,7 +340,7 @@ export async function marcarPagamentoAgendamento(
         .single();
       const obsAtual = (agObs?.observacoes ?? "").trim();
       const linha = `Método de pagamento: ${outrosDesc.trim()}`;
-      update.observacoes = obsAtual ? `${obsAtual}\n${linha}` : linha;
+      update.observacoes = obsAtual ? `${linha}\n${obsAtual}` : linha;
     }
   } else {
     update.valor_sessao    = null;

@@ -55,7 +55,7 @@ export default async function DashboardPage({
       .order("data_hora_inicio", { ascending: true }),
     supabase
       .from("profissionais")
-      .select("id, cor, valor_consulta, profile:profiles(nome_completo)")
+      .select("id, cor, valor_consulta, duracao_consulta, profile:profiles(nome_completo)")
       .eq("ativo", true)
       .order("id"),
     supabase

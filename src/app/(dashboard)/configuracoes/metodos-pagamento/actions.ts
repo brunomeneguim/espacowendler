@@ -60,6 +60,19 @@ export async function atualizarMetodo(
   return { error: null };
 }
 
+export async function excluirMetodo(
+  id: number
+): Promise<{ error: string | null }> {
+  const profile = await getCurrentProfile();
+  if (profile.role !== "admin") return { error: "Apenas administradores podem excluir métodos de pagamento." };
+
+  const supabase = createClient();
+  const { error } = await supabase.from("metodos_pagamento").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/configuracoes/metodos-pagamento");
+  return { error: null };
+}
+
 export async function reordenarMetodos(
   ids: number[]
 ): Promise<{ error: string | null }> {

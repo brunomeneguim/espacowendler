@@ -6,10 +6,10 @@ import Link from "next/link";
 import { format, addDays, addWeeks, subWeeks, isSameDay, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
+  ChevronLeft, ChevronRight, ChevronDown, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
   DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope, Users, AlertTriangle,
-  FileText, DollarSign, HelpCircle, CheckCircle2, PhoneCall, CalendarPlus,
+  FileText, DollarSign, CheckCircle2, PhoneCall, CalendarPlus,
 } from "lucide-react";
 
 const Users2Icon = Users;
@@ -50,7 +50,7 @@ interface Agendamento {
   profissional: { id: string; profile: { nome_completo: string } | null } | null;
   sala: { id: number; nome: string } | null;
 }
-interface Profissional { id: string; cor?: string | null; valor_consulta?: number | null; profile: { nome_completo: string } | null }
+interface Profissional { id: string; cor?: string | null; valor_consulta?: number | null; duracao_consulta?: number | null; profile: { nome_completo: string } | null }
 interface Paciente     { id: string; nome_completo: string; telefone?: string }
 interface HorarioDisponivel { profissional_id: string; dia_semana: number; hora_inicio: string; hora_fim: string }
 interface Sala         { id: number; nome: string }
@@ -520,17 +520,19 @@ function FaltaJustificadaModal({
               <CalendarPlus className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <h3 className="font-display text-base text-forest">Deseja remarcar este paciente?</h3>
-              <p className="text-sm text-forest-500 mt-0.5">{pacienteNome}</p>
+              <h3 className="font-display text-base text-forest">Falta justificada registrada</h3>
+              <p className="text-sm text-forest-500 mt-0.5">
+                <span className="font-semibold">{pacienteNome}</span> foi adicionado(a) à lista de encaixe automaticamente.
+              </p>
             </div>
           </div>
           <div className="flex flex-col gap-2">
             <button
               type="button"
               onClick={onListaEncaixe}
-              className="btn-primary flex items-center justify-center gap-2"
+              className="btn-secondary flex items-center justify-center gap-2"
             >
-              <List className="w-4 h-4" /> Lista de Encaixe
+              <List className="w-4 h-4" /> Ver Lista de Encaixe
             </button>
             <button
               type="button"
@@ -599,50 +601,35 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
       className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none overflow-hidden ${expanded ? "z-30 shadow-lg" : "z-10"} ${pending ? "pointer-events-none" : ""}`}
       onClick={onExpand}
     >
-      <div className="px-1.5 pt-0.5 pb-0.5 leading-tight flex flex-col gap-px">
+      {/* ✓ Check de presença confirmada — canto superior direito */}
+      {ag.status === "confirmado" && (
+        <div className="absolute top-0.5 right-1 z-10 pointer-events-none">
+          <Check className="w-3 h-3" style={{ color: isColorDark(bgColor) ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.75)" }} strokeWidth={3} />
+        </div>
+      )}
+      {/* $ Pagamento — canto inferior direito */}
+      {ag.status !== "ausencia" && ag.status !== "cancelado" && (
+        <div className="absolute bottom-1 right-1 z-10 pointer-events-none">
+          <span
+            title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}
+            className="w-4 h-4 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: ag.pago ? "rgba(34,197,94,0.85)" : "rgba(239,68,68,0.80)" }}
+          >
+            <DollarSign className="w-2.5 h-2.5 text-white" />
+          </span>
+        </div>
+      )}
+      <div className="px-1.5 pt-0.5 pb-4 leading-tight flex flex-col gap-px">
         {/* Linha 1: horário + nome */}
-        <p className="text-xs font-semibold truncate" style={{ color: textColor }}>
+        <p className="text-xs font-semibold truncate pr-3" style={{ color: textColor }}>
           {format(new Date(ag.data_hora_inicio), "HH:mm")} {privacyMode ? "● ● ●" : (ag.paciente?.nome_completo ?? "—")}
         </p>
-        {/* Linha 2: profissional */}
-        <p className="text-[10px] truncate" style={{ color: textMuted }}>
-          {ag.profissional?.profile?.nome_completo}
-        </p>
-        {/* Linha 3: dot status + ícones de pagamento/confirmação */}
-        <div className="flex items-center justify-between gap-1 mt-0.5">
-          {/* Dot com anel adaptativo */}
-          <span
-            className={`w-3 h-3 rounded-full shrink-0 ${cfg.dot}`}
-            title={cfg.label}
-            style={{ boxShadow: `0 0 0 1.5px ${isColorDark(bgColor) ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.25)"}` }}
-          />
-          <div className="flex items-center gap-0.5 shrink-0 ml-auto">
-            {ag.status !== "ausencia" && (
-              /* Badge circular — verde se pago, vermelho se pendente */
-              <span
-                title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}
-                className="w-5 h-5 rounded-full flex items-center justify-center"
-                style={{
-                  backgroundColor: ag.pago
-                    ? "rgba(34,197,94,0.85)"
-                    : "rgba(239,68,68,0.80)",
-                }}
-              >
-                <DollarSign className="w-3 h-3 text-white" />
-              </span>
-            )}
-            {ag.status === "agendado" && (
-              <span title="Aguardando confirmação" className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#f59e0b" }}>
-                <HelpCircle className="w-3 h-3 text-white" />
-              </span>
-            )}
-            {ag.status === "confirmado" && (
-              <span title="Presença confirmada" className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(34,197,94,0.85)" }}>
-                <CheckCircle2 className="w-3 h-3 text-white" />
-              </span>
-            )}
-          </div>
-        </div>
+        {/* Linha 2: profissional (oculto no modo privacidade) */}
+        {!privacyMode && (
+          <p className="text-[10px] truncate" style={{ color: textMuted }}>
+            {ag.profissional?.profile?.nome_completo}
+          </p>
+        )}
       </div>
 
       {expanded && (
@@ -756,7 +743,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
       )}
 
       {/* Handle de resize */}
-      {canEdit && (
+      {canEdit && ag.status !== "finalizado" && (
         <div
           className="absolute bottom-0 left-0 right-0 h-2.5 cursor-s-resize flex items-center justify-center group/resize"
           onMouseDown={e => {
@@ -1090,6 +1077,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     profissional: Agendamento["profissional"];
   } | null>(null);
 
+  // ── Mapa agId → encaixeId (para desfazer falta justificada) ────
+  const [encaixePorAg, setEncaixePorAg] = useState<Record<string, string>>({});
+
   // ── Reagendamento (sincronizado com DashboardContent via props) ──
   const [localReagendarInfo, setLocalReagendarInfo] = useState<ReagendarInfo | null>(null);
   // Usa valor externo se fornecido, senão local
@@ -1120,15 +1110,29 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragRef.current) return;
-    const { startY, startDurationMin, el } = dragRef.current;
+    const { startY, startDurationMin, el, ag } = dragRef.current;
     const deltaY = e.clientY - startY;
-    // 1px = 1 minute (PX_POR_HORA=60, 60min)
     const rawMin = startDurationMin + deltaY;
-    // snap to 15 min, minimum 15 min
-    const snappedMin = Math.max(15, Math.round(rawMin / 15) * 15);
+    // Minimum duration = duracao_consulta do profissional ou 15min
+    const prof = profissionais.find(p => p.id === (ag.profissional?.id ?? ""));
+    const minDur = prof?.duracao_consulta ?? 15;
+    // Maximum duration = até o próximo agendamento do mesmo profissional
+    const agInicio = new Date(ag.data_hora_inicio).getTime();
+    const proximoInicio = agendamentos
+      .filter(a =>
+        a.id !== ag.id &&
+        a.profissional?.id === ag.profissional?.id &&
+        new Date(a.data_hora_inicio).getTime() > agInicio
+      )
+      .map(a => new Date(a.data_hora_inicio).getTime())
+      .sort((a, b) => a - b)[0];
+    const maxDur = proximoInicio
+      ? Math.floor((proximoInicio - agInicio) / 60000)
+      : 24 * 60;
+    const snappedMin = Math.min(maxDur, Math.max(minDur, Math.round(rawMin / 15) * 15));
     const newHeight = Math.max(22, (snappedMin / 60) * PX_POR_HORA - 2);
     el.style.height = `${newHeight}px`;
-  }, []);
+  }, [agendamentos, profissionais]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (!dragRef.current) return;
@@ -1139,7 +1143,21 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
 
     const deltaY = e.clientY - startY;
     const rawMin = startDurationMin + deltaY;
-    const snappedMin = Math.max(15, Math.round(rawMin / 15) * 15);
+    const prof = profissionais.find(p => p.id === (ag.profissional?.id ?? ""));
+    const minDur = prof?.duracao_consulta ?? 15;
+    const agInicio = new Date(ag.data_hora_inicio).getTime();
+    const proximoInicio = agendamentos
+      .filter(a =>
+        a.id !== ag.id &&
+        a.profissional?.id === ag.profissional?.id &&
+        new Date(a.data_hora_inicio).getTime() > agInicio
+      )
+      .map(a => new Date(a.data_hora_inicio).getTime())
+      .sort((a, b) => a - b)[0];
+    const maxDur = proximoInicio
+      ? Math.floor((proximoInicio - agInicio) / 60000)
+      : 24 * 60;
+    const snappedMin = Math.min(maxDur, Math.max(minDur, Math.round(rawMin / 15) * 15));
     if (snappedMin === startDurationMin) return;
 
     const tzOffset = new Date().getTimezoneOffset();
@@ -1160,7 +1178,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
         tzOffset,
       );
     });
-  }, [startTransition]);
+  }, [startTransition, agendamentos, profissionais]);
 
   // Usa a cor cadastrada do profissional, ou fallback por índice
   const profColorMap = new Map(profissionais.map((p, i) => [
@@ -1220,12 +1238,30 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     startTransition(async () => {
       await atualizarStatusAgendamento(id, novoStatus);
       setExpandedId(null);
+      setExpandedListId(null);
       if (novoStatus === "finalizado") {
         router.push("/dashboard");
         return;
       }
+      const ag = agendamentos.find(a => a.id === id);
+      // Falta justificada → adicionar automaticamente à lista de encaixe
+      if (novoStatus === "cancelado" && ag?.paciente) {
+        const res = await adicionarEncaixeDireto(
+          ag.paciente.nome_completo,
+          ag.profissional?.id ?? null,
+          ag.paciente.telefone ?? null,
+        );
+        if (res.id) {
+          setEncaixePorAg(prev => ({ ...prev, [id]: res.id! }));
+        }
+      }
+      // Desfazer falta justificada → remover da lista de encaixe
+      if (novoStatus === "agendado" && encaixePorAg[id]) {
+        const { removerEncaixe } = await import("./listaEncaixeActions");
+        await removerEncaixe(encaixePorAg[id]);
+        setEncaixePorAg(prev => { const next = { ...prev }; delete next[id]; return next; });
+      }
       if (novoStatus === "faltou" || novoStatus === "cancelado") {
-        const ag = agendamentos.find(a => a.id === id);
         if (ag) {
           setFaltaModal({
             tipo: novoStatus === "faltou" ? "cobrada" : "justificada",
@@ -1566,7 +1602,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                                 </div>
                                 {/* Ícones de status inline */}
                                 <div className="flex items-center gap-1.5 shrink-0">
-                                  {a.status !== "ausencia" && (
+                                  {a.status !== "ausencia" && a.status !== "cancelado" && (
                                     <span
                                       title={a.pago ? `Pago${a.forma_pagamento ? ` · ${FORMA_LABELS[a.forma_pagamento] ?? a.forma_pagamento}` : ""}` : "Pagamento pendente"}
                                       className="w-6 h-6 rounded-full flex items-center justify-center"
@@ -1575,14 +1611,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                                       <DollarSign className="w-3.5 h-3.5 text-white" />
                                     </span>
                                   )}
-                                  {a.status === "agendado" && (
-                                    <span title="Aguardando confirmação" className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "#f59e0b" }}>
-                                      <HelpCircle className="w-3.5 h-3.5 text-white" />
-                                    </span>
-                                  )}
                                   {a.status === "confirmado" && (
                                     <span title="Presença confirmada" className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(34,197,94,0.85)" }}>
-                                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                                      <Check className="w-3.5 h-3.5 text-white" />
                                     </span>
                                   )}
                                 </div>
@@ -1874,14 +1905,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
         <FaltaJustificadaModal
           pacienteNome={faltaModal.paciente?.nome_completo ?? "Paciente"}
           onListaEncaixe={() => {
-            const paciente = faltaModal.paciente;
-            const profissional = faltaModal.profissional;
-            if (paciente) {
-              // Adiciona à lista de encaixe no banco
-              startTransition(async () => {
-                await adicionarEncaixeDireto(paciente.nome_completo, profissional?.id ?? null);
-              });
-            }
+            // Paciente já foi adicionado automaticamente à lista de encaixe
             setFaltaModal(null);
             router.refresh();
           }}
