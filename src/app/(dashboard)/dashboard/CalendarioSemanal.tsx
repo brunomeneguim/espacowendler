@@ -9,7 +9,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
   DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope, Users, AlertTriangle,
-  FileText, Eye, EyeOff,
+  FileText, Eye, EyeOff, DollarSign, HelpCircle,
 } from "lucide-react";
 
 const Users2Icon = Users;
@@ -418,7 +418,18 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
             {ag.profissional?.profile?.nome_completo}
           </p>
         </div>
-        <span className={`w-2 h-2 rounded-full shrink-0 mt-1 ${cfg.dot}`} title={cfg.label} />
+        <div className="flex flex-col items-center gap-0.5 shrink-0 mt-0.5">
+          <span className={`w-2 h-2 rounded-full ${cfg.dot}`} title={cfg.label} />
+          {ag.status !== "ausencia" && (
+            <DollarSign
+              className={`w-2.5 h-2.5 ${ag.pago ? "text-green-500" : "text-gray-300"}`}
+              title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}
+            />
+          )}
+          {ag.status === "agendado" && (
+            <HelpCircle className="w-2.5 h-2.5 text-amber-400" title="Aguardando confirmação do paciente" />
+          )}
+        </div>
       </div>
 
       {expanded && (
@@ -474,11 +485,11 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
             )}
 
             {/* Pagamento */}
-            {(ag.status === "realizado" || ag.status === "finalizado") && (
+            {ag.status !== "ausencia" && (
               <div className="border-t border-gray-100 mt-0.5 pt-1">
                 {ag.pago ? (
                   <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-green-700">
-                    <Check className="w-4 h-4 shrink-0 text-green-500" />
+                    <DollarSign className="w-4 h-4 shrink-0 text-green-500" />
                     <span>Pago{ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}</span>
                   </div>
                 ) : (
