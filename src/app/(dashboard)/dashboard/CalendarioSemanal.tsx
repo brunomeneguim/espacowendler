@@ -766,6 +766,7 @@ interface ReagendarInfo {
   pacienteNome: string;
   profissionalId: string;
   profissionalNome: string;
+  encaixeId?: string | null;
 }
 
 function SlotVazio({
