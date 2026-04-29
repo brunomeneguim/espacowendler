@@ -360,6 +360,10 @@ interface CardProps {
   privacyMode: boolean;
 }
 
+function formatCentavos(c: number): string {
+  return (c / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 const FORMAS_PAGAMENTO = [
   { value: "pix",             label: "PIX"      },
   { value: "dinheiro",        label: "Dinheiro" },
@@ -379,9 +383,24 @@ function PaymentForm({
   onConfirm: (forma: string, valor: number | null) => void;
 }) {
   const [forma, setForma] = useState("pix");
-  const [valor, setValor] = useState(defaultValor != null ? String(defaultValor) : "");
+  const [centavos, setCentavos] = useState(() =>
+    defaultValor != null ? Math.round(defaultValor * 100) : 0
+  );
 
-  const valorNum = valor.trim() ? parseFloat(valor.replace(",", ".")) : null;
+  const valorNum = centavos > 0 ? centavos / 100 : null;
+
+  function handleValorKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key >= "0" && e.key <= "9") {
+      e.preventDefault();
+      setCentavos(prev => Math.min(prev * 10 + parseInt(e.key), 9999999));
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      setCentavos(prev => Math.floor(prev / 10));
+    } else if (e.key === "Delete") {
+      e.preventDefault();
+      setCentavos(0);
+    }
+  }
 
   return (
     <div className="px-2.5 py-2 space-y-2" onClick={e => e.stopPropagation()}>
@@ -391,13 +410,12 @@ function PaymentForm({
       <div className="flex items-center gap-1.5">
         <span className="text-xs text-gray-400 shrink-0">R$</span>
         <input
-          type="number"
-          min="0"
-          step="0.01"
-          placeholder="Valor da sessão"
-          value={valor}
-          onChange={e => setValor(e.target.value)}
-          className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-forest/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+          type="text"
+          inputMode="numeric"
+          value={formatCentavos(centavos)}
+          onChange={() => {}}
+          onKeyDown={handleValorKeyDown}
+          className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-forest/30 text-right tabular-nums"
         />
       </div>
 
