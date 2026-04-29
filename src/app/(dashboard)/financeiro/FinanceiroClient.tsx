@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   TrendingUp, TrendingDown, Clock, AlertCircle,
-  Plus, Check, Pencil, Trash2, Loader2, Filter,
+  Check, Pencil, Trash2, Loader2, Filter,
   Calendar, DollarSign, UserCircle,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -40,6 +40,7 @@ interface Filtros {
   tipo: string;
   status: string;
   profissional_id: string;
+  sala_id: string;
 }
 
 interface ProfissionalItem {
@@ -80,12 +81,15 @@ interface ProfTotais {
   totalLiquido: number;
 }
 
+interface SalaItem { id: number; nome: string; }
+
 interface Props {
   lancamentos: Lancamento[];
   totaisMes: Totais;
   filtros: Filtros;
   isAdmin: boolean;
   profissionais: ProfissionalItem[];
+  salas: SalaItem[];
   profAgendamentos: AgendamentoProfissional[];
   profSelecionado: ProfissionalItem | null;
   profTotais: ProfTotais;
@@ -129,7 +133,7 @@ function KpiCard({ label, value, icon: Icon, color, bg }: {
   );
 }
 
-export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, profissionais, profAgendamentos, profSelecionado, profTotais, agendamentosPeriodo }: Props) {
+export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, profissionais, salas, profAgendamentos, profSelecionado, profTotais, agendamentosPeriodo }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pagarId, setPagarId] = useState<string | null>(null);
@@ -140,7 +144,7 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const params = new URLSearchParams();
-    (["periodo_inicio", "periodo_fim", "tipo", "status", "profissional_id"] as const).forEach(k => {
+    (["periodo_inicio", "periodo_fim", "tipo", "status", "profissional_id", "sala_id"] as const).forEach(k => {
       const v = fd.get(k) as string;
       if (v) params.set(k, v);
     });
@@ -153,77 +157,77 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Receita recebida (mês)" value={fmt(totaisMes.receitaPaga)}
           icon={TrendingUp} color="text-green-600" bg="bg-green-50" />
-        <KpiCard label="Pendente" value={fmt(totaisMes.pendente)}
+        <KpiCard label="Pendente (sessões agendadas)" value={fmt(totaisMes.pendente)}
           icon={Clock} color="text-amber-600" bg="bg-amber-50" />
-        <KpiCard label="Inadimplente" value={fmt(totaisMes.inadimplente)}
+        <KpiCard label="Inadimplente (finalizadas sem pagamento)" value={fmt(totaisMes.inadimplente)}
           icon={AlertCircle} color="text-rust" bg="bg-rust/10" />
         <KpiCard label="Despesas (mês)" value={fmt(totaisMes.despesasMes)}
           icon={TrendingDown} color="text-blue-600" bg="bg-blue-50" />
       </div>
 
-      {/* Filtros + Novo */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-        <form onSubmit={applyFilter} className="flex flex-wrap gap-2 flex-1">
+      {/* Filtros */}
+      <form onSubmit={applyFilter} className="flex flex-wrap gap-2 items-end">
+        <div>
+          <label className="label text-xs">De</label>
+          <input type="date" name="periodo_inicio" defaultValue={filtros.periodo_inicio}
+            className="input-field py-1.5 text-sm" />
+        </div>
+        <div>
+          <label className="label text-xs">Até</label>
+          <input type="date" name="periodo_fim" defaultValue={filtros.periodo_fim}
+            className="input-field py-1.5 text-sm" />
+        </div>
+        <div>
+          <label className="label text-xs">Tipo</label>
+          <select name="tipo" defaultValue={filtros.tipo} className="input-field py-1.5 text-sm">
+            <option value="">Todos</option>
+            <option value="receita">Receita</option>
+            <option value="despesa">Despesa</option>
+          </select>
+        </div>
+        <div>
+          <label className="label text-xs">Status</label>
+          <select name="status" defaultValue={filtros.status} className="input-field py-1.5 text-sm">
+            <option value="">Todos</option>
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+        {profissionais.length > 0 && (
           <div>
-            <label className="label text-xs">De</label>
-            <input type="date" name="periodo_inicio" defaultValue={filtros.periodo_inicio}
-              className="input-field py-1.5 text-sm" />
-          </div>
-          <div>
-            <label className="label text-xs">Até</label>
-            <input type="date" name="periodo_fim" defaultValue={filtros.periodo_fim}
-              className="input-field py-1.5 text-sm" />
-          </div>
-          <div>
-            <label className="label text-xs">Tipo</label>
-            <select name="tipo" defaultValue={filtros.tipo} className="input-field py-1.5 text-sm">
+            <label className="label text-xs">Profissional</label>
+            <select name="profissional_id" defaultValue={filtros.profissional_id} className="input-field py-1.5 text-sm">
               <option value="">Todos</option>
-              <option value="receita">Receita</option>
-              <option value="despesa">Despesa</option>
+              {profissionais.map(p => (
+                <option key={p.id} value={p.id}>
+                  {(p.profile as any)?.nome_completo ?? `Profissional ${p.id}`}
+                </option>
+              ))}
             </select>
           </div>
+        )}
+        {salas.length > 0 && (
           <div>
-            <label className="label text-xs">Status</label>
-            <select name="status" defaultValue={filtros.status} className="input-field py-1.5 text-sm">
-              <option value="">Todos</option>
-              <option value="pendente">Pendente</option>
-              <option value="pago">Pago</option>
-              <option value="cancelado">Cancelado</option>
+            <label className="label text-xs">Sala</label>
+            <select name="sala_id" defaultValue={filtros.sala_id} className="input-field py-1.5 text-sm">
+              <option value="">Todas</option>
+              {salas.map(s => (
+                <option key={s.id} value={String(s.id)}>{s.nome}</option>
+              ))}
             </select>
           </div>
-          {profissionais.length > 0 && (
-            <div>
-              <label className="label text-xs">Profissional</label>
-              <select name="profissional_id" defaultValue={filtros.profissional_id} className="input-field py-1.5 text-sm">
-                <option value="">Todos</option>
-                {profissionais.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {(p.profile as any)?.nome_completo ?? `Profissional ${p.id}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div className="flex items-end">
-            <button type="submit" className="btn-secondary py-1.5 text-sm flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5" /> Filtrar
-            </button>
-          </div>
-        </form>
-        <Link href="/financeiro/novo"
-          className="btn-primary text-sm flex items-center gap-1.5 shrink-0">
-          <Plus className="w-4 h-4" /> Novo lançamento
-        </Link>
-      </div>
+        )}
+        <button type="submit" className="btn-secondary py-1.5 text-sm flex items-center gap-1.5">
+          <Filter className="w-3.5 h-3.5" /> Filtrar
+        </button>
+      </form>
 
       {/* Tabela */}
       <div className="card p-0 overflow-hidden">
         {lancamentos.length === 0 ? (
           <div className="p-10 text-center text-forest-400">
             <p className="text-sm">Nenhum lançamento encontrado para o período.</p>
-            <Link href="/financeiro/novo" className="mt-3 inline-flex items-center gap-1.5 text-sm text-forest hover:underline">
-              <Plus className="w-3.5 h-3.5" /> Criar primeiro lançamento
-            </Link>
           </div>
         ) : (
           <div className="overflow-x-auto">

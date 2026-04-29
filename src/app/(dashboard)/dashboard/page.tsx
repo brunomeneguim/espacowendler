@@ -1,8 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { format, startOfWeek, parseISO } from "date-fns";
-import { CalendarioSemanal } from "./CalendarioSemanal";
-import { ListaEncaixe } from "./ListaEncaixe";
+import { DashboardContent } from "./DashboardContent";
 
 export default async function DashboardPage({
   searchParams,
@@ -128,19 +127,18 @@ export default async function DashboardPage({
 
   return (
     <div className="p-4 md:p-6 max-w-full">
-      <ListaEncaixe
+      <DashboardContent
         encaixes={(encaixes as any) ?? []}
-        profissionais={(profissionais as any) ?? []}
-      />
-      <CalendarioSemanal
-        agendamentos={(agendamentos as any) ?? []}
-        profissionais={(profissionais as any) ?? []}
-        horariosDisponiveis={(horarios as any) ?? []}
-        salas={(salas as any) ?? []}
-        pacientes={(pacientes as any) ?? []}
-        aniversariantes={(todosAniversariantes as any) ?? []}
-        weekStartStr={format(weekStart, "yyyy-MM-dd")}
-        userRole={profile.role}
+        calProps={{
+          agendamentos: (agendamentos as any) ?? [],
+          profissionais: (profissionais as any) ?? [],
+          horariosDisponiveis: (horarios as any) ?? [],
+          salas: (salas as any) ?? [],
+          pacientes: (pacientes as any) ?? [],
+          aniversariantes: (todosAniversariantes as any) ?? [],
+          weekStartStr: format(weekStart, "yyyy-MM-dd"),
+          userRole: profile.role,
+        }}
       />
     </div>
   );

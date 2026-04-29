@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { UserPlus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Phone, FileText, User, Pencil, Check, X } from "lucide-react";
+import { UserPlus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Phone, FileText, User, Pencil, Check, X, CalendarPlus } from "lucide-react";
 import { adicionarEncaixe, removerEncaixe, editarEncaixe } from "./listaEncaixeActions";
 
 interface Encaixe {
@@ -19,9 +19,18 @@ interface Profissional {
   profile: { nome_completo: string } | null;
 }
 
+interface ReagendarInfo {
+  pacienteId?: string;
+  pacienteNome: string;
+  profissionalId: string;
+  profissionalNome: string;
+  encaixeId?: string;
+}
+
 interface Props {
   encaixes: Encaixe[];
   profissionais: Profissional[];
+  onReagendar?: (info: ReagendarInfo) => void;
 }
 
 function maskPhone(v: string) {
@@ -34,7 +43,7 @@ function maskPhone(v: string) {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props) {
+export function ListaEncaixe({ encaixes: initialEncaixes, profissionais, onReagendar }: Props) {
   const [isPending, startTransition] = useTransition();
   const [encaixes, setEncaixes] = useState(initialEncaixes);
   const [aberto, setAberto] = useState(false);
@@ -305,6 +314,24 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais }: Props
                         </div>
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
+                        {onReagendar && e.profissional_id && (
+                          <button
+                            onClick={() => {
+                              onReagendar({
+                                pacienteNome: e.paciente_nome,
+                                profissionalId: e.profissional_id!,
+                                profissionalNome: e.profissional?.profile?.nome_completo ?? "Profissional",
+                                encaixeId: e.id,
+                              });
+                              // Fecha a lista para o usuário ver a agenda
+                              setAberto(false);
+                            }}
+                            className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Agendar — próximo clique na agenda"
+                          >
+                            <CalendarPlus className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button onClick={() => iniciarEdicao(e)}
                           className="p-1 text-forest-300 hover:text-forest hover:bg-forest/10 rounded-lg transition-colors"
                           title="Editar">

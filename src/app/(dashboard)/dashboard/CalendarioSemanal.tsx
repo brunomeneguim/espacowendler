@@ -72,6 +72,9 @@ interface Props {
   salas: Sala[];
   weekStartStr: string;
   userRole: string;
+  // Reagendar externo (controlado por DashboardContent)
+  reagendarInfo?: ReagendarInfo | null;
+  onSetReagendarInfo?: (info: ReagendarInfo | null) => void;
 }
 
 // ── Status config ─────────────────────────────────────────────────
@@ -1052,7 +1055,7 @@ ${sorted.map(ag => {
 }
 
 // ── Componente principal ──────────────────────────────────────────
-export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole }: Props) {
+export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole, reagendarInfo: externalReagendarInfo, onSetReagendarInfo }: Props) {
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
@@ -1073,6 +1076,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   });
   const [editingAg, setEditingAg] = useState<Agendamento|null>(null);
   const [expandedId, setExpandedId] = useState<string|null>(null);
+  const [expandedListId, setExpandedListId] = useState<string|null>(null);
   const [isPending, startTransition] = useTransition();
   const [showAniversariantes, setShowAniversariantes] = useState(false);
   const [showEspelho, setShowEspelho] = useState(false);
@@ -1086,8 +1090,14 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     profissional: Agendamento["profissional"];
   } | null>(null);
 
-  // ── Reagendamento ────────────────────────────────────────────────
-  const [reagendarInfo, setReagendarInfo] = useState<ReagendarInfo | null>(null);
+  // ── Reagendamento (sincronizado com DashboardContent via props) ──
+  const [localReagendarInfo, setLocalReagendarInfo] = useState<ReagendarInfo | null>(null);
+  // Usa valor externo se fornecido, senão local
+  const reagendarInfo = externalReagendarInfo !== undefined ? externalReagendarInfo : localReagendarInfo;
+  function setReagendarInfo(info: ReagendarInfo | null) {
+    if (onSetReagendarInfo) onSetReagendarInfo(info);
+    else setLocalReagendarInfo(info);
+  }
 
   const canEdit = ["admin","supervisor","secretaria"].includes(userRole);
 
@@ -1529,30 +1539,138 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                     </h2>
                     <div className="card p-0 overflow-hidden">
                       <ul className="divide-y divide-sand/20">
-                        {itens.map(a => (
-                          <li key={a.id} className="flex items-center gap-4 px-6 py-4 hover:bg-cream/40 transition-colors">
-                            <div className="w-16 text-center shrink-0">
-                              <p className="font-display text-xl text-forest">{format(new Date(a.data_hora_inicio), "HH:mm")}</p>
-                              <p className="font-mono text-xs text-forest-500">{format(new Date(a.data_hora_fim), "HH:mm")}</p>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-forest truncate">{privacyMode ? "● ● ●" : (a.paciente?.nome_completo ?? "—")}</p>
-                              <p className="text-sm text-forest-600 truncate">
-                                com {a.profissional?.profile?.nome_completo ?? "—"}
-                                {!privacyMode && a.paciente?.telefone && <> · {a.paciente.telefone}</>}
-                              </p>
-                            </div>
-                            <span className={`text-xs px-3 py-1 rounded-full font-medium shrink-0 ${STATUS_BADGE_LISTA[a.status] ?? STATUS_BADGE_LISTA.agendado}`}>
-                              {STATUS[a.status as Status]?.label ?? a.status}
-                            </span>
-                            {canEdit && (
-                              <div className="flex items-center gap-1 shrink-0">
-                                <Link href={`/agenda/${a.id}/editar`} className="p-2 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors" title="Editar"><Pencil className="w-4 h-4" /></Link>
-                                <button onClick={() => handleDelete(a.id)} className="p-2 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors" title="Excluir"><Trash2 className="w-4 h-4" /></button>
+                        {itens.map(a => {
+                          const ativo = a.status === "agendado" || a.status === "confirmado";
+                          const isExpanded = expandedListId === a.id;
+                          const profHex = profHexMap.get(a.profissional?.id ?? "") ?? PROF_CORES[0].hex;
+                          const profValorConsulta = profValorConsultaMap.get(a.profissional?.id ?? "");
+                          return (
+                            <li key={a.id} className="border-b border-sand/20 last:border-b-0">
+                              {/* Linha principal */}
+                              <div
+                                className="flex items-center gap-4 px-6 py-3.5 hover:bg-cream/40 transition-colors cursor-pointer"
+                                onClick={() => setExpandedListId(isExpanded ? null : a.id)}
+                              >
+                                {/* Barra colorida do profissional */}
+                                <div className="w-1 h-10 rounded-full shrink-0" style={{ backgroundColor: profHex }} />
+                                <div className="w-14 text-center shrink-0">
+                                  <p className="text-sm font-semibold text-forest">{format(new Date(a.data_hora_inicio), "HH:mm")}</p>
+                                  <p className="text-xs text-forest-400">{format(new Date(a.data_hora_fim), "HH:mm")}</p>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-forest truncate">{privacyMode ? "● ● ●" : (a.paciente?.nome_completo ?? "—")}</p>
+                                  <p className="text-sm text-forest-600 truncate">
+                                    {a.profissional?.profile?.nome_completo ?? "—"}
+                                    {a.sala && <span className="text-forest-400"> · {a.sala.nome}</span>}
+                                  </p>
+                                </div>
+                                {/* Ícones de status inline */}
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {a.status !== "ausencia" && (
+                                    <span
+                                      title={a.pago ? `Pago${a.forma_pagamento ? ` · ${FORMA_LABELS[a.forma_pagamento] ?? a.forma_pagamento}` : ""}` : "Pagamento pendente"}
+                                      className="w-6 h-6 rounded-full flex items-center justify-center"
+                                      style={{ backgroundColor: a.pago ? "rgba(34,197,94,0.85)" : "rgba(239,68,68,0.80)" }}
+                                    >
+                                      <DollarSign className="w-3.5 h-3.5 text-white" />
+                                    </span>
+                                  )}
+                                  {a.status === "agendado" && (
+                                    <span title="Aguardando confirmação" className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "#f59e0b" }}>
+                                      <HelpCircle className="w-3.5 h-3.5 text-white" />
+                                    </span>
+                                  )}
+                                  {a.status === "confirmado" && (
+                                    <span title="Presença confirmada" className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(34,197,94,0.85)" }}>
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                                    </span>
+                                  )}
+                                </div>
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${STATUS_BADGE_LISTA[a.status] ?? STATUS_BADGE_LISTA.agendado}`}>
+                                  {STATUS[a.status as Status]?.label ?? a.status}
+                                </span>
+                                <ChevronDown className={`w-4 h-4 text-forest-400 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                               </div>
-                            )}
-                          </li>
-                        ))}
+
+                              {/* Painel expandido de ações */}
+                              {isExpanded && (
+                                <div className="px-6 pb-4 pt-2 bg-cream/40 border-t border-sand/20 space-y-3">
+                                  {/* Botões de status */}
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {ativo && a.status === "agendado" && (
+                                      <button title="Confirmar presença" onClick={() => { handleStatus(a.id, "confirmado"); setExpandedListId(null); }}
+                                        className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-xs font-medium transition-colors">
+                                        <Check className="w-3.5 h-3.5" /> Confirmar presença
+                                      </button>
+                                    )}
+                                    {a.status === "confirmado" && (
+                                      <button
+                                        title={a.pago ? "Finalizar sessão" : "Registre o pagamento antes de finalizar"}
+                                        onClick={() => { if (a.pago) { handleStatus(a.id, "finalizado"); setExpandedListId(null); }}}
+                                        className={`flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium transition-colors ${a.pago ? "bg-teal-50 text-teal-700 hover:bg-teal-100" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> Finalizar
+                                      </button>
+                                    )}
+                                    {ativo && (
+                                      <>
+                                        <button title="Falta Cobrada" onClick={() => { handleStatus(a.id, "faltou"); setExpandedListId(null); }}
+                                          className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-xs font-medium transition-colors">
+                                          <UserX className="w-3.5 h-3.5" /> Falta Cobrada
+                                        </button>
+                                        <button title="Falta Justificada" onClick={() => { handleStatus(a.id, "cancelado"); setExpandedListId(null); }}
+                                          className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium transition-colors">
+                                          <XCircle className="w-3.5 h-3.5" /> Falta Justificada
+                                        </button>
+                                      </>
+                                    )}
+                                    {(a.status === "faltou" || a.status === "cancelado" || a.status === "confirmado" || a.status === "ausencia" || a.status === "finalizado") && (
+                                      <button title="Desfazer" onClick={() => { handleStatus(a.id, "agendado"); setExpandedListId(null); }}
+                                        className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 text-xs font-medium transition-colors">
+                                        <RotateCcw className="w-3.5 h-3.5" /> Desfazer
+                                      </button>
+                                    )}
+                                    {canEdit && (
+                                      <>
+                                        <Link href={`/agenda/${a.id}/editar`} className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-forest/10 text-forest hover:bg-forest/20 text-xs font-medium transition-colors">
+                                          <Pencil className="w-3.5 h-3.5" /> Editar
+                                        </Link>
+                                        <button onClick={() => { handleDelete(a.id); setExpandedListId(null); }}
+                                          className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 text-xs font-medium transition-colors">
+                                          <Trash2 className="w-3.5 h-3.5" /> Excluir
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* Pagamento */}
+                                  {a.status !== "ausencia" && (
+                                    <div className="border-t border-sand/20 pt-2">
+                                      {a.status === "cancelado" ? (
+                                        <p className="text-xs text-gray-500 italic flex items-center gap-1.5">
+                                          <DollarSign className="w-3.5 h-3.5 text-gray-400" /> Cobrança não necessária
+                                        </p>
+                                      ) : a.pago ? (
+                                        <p className="text-xs font-semibold text-green-700 flex items-center gap-1.5">
+                                          <DollarSign className="w-3.5 h-3.5" />
+                                          Sessão paga
+                                          {a.valor_sessao != null && <span className="font-bold">{Number(a.valor_sessao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>}
+                                          {a.forma_pagamento && <span className="font-normal text-gray-400">· {FORMA_LABELS[a.forma_pagamento] ?? a.forma_pagamento}</span>}
+                                        </p>
+                                      ) : (
+                                        <PaymentForm
+                                          agId={a.id}
+                                          defaultValor={a.valor_sessao ?? profValorConsulta}
+                                          onConfirm={(forma, valor, outrosDesc) => { handlePayment(a.id, forma, valor, outrosDesc); setExpandedListId(null); }}
+                                        />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   </section>
@@ -1594,7 +1712,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                     </div>
                   </div>
                   <div className="relative px-0.5">
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} profValorConsultaMap={profValorConsultaMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} privacyMode={privacyMode} reagendarInfo={reagendarInfo} onReagendarSlotClick={() => setReagendarInfo(null)} />
+                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} profValorConsultaMap={profValorConsultaMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} privacyMode={privacyMode} reagendarInfo={reagendarInfo} onReagendarSlotClick={() => { if (reagendarInfo?.encaixeId) { startTransition(async () => { const { removerEncaixe } = await import("./listaEncaixeActions"); await removerEncaixe(reagendarInfo.encaixeId!); router.refresh(); }); } setReagendarInfo(null); }} />
                   </div>
                 </div>
               );
@@ -1646,7 +1764,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                   onExpand={setExpandedId}
                   privacyMode={privacyMode}
                   reagendarInfo={reagendarInfo}
-                  onReagendarSlotClick={() => setReagendarInfo(null)}
+                  onReagendarSlotClick={() => { if (reagendarInfo?.encaixeId) { startTransition(async () => { const { removerEncaixe } = await import("./listaEncaixeActions"); await removerEncaixe(reagendarInfo.encaixeId!); router.refresh(); }); } setReagendarInfo(null); }}
                 />
               </div>
             </div>
