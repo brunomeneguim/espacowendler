@@ -297,7 +297,8 @@ export async function marcarPagamentoAgendamento(
   id: string,
   pago: boolean,
   forma_pagamento: string | null,
-  valor_sessao?: number | null
+  valor_sessao?: number | null,
+  outrosDesc?: string
 ): Promise<{ error: string | null }> {
   const supabase = createClient();
 
@@ -307,10 +308,10 @@ export async function marcarPagamentoAgendamento(
   };
 
   if (pago) {
-    // Buscar agendamento para obter profissional_id e valor já gravado
+    // Buscar agendamento para obter profissional_id, valor já gravado e observacoes atuais
     const { data: ag } = await supabase
       .from("agendamentos")
-      .select("profissional_id, tipo_agendamento, valor_sessao")
+      .select("profissional_id, tipo_agendamento, valor_sessao, observacoes")
       .eq("id", id)
       .single();
 
@@ -328,6 +329,18 @@ export async function marcarPagamentoAgendamento(
         update.aluguel_cobrado = true;
         update.aluguel_valor   = prof.valor_aluguel_sala ?? 50;
       }
+    }
+
+    // Forma "outros": registrar descrição nas observações
+    if (forma_pagamento === "outros" && outrosDesc?.trim()) {
+      const { data: agObs } = await supabase
+        .from("agendamentos")
+        .select("observacoes")
+        .eq("id", id)
+        .single();
+      const obsAtual = (agObs?.observacoes ?? "").trim();
+      const linha = `Método de pagamento: ${outrosDesc.trim()}`;
+      update.observacoes = obsAtual ? `${obsAtual}\n${linha}` : linha;
     }
   } else {
     update.valor_sessao    = null;

@@ -351,7 +351,7 @@ interface CardProps {
   onEdit: () => void;
   onDelete: () => void;
   onStatus: (s: Status) => void;
-  onPayment: (id: string, forma: string, valor: number | null) => void;
+  onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
@@ -380,12 +380,13 @@ function PaymentForm({
 }: {
   agId: string;
   defaultValor?: number | null;
-  onConfirm: (forma: string, valor: number | null) => void;
+  onConfirm: (forma: string, valor: number | null, outrosDesc?: string) => void;
 }) {
   const [forma, setForma] = useState("pix");
   const [centavos, setCentavos] = useState(() =>
     defaultValor != null ? Math.round(defaultValor * 100) : 0
   );
+  const [outrosDesc, setOutrosDesc] = useState("");
 
   const valorNum = centavos > 0 ? centavos / 100 : null;
 
@@ -437,9 +438,20 @@ function PaymentForm({
         ))}
       </div>
 
+      {/* Campo livre quando "Outros" */}
+      {forma === "outros" && (
+        <input
+          type="text"
+          placeholder="Descreva o método de pagamento…"
+          value={outrosDesc}
+          onChange={e => setOutrosDesc(e.target.value)}
+          className="w-full text-xs border border-amber-200 rounded-lg px-2 py-1 bg-amber-50 text-gray-700 focus:outline-none focus:ring-1 focus:ring-amber-300 placeholder:text-gray-400"
+        />
+      )}
+
       <button
         type="button"
-        onClick={() => onConfirm(forma, valorNum)}
+        onClick={() => onConfirm(forma, valorNum, forma === "outros" ? outrosDesc.trim() || undefined : undefined)}
         className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
       >
         <Check className="w-3 h-3" /> Confirmar pagamento
@@ -547,33 +559,46 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
             </span>
           </div>
 
-          {/* Botões de ação */}
+          {/* Botões de ação — linha de ícones */}
           <div className="p-2 flex flex-col gap-1">
-            {ativo && ag.status === "agendado" && (
-              <button onClick={() => onStatus("confirmado")} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
-                <Check className="w-4 h-4 shrink-0" /> Confirmar
-              </button>
-            )}
-            {ativo && ag.status === "confirmado" && (
-              <button onClick={() => onStatus("finalizado")} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors">
-                <Check className="w-4 h-4 shrink-0" /> Finalizar sessão
-              </button>
-            )}
-            {ativo && (
-              <>
-                <button onClick={() => onStatus("faltou")} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors">
-                  <UserX className="w-4 h-4 shrink-0" /> Falta Cobrada
+            <div className="flex items-center gap-1">
+              {ativo && ag.status === "agendado" && (
+                <button title="Confirmar" onClick={() => onStatus("confirmado")} className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
+                  <Check className="w-4 h-4" />
                 </button>
-                <button onClick={() => onStatus("cancelado")} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
-                  <XCircle className="w-4 h-4 shrink-0" /> Falta Justificada
+              )}
+              {ativo && ag.status === "confirmado" && (
+                <button title="Finalizar sessão" onClick={() => onStatus("finalizado")} className="flex items-center justify-center w-8 h-8 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors">
+                  <Check className="w-4 h-4" />
                 </button>
-              </>
-            )}
-            {(ag.status === "faltou" || ag.status === "cancelado" || ag.status === "confirmado") && (
-              <button onClick={() => onStatus("agendado")} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
-                <RotateCcw className="w-4 h-4 shrink-0" /> Desfazer
-              </button>
-            )}
+              )}
+              {ativo && (
+                <>
+                  <button title="Falta Cobrada" onClick={() => onStatus("faltou")} className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors">
+                    <UserX className="w-4 h-4" />
+                  </button>
+                  <button title="Falta Justificada" onClick={() => onStatus("cancelado")} className="flex items-center justify-center w-8 h-8 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+              {(ag.status === "faltou" || ag.status === "cancelado" || ag.status === "confirmado") && (
+                <button title="Desfazer" onClick={() => onStatus("agendado")} className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              )}
+              {canEdit && (
+                <>
+                  <div className="flex-1" />
+                  <button title="Editar" onClick={onEdit} className="flex items-center justify-center w-8 h-8 rounded-lg bg-forest/10 text-forest hover:bg-forest/20 transition-colors">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button title="Excluir" onClick={onDelete} className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
 
             {/* Pagamento */}
             {ag.status !== "ausencia" && (
@@ -601,20 +626,9 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
                   <PaymentForm
                     agId={ag.id}
                     defaultValor={ag.valor_sessao ?? profValorConsulta}
-                    onConfirm={(forma, valor) => onPayment(ag.id, forma, valor)}
+                    onConfirm={(forma, valor, outrosDesc) => onPayment(ag.id, forma, valor, outrosDesc)}
                   />
                 )}
-              </div>
-            )}
-
-            {canEdit && (
-              <div className="flex gap-1 pt-1 border-t border-gray-100 mt-0.5">
-                <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-forest/10 text-forest hover:bg-forest/20 transition-colors">
-                  <Pencil className="w-4 h-4" /> Editar
-                </button>
-                <button onClick={onDelete} className="flex items-center justify-center px-3 py-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
               </div>
             )}
           </div>
@@ -670,7 +684,7 @@ interface ColunaProps {
   onEdit: (ag: Agendamento) => void;
   onDelete: (id: string) => void;
   onStatus: (id: string, s: Status) => void;
-  onPayment: (id: string, forma: string, valor: number | null) => void;
+  onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
@@ -1036,9 +1050,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     });
   }
 
-  function handlePayment(id: string, forma: string, valor: number | null) {
+  function handlePayment(id: string, forma: string, valor: number | null, outrosDesc?: string) {
     startTransition(async () => {
-      await marcarPagamentoAgendamento(id, true, forma, valor);
+      await marcarPagamentoAgendamento(id, true, forma, valor, outrosDesc);
       router.refresh();
     });
   }
