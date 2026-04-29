@@ -487,7 +487,12 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
           <p className="text-xs font-semibold truncate flex-1" style={{ color: textColor }}>
             {format(new Date(ag.data_hora_inicio), "HH:mm")} {privacyMode ? "● ● ●" : (ag.paciente?.nome_completo ?? "—")}
           </p>
-          <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} title={cfg.label} />
+          {/* Dot com anel branco/escuro para sempre contrastar com o fundo do card */}
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`}
+            title={cfg.label}
+            style={{ boxShadow: `0 0 0 1.5px ${isColorDark(bgColor) ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.25)"}` }}
+          />
         </div>
         {/* Linha 2: profissional + ícones de pagamento/confirmação */}
         <div className="flex items-center gap-1">
@@ -496,16 +501,27 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
           </p>
           <div className="flex items-center gap-0.5 shrink-0">
             {ag.status !== "ausencia" && (
-              <span title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}>
-                <DollarSign
-                  className={`w-3.5 h-3.5 ${ag.pago ? "text-green-400" : ""}`}
-                  style={ag.pago ? undefined : { color: textMuted }}
-                />
+              /* Badge circular — verde se pago, semi-transparente se pendente */
+              <span
+                title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}
+                className="w-4 h-4 rounded-full flex items-center justify-center"
+                style={{
+                  backgroundColor: ag.pago
+                    ? "rgba(34,197,94,0.85)"
+                    : isColorDark(bgColor) ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.10)",
+                }}
+              >
+                <DollarSign className="w-2.5 h-2.5" style={{ color: ag.pago ? "#fff" : textColor }} />
               </span>
             )}
             {ag.status === "agendado" && (
-              <span title="Aguardando confirmação do paciente">
-                <HelpCircle className="w-3.5 h-3.5" style={{ color: isColorDark(bgColor) ? "rgba(251,191,36,0.9)" : "#f59e0b" }} />
+              /* Badge circular âmbar — sempre visível em qualquer cor de card */
+              <span
+                title="Aguardando confirmação do paciente"
+                className="w-4 h-4 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: "#f59e0b" }}
+              >
+                <HelpCircle className="w-2.5 h-2.5 text-white" />
               </span>
             )}
           </div>
