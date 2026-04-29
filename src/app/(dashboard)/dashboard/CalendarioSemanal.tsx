@@ -110,6 +110,16 @@ function isColorDark(hex: string): boolean {
   return luminance < 0.5;
 }
 
+// Converte hex para rgba com transparência
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  if (h.length < 6) return `rgba(0,0,0,${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 // ── Detecção de overlap ───────────────────────────────────────────
 function calcularColunas(ags: Agendamento[]) {
   const sorted = [...ags].sort((a,b)=>new Date(a.data_hora_inicio).getTime()-new Date(b.data_hora_inicio).getTime());
@@ -588,23 +598,27 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
     };
   }, [expanded]);
 
-  const bgColor = ag.status === "faltou" ? "#dc2626" : ag.status === "cancelado" ? "#ffffff" : profHex;
-  const textColor = isColorDark(bgColor) ? "#ffffff" : "#1a1a1a";
-  const textMuted = isColorDark(bgColor) ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.5)";
+  const bgColor =
+    ag.status === "faltou"    ? hexToRgba("#dc2626", 0.12) :
+    ag.status === "cancelado" ? "#f9f9f9" :
+    ag.status === "ausencia"  ? "#f3f4f6" :
+    hexToRgba(profHex, 0.14);
+  const textColor = "#1a1a1a";
+  const textMuted = "rgba(0,0,0,0.5)";
 
   const durationMin = Math.round((new Date(ag.data_hora_fim).getTime() - new Date(ag.data_hora_inicio).getTime()) / 60000);
 
   return (
     <div
       ref={cardRef}
-      style={{ ...style, backgroundColor: bgColor, borderLeftColor: profHex }}
+      style={{ ...style, backgroundColor: bgColor, borderLeftColor: profHex, borderColor: hexToRgba(profHex, 0.30) }}
       className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none overflow-hidden ${expanded ? "z-30 shadow-lg" : "z-10"} ${pending ? "pointer-events-none" : ""}`}
       onClick={onExpand}
     >
       {/* ✓ Check de presença confirmada — canto superior direito */}
       {ag.status === "confirmado" && (
         <div className="absolute top-0.5 right-1 z-10 pointer-events-none">
-          <Check className="w-3 h-3" style={{ color: isColorDark(bgColor) ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.75)" }} strokeWidth={3} />
+          <Check className="w-3 h-3" style={{ color: "rgba(0,0,0,0.7)" }} strokeWidth={3} />
         </div>
       )}
       {/* $ Pagamento — canto inferior direito */}
