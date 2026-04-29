@@ -9,7 +9,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
   DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope, Users, AlertTriangle,
-  FileText, Eye, EyeOff, DollarSign, HelpCircle,
+  FileText, DollarSign, HelpCircle,
 } from "lucide-react";
 
 const Users2Icon = Users;
@@ -23,6 +23,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
 }
 import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient, verificarHorarioIndisponivel, marcarPagamentoAgendamento } from "../agenda/actions";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
+import { usePrivacyMode } from "@/app/(dashboard)/PrivacyContext";
 
 // ── Constantes ───────────────────────────────────────────────────
 const HORA_INICIO = 7;
@@ -421,13 +422,14 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
         <div className="flex flex-col items-center gap-0.5 shrink-0 mt-0.5">
           <span className={`w-2 h-2 rounded-full ${cfg.dot}`} title={cfg.label} />
           {ag.status !== "ausencia" && (
-            <DollarSign
-              className={`w-2.5 h-2.5 ${ag.pago ? "text-green-500" : "text-gray-300"}`}
-              title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}
-            />
+            <span title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}>
+              <DollarSign className={`w-2.5 h-2.5 ${ag.pago ? "text-green-500" : "text-gray-300"}`} />
+            </span>
           )}
           {ag.status === "agendado" && (
-            <HelpCircle className="w-2.5 h-2.5 text-amber-400" title="Aguardando confirmação do paciente" />
+            <span title="Aguardando confirmação do paciente">
+              <HelpCircle className="w-2.5 h-2.5 text-amber-400" />
+            </span>
           )}
         </div>
       </div>
@@ -797,7 +799,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const [isPending, startTransition] = useTransition();
   const [showAniversariantes, setShowAniversariantes] = useState(false);
   const [showEspelho, setShowEspelho] = useState(false);
-  const [privacyMode, setPrivacyMode] = useState(false);
+  const { privacyMode } = usePrivacyMode();
 
   const canEdit = ["admin","supervisor","secretaria"].includes(userRole);
 
@@ -1133,16 +1135,6 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
           title="Espelho de agendamento"
         >
           <FileText className="w-4 h-4" />
-        </button>
-
-        {/* Ocultar informações */}
-        <button
-          type="button"
-          onClick={() => setPrivacyMode(v => !v)}
-          className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${privacyMode ? "bg-amber-100 border-amber-300 text-amber-700" : "border-sand/40 hover:bg-sand/20 text-forest"}`}
-          title={privacyMode ? "Exibir informações" : "Ocultar informações"}
-        >
-          {privacyMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
 
         <div className="flex-1" />

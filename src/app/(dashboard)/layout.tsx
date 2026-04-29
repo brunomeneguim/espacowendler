@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/Sidebar";
+import { PrivacyProvider } from "./PrivacyContext";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -36,12 +37,14 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-cream">
-      <Sidebar
-        role={profile.role}
-        nome={profile.nome_completo}
-        menuConfig={(menuConfig as any) ?? []}
-      />
-      <main className="flex-1 min-w-0">{children}</main>
+      <PrivacyProvider>
+        <Sidebar
+          role={profile.role}
+          nome={profile.nome_completo}
+          menuConfig={(menuConfig as any) ?? []}
+        />
+        <main className="flex-1 min-w-0">{children}</main>
+      </PrivacyProvider>
     </div>
   );
 }

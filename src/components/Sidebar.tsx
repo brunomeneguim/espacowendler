@@ -7,12 +7,13 @@ import {
   Calendar, Users, UserCircle, LogOut, Leaf,
   Stethoscope, CheckSquare, Settings2, Check,
   ChevronUp, ChevronDown, X, Pencil, Building2,
-  DollarSign, BarChart2,
+  DollarSign, BarChart2, Eye, EyeOff,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
 import { signOut } from "@/app/(auth)/actions";
 import { salvarMenuConfig } from "@/app/(dashboard)/menuConfigActions";
 import type { MenuItem } from "@/app/(dashboard)/menuConfigActions";
+import { usePrivacyMode } from "@/app/(dashboard)/PrivacyContext";
 
 // ── Mapeamento de ícones (string → componente) ────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -53,6 +54,8 @@ export function Sidebar({
   const [editItems, setEditItems] = useState<MenuItem[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  const { privacyMode, setPrivacyMode } = usePrivacyMode();
 
   const isAdmin = role === "admin";
   const access = ROLE_ACCESS[role] ?? ROLE_ACCESS.profissional;
@@ -233,6 +236,19 @@ export function Sidebar({
 
           {configAberto && (
             <div className="mt-0.5 ml-4 space-y-0.5">
+              <button
+                type="button"
+                onClick={() => setPrivacyMode(v => !v)}
+                className={`flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm transition-colors ${
+                  privacyMode
+                    ? "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+                    : "text-cream/70 hover:text-cream hover:bg-cream/5"
+                }`}
+              >
+                {privacyMode ? <EyeOff className="w-4 h-4" strokeWidth={1.5} /> : <Eye className="w-4 h-4" strokeWidth={1.5} />}
+                {privacyMode ? "Exibir informações" : "Ocultar informações"}
+              </button>
+
               <Link
                 href="/configuracoes/conta"
                 className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
