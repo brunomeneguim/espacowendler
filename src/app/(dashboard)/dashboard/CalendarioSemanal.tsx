@@ -266,7 +266,7 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
               <label className="label">Paciente</label>
               <select name="paciente_id" required className="input-field" defaultValue={ag.paciente?.id ?? ""}>
                 <option value="" disabled>Selecione</option>
-                {pacientes.map(p => <option key={p.id} value={p.id}>{p.nome_completo}{p.telefone ? ` — ${p.telefone}` : ""}</option>)}
+                {pacientes.map(p => <option key={p.id} value={p.id}>{p.nome_completo}</option>)}
               </select>
             </div>
           )}
