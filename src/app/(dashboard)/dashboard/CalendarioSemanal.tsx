@@ -44,11 +44,12 @@ interface Agendamento {
   tipo_agendamento?: string | null;
   pago?: boolean;
   forma_pagamento?: string | null;
+  valor_sessao?: number | null;
   paciente: { id: string; nome_completo: string; telefone?: string } | null;
   profissional: { id: string; profile: { nome_completo: string } | null } | null;
   sala: { id: number; nome: string } | null;
 }
-interface Profissional { id: string; cor?: string | null; profile: { nome_completo: string } | null }
+interface Profissional { id: string; cor?: string | null; valor_consulta?: number | null; profile: { nome_completo: string } | null }
 interface Paciente     { id: string; nome_completo: string; telefone?: string }
 interface HorarioDisponivel { profissional_id: string; dia_semana: number; hora_inicio: string; hora_fim: string }
 interface Sala         { id: number; nome: string }
@@ -346,10 +347,11 @@ interface CardProps {
   style: React.CSSProperties;
   bordaProf: string;
   profHex: string;
+  profValorConsulta?: number | null;
   onEdit: () => void;
   onDelete: () => void;
   onStatus: (s: Status) => void;
-  onPayment: (id: string, forma: string) => void;
+  onPayment: (id: string, forma: string, valor: number | null) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
@@ -367,11 +369,39 @@ const FORMAS_PAGAMENTO = [
   { value: "outros",          label: "Outros"   },
 ];
 
-function PaymentForm({ agId, onConfirm }: { agId: string; onConfirm: (forma: string) => void }) {
+function PaymentForm({
+  agId,
+  defaultValor,
+  onConfirm,
+}: {
+  agId: string;
+  defaultValor?: number | null;
+  onConfirm: (forma: string, valor: number | null) => void;
+}) {
   const [forma, setForma] = useState("pix");
+  const [valor, setValor] = useState(defaultValor != null ? String(defaultValor) : "");
+
+  const valorNum = valor.trim() ? parseFloat(valor.replace(",", ".")) : null;
+
   return (
     <div className="px-2.5 py-2 space-y-2" onClick={e => e.stopPropagation()}>
       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Registrar pagamento</p>
+
+      {/* Valor da sessão */}
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-gray-400 shrink-0">R$</span>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          placeholder="Valor da sessão"
+          value={valor}
+          onChange={e => setValor(e.target.value)}
+          className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-forest/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+        />
+      </div>
+
+      {/* Método de pagamento */}
       <div className="flex flex-wrap gap-1">
         {FORMAS_PAGAMENTO.map(f => (
           <button
@@ -388,9 +418,10 @@ function PaymentForm({ agId, onConfirm }: { agId: string; onConfirm: (forma: str
           </button>
         ))}
       </div>
+
       <button
         type="button"
-        onClick={() => onConfirm(forma)}
+        onClick={() => onConfirm(forma, valorNum)}
         className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
       >
         <Check className="w-3 h-3" /> Confirmar pagamento
@@ -399,7 +430,7 @@ function PaymentForm({ agId, onConfirm }: { agId: string; onConfirm: (forma: str
   );
 }
 
-function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, expanded, onExpand, privacyMode }: CardProps) {
+function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, expanded, onExpand, privacyMode }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
   const cardRef = useRef<HTMLDivElement>(null);
@@ -424,30 +455,34 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
       className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
       onClick={onExpand}
     >
-      <div className="px-1.5 py-0.5 leading-tight flex items-start gap-1">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold truncate" style={{ color: textColor }}>
+      <div className="px-1.5 pt-0.5 pb-0 leading-tight">
+        {/* Linha 1: horário + nome + dot status */}
+        <div className="flex items-center gap-1">
+          <p className="text-xs font-semibold truncate flex-1" style={{ color: textColor }}>
             {format(new Date(ag.data_hora_inicio), "HH:mm")} {privacyMode ? "● ● ●" : (ag.paciente?.nome_completo ?? "—")}
           </p>
-          <p className="text-[10px] truncate" style={{ color: textMuted }}>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} title={cfg.label} />
+        </div>
+        {/* Linha 2: profissional + ícones de pagamento/confirmação */}
+        <div className="flex items-center gap-1">
+          <p className="text-[10px] truncate flex-1" style={{ color: textMuted }}>
             {ag.profissional?.profile?.nome_completo}
           </p>
-        </div>
-        <div className="flex flex-col items-center gap-0.5 shrink-0 mt-0.5">
-          <span className={`w-2 h-2 rounded-full ${cfg.dot}`} title={cfg.label} />
-          {ag.status !== "ausencia" && (
-            <span title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}>
-              <DollarSign
-                className={`w-2.5 h-2.5 ${ag.pago ? "text-green-400" : ""}`}
-                style={ag.pago ? undefined : { color: textMuted }}
-              />
-            </span>
-          )}
-          {ag.status === "agendado" && (
-            <span title="Aguardando confirmação do paciente">
-              <HelpCircle className="w-2.5 h-2.5" style={{ color: isColorDark(bgColor) ? "rgba(251,191,36,0.9)" : "#f59e0b" }} />
-            </span>
-          )}
+          <div className="flex items-center gap-0.5 shrink-0">
+            {ag.status !== "ausencia" && (
+              <span title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}>
+                <DollarSign
+                  className={`w-3.5 h-3.5 ${ag.pago ? "text-green-400" : ""}`}
+                  style={ag.pago ? undefined : { color: textMuted }}
+                />
+              </span>
+            )}
+            {ag.status === "agendado" && (
+              <span title="Aguardando confirmação do paciente">
+                <HelpCircle className="w-3.5 h-3.5" style={{ color: isColorDark(bgColor) ? "rgba(251,191,36,0.9)" : "#f59e0b" }} />
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -467,7 +502,6 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
               <p className="text-xs font-semibold text-gray-800 truncate">{privacyMode ? "● ● ●" : (ag.paciente?.nome_completo ?? "—")}</p>
               <p className="text-[11px] text-gray-400 truncate">
                 {format(new Date(ag.data_hora_inicio), "HH:mm")} – {format(new Date(ag.data_hora_fim), "HH:mm")}
-                {ag.sala ? ` · ${ag.sala.nome}` : ""}
               </p>
             </div>
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 whitespace-nowrap ${cfg.badge}`}>
@@ -511,15 +545,26 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
                     <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                       <DollarSign className="w-3.5 h-3.5 text-green-600" />
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-green-700 leading-tight">Sessão paga</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-green-700 leading-tight">
+                        Sessão paga
+                        {ag.valor_sessao != null && (
+                          <span className="ml-1.5 font-bold">
+                            {Number(ag.valor_sessao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          </span>
+                        )}
+                      </p>
                       {ag.forma_pagamento && (
                         <p className="text-[10px] text-gray-400 leading-tight">{FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}</p>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <PaymentForm agId={ag.id} onConfirm={(forma) => onPayment(ag.id, forma)} />
+                  <PaymentForm
+                    agId={ag.id}
+                    defaultValor={ag.valor_sessao ?? profValorConsulta}
+                    onConfirm={(forma, valor) => onPayment(ag.id, forma, valor)}
+                  />
                 )}
               </div>
             )}
@@ -583,10 +628,11 @@ interface ColunaProps {
   mostrarHorarios: boolean;
   profColorMap: Map<string,string>;
   profHexMap: Map<string,string>;
+  profValorConsultaMap: Map<string, number | null>;
   onEdit: (ag: Agendamento) => void;
   onDelete: (id: string) => void;
   onStatus: (id: string, s: Status) => void;
-  onPayment: (id: string, forma: string) => void;
+  onPayment: (id: string, forma: string, valor: number | null) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
@@ -596,7 +642,7 @@ interface ColunaProps {
   privacyMode: boolean;
 }
 
-function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, salaId, expandedId, onExpand, privacyMode }: ColunaProps) {
+function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, profValorConsultaMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, salaId, expandedId, onExpand, privacyMode }: ColunaProps) {
   const colMap = calcularColunas(ags);
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
   const slotsOcupados = new Set(
@@ -635,6 +681,7 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
             style={{ top:Math.max(0,top), height, left:`${(col/total)*100}%`, width:`calc(${100/total}% - 2px)` }}
             bordaProf={profColorMap.get(ag.profissional?.id ?? "") ?? BORDA_PROF[0]}
             profHex={profHexMap.get(ag.profissional?.id ?? "") ?? PROF_CORES[0].hex}
+            profValorConsulta={profValorConsultaMap.get(ag.profissional?.id ?? "")}
             onEdit={() => onEdit(ag)}
             onDelete={() => onDelete(ag.id)}
             onStatus={s => onStatus(ag.id, s)}
@@ -901,6 +948,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     p.id,
     p.cor ? getCorById(p.cor).hex : PROF_CORES[i % PROF_CORES.length].hex,
   ]));
+  const profValorConsultaMap = new Map(profissionais.map(p => [p.id, p.valor_consulta ?? null]));
 
   // Semana seg-sáb (sem domingo)
   const weekDays = Array.from({length:6},(_,i)=>addDays(weekStart,i))
@@ -950,9 +998,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     });
   }
 
-  function handlePayment(id: string, forma: string) {
+  function handlePayment(id: string, forma: string, valor: number | null) {
     startTransition(async () => {
-      await marcarPagamentoAgendamento(id, true, forma);
+      await marcarPagamentoAgendamento(id, true, forma, valor);
       router.refresh();
     });
   }
@@ -1296,7 +1344,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                     </div>
                   </div>
                   <div className="relative px-0.5">
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} privacyMode={privacyMode} />
+                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} profValorConsultaMap={profValorConsultaMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} privacyMode={privacyMode} />
                   </div>
                 </div>
               );
@@ -1335,6 +1383,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                   mostrarHorarios={filtroProf!=="todos"}
                   profColorMap={profColorMap}
                   profHexMap={profHexMap}
+                  profValorConsultaMap={profValorConsultaMap}
                   onEdit={setEditingAg}
                   onDelete={handleDelete}
                   onStatus={handleStatus}
