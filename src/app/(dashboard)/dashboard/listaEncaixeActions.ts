@@ -3,6 +3,24 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
+export async function adicionarEncaixeDireto(
+  paciente_nome: string,
+  profissional_id: string | null
+): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!paciente_nome.trim()) return { error: "Nome do paciente é obrigatório." };
+  const { error } = await supabase.from("lista_encaixe").insert({
+    paciente_nome: paciente_nome.trim(),
+    profissional_id: profissional_id || null,
+    created_by: user?.id,
+    ativo: true,
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function adicionarEncaixe(formData: FormData): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();

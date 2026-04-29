@@ -7,7 +7,7 @@ import {
   Calendar, Users, UserCircle, LogOut, Leaf,
   Stethoscope, CheckSquare, Settings2, Check,
   ChevronUp, ChevronDown, X, Pencil, Building2,
-  DollarSign, BarChart2, Eye, EyeOff,
+  DollarSign, BarChart2, Eye, EyeOff, ShieldCheck, CreditCard,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
 import { signOut } from "@/app/(auth)/actions";
@@ -258,13 +258,37 @@ export function Sidebar({
               </Link>
 
               {isAdmin && !editMode && (
-                <button
-                  onClick={() => { setConfigAberto(false); enterEditMode(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                  className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
-                >
-                  <Pencil className="w-4 h-4" strokeWidth={1.5} />
-                  Editar Sistema
-                </button>
+                <>
+                  <button
+                    onClick={() => { setConfigAberto(false); enterEditMode(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" strokeWidth={1.5} />
+                    Editar Sistema
+                  </button>
+                  <Link
+                    href="/configuracoes/acesso"
+                    className={`flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm transition-colors ${
+                      pathname.startsWith("/configuracoes/acesso")
+                        ? "bg-cream/10 text-peach font-medium"
+                        : "text-cream/70 hover:text-cream hover:bg-cream/5"
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4" strokeWidth={1.5} />
+                    Controle de Acesso
+                  </Link>
+                  <Link
+                    href="/configuracoes/metodos-pagamento"
+                    className={`flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm transition-colors ${
+                      pathname.startsWith("/configuracoes/metodos-pagamento")
+                        ? "bg-cream/10 text-peach font-medium"
+                        : "text-cream/70 hover:text-cream hover:bg-cream/5"
+                    }`}
+                  >
+                    <CreditCard className="w-4 h-4" strokeWidth={1.5} />
+                    Métodos de Pagamento
+                  </Link>
+                </>
               )}
             </div>
           )}
