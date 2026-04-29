@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef, useCallback } from "react";
+import { useState, useTransition, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format, addDays, addWeeks, subWeeks, isSameDay, startOfWeek } from "date-fns";
@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
   DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope, Users, AlertTriangle,
+  FileText, Eye, EyeOff,
 } from "lucide-react";
 
 const Users2Icon = Users;
@@ -353,6 +354,7 @@ interface CardProps {
   canEdit: boolean;
   expanded: boolean;
   onExpand: () => void;
+  privacyMode: boolean;
 }
 
 function PaymentForm({ agId, onConfirm }: { agId: string; onConfirm: (forma: string) => void }) {
@@ -382,10 +384,17 @@ function PaymentForm({ agId, onConfirm }: { agId: string; onConfirm: (forma: str
   );
 }
 
-function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, expanded, onExpand }: CardProps) {
+function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, expanded, onExpand, privacyMode }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
   const cardRef = useRef<HTMLDivElement>(null);
+  const [openUpward, setOpenUpward] = useState(false);
+
+  useEffect(() => {
+    if (!expanded || !cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    setOpenUpward(window.innerHeight - rect.bottom < 340);
+  }, [expanded]);
 
   const bgColor = ag.status === "faltou" ? "#dc2626" : ag.status === "cancelado" ? "#ffffff" : profHex;
   const textColor = isColorDark(bgColor) ? "#ffffff" : "#1a1a1a";
@@ -403,7 +412,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
       <div className="px-1.5 py-0.5 leading-tight flex items-start gap-1">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold truncate" style={{ color: textColor }}>
-            {format(new Date(ag.data_hora_inicio), "HH:mm")} {ag.paciente?.nome_completo ?? "—"}
+            {format(new Date(ag.data_hora_inicio), "HH:mm")} {privacyMode ? "● ● ●" : (ag.paciente?.nome_completo ?? "—")}
           </p>
           <p className="text-[10px] truncate" style={{ color: textMuted }}>
             {ag.profissional?.profile?.nome_completo}
@@ -415,13 +424,17 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, onEdit, onDelete, onSt
       {expanded && (
         <div
           className="bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden"
-          style={{ position: "absolute", top: "calc(100% + 4px)", left: "-1px", right: "-1px", zIndex: 40, minWidth: 180 }}
+          style={{
+            position: "absolute",
+            ...(openUpward ? { bottom: "calc(100% + 4px)" } : { top: "calc(100% + 4px)" }),
+            left: "-1px", right: "-1px", zIndex: 40, minWidth: 180,
+          }}
           onClick={e => e.stopPropagation()}
         >
           {/* Info do agendamento */}
           <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-start gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-800 truncate">{ag.paciente?.nome_completo ?? "—"}</p>
+              <p className="text-xs font-semibold text-gray-800 truncate">{privacyMode ? "● ● ●" : (ag.paciente?.nome_completo ?? "—")}</p>
               <p className="text-[11px] text-gray-400 truncate">
                 {format(new Date(ag.data_hora_inicio), "HH:mm")} – {format(new Date(ag.data_hora_fim), "HH:mm")}
                 {ag.sala ? ` · ${ag.sala.nome}` : ""}
@@ -543,9 +556,10 @@ interface ColunaProps {
   salaId: number | null;
   expandedId: string | null;
   onExpand: (id: string | null) => void;
+  privacyMode: boolean;
 }
 
-function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, salaId, expandedId, onExpand }: ColunaProps) {
+function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, salaId, expandedId, onExpand, privacyMode }: ColunaProps) {
   const colMap = calcularColunas(ags);
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
   const slotsOcupados = new Set(
@@ -593,6 +607,7 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
             canEdit={canEdit}
             expanded={expandedId === ag.id}
             onExpand={() => onExpand(expandedId === ag.id ? null : ag.id)}
+            privacyMode={privacyMode}
           />
         );
       })}
@@ -609,6 +624,142 @@ const STATUS_BADGE_LISTA: Record<string, string> = {
   cancelado:  "bg-red-100 text-red-600",
   faltou:     "bg-orange-100 text-orange-700",
 };
+
+// ── Espelho de agendamento ────────────────────────────────────────
+function EspelhoModal({ dia, agendamentos, onClose }: {
+  dia: Date;
+  agendamentos: Agendamento[];
+  onClose: () => void;
+}) {
+  const sorted = [...agendamentos].sort(
+    (a, b) => new Date(a.data_hora_inicio).getTime() - new Date(b.data_hora_inicio).getTime()
+  );
+  const diaLabel = format(dia, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
+
+  function handlePrint() {
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<title>Espelho – ${diaLabel}</title>
+<style>
+  body { font-family: sans-serif; padding: 32px; color: #1a2e1a; font-size: 13px; }
+  h1 { font-size: 18px; margin-bottom: 2px; }
+  p.sub { color: #6b7280; margin-bottom: 20px; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #f3f4f0; text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #4b6347; border-bottom: 2px solid #d1d9cf; }
+  td { padding: 8px 12px; border-bottom: 1px solid #e9ede8; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .agendado   { background:#dbeafe; color:#1d4ed8; }
+  .confirmado { background:#dcfce7; color:#166534; }
+  .realizado  { background:#ccfbf1; color:#0f766e; }
+  .finalizado { background:#f3f4f6; color:#4b5563; }
+  .cancelado  { background:#fee2e2; color:#991b1b; }
+  .faltou     { background:#ffedd5; color:#c2410c; }
+  @media print { body { padding: 16px; } }
+</style>
+</head>
+<body>
+<h1>espaço wendler</h1>
+<p class="sub">Espelho de agendamento · ${diaLabel}</p>
+<table>
+<thead><tr>
+  <th>Horário</th>
+  <th>Paciente</th>
+  <th>Profissional</th>
+  <th>Sala</th>
+  <th>Status</th>
+</tr></thead>
+<tbody>
+${sorted.map(ag => {
+  const inicio = format(new Date(ag.data_hora_inicio), "HH:mm");
+  const fim    = format(new Date(ag.data_hora_fim),    "HH:mm");
+  const paciente = ag.paciente?.nome_completo ?? "—";
+  const prof     = ag.profissional?.profile?.nome_completo ?? "—";
+  const sala     = ag.sala?.nome ?? "—";
+  const status   = ag.status;
+  return `<tr>
+    <td>${inicio} – ${fim}</td>
+    <td>${paciente}</td>
+    <td>${prof}</td>
+    <td>${sala}</td>
+    <td><span class="status ${status}">${STATUS[ag.status]?.label ?? ag.status}</span></td>
+  </tr>`;
+}).join("")}
+</tbody>
+</table>
+<p style="margin-top:24px;font-size:11px;color:#9ca3af;">
+  Gerado em ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+</p>
+<script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }</script>
+</body></html>`;
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30">
+          <div>
+            <p className="text-xs text-forest-400 uppercase tracking-wider mb-0.5">Espelho de agendamento</p>
+            <h2 className="font-display text-lg font-semibold text-forest capitalize">{diaLabel}</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-forest text-cream text-sm font-medium hover:bg-forest/90 transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" /> Imprimir
+            </button>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-sand/30 text-forest-400 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          {sorted.length === 0 ? (
+            <p className="text-sm text-forest-400 text-center py-8">Nenhum agendamento neste dia.</p>
+          ) : (
+            <div className="divide-y divide-sand/20">
+              {sorted.map(ag => {
+                const inicio = format(new Date(ag.data_hora_inicio), "HH:mm");
+                const fim    = format(new Date(ag.data_hora_fim),    "HH:mm");
+                const cfg    = STATUS[ag.status] ?? STATUS.agendado;
+                return (
+                  <div key={ag.id} className="flex items-center gap-4 py-3">
+                    <div className="text-center shrink-0 w-16">
+                      <p className="text-sm font-medium text-forest">{inicio}</p>
+                      <p className="text-xs text-forest-400">{fim}</p>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-forest truncate">{ag.paciente?.nome_completo ?? "—"}</p>
+                      <p className="text-xs text-forest-500 truncate">
+                        {ag.profissional?.profile?.nome_completo}{ag.sala ? ` · ${ag.sala.nome}` : ""}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${cfg.badge}`}>{cfg.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-sand/20 text-xs text-forest-400">
+          {sorted.length} agendamento{sorted.length !== 1 ? "s" : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Componente principal ──────────────────────────────────────────
 export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole }: Props) {
@@ -634,6 +785,8 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const [expandedId, setExpandedId] = useState<string|null>(null);
   const [isPending, startTransition] = useTransition();
   const [showAniversariantes, setShowAniversariantes] = useState(false);
+  const [showEspelho, setShowEspelho] = useState(false);
+  const [privacyMode, setPrivacyMode] = useState(false);
 
   const canEdit = ["admin","supervisor","secretaria"].includes(userRole);
 
@@ -961,6 +1114,26 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
             </>
           )}
         </div>
+        {/* Espelho do dia */}
+        <button
+          type="button"
+          onClick={() => setShowEspelho(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-sand/40 hover:bg-sand/20 text-forest transition-colors"
+          title="Espelho de agendamento"
+        >
+          <FileText className="w-4 h-4" />
+        </button>
+
+        {/* Ocultar informações */}
+        <button
+          type="button"
+          onClick={() => setPrivacyMode(v => !v)}
+          className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${privacyMode ? "bg-amber-100 border-amber-300 text-amber-700" : "border-sand/40 hover:bg-sand/20 text-forest"}`}
+          title={privacyMode ? "Exibir informações" : "Ocultar informações"}
+        >
+          {privacyMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+
         <div className="flex-1" />
         <div className="flex rounded-lg border border-sand/40 overflow-hidden text-sm">
           {(["dia","semana","lista"] as const).map(mode => {
@@ -1038,10 +1211,10 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                               <p className="font-mono text-xs text-forest-500">{format(new Date(a.data_hora_fim), "HH:mm")}</p>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-forest truncate">{a.paciente?.nome_completo ?? "—"}</p>
+                              <p className="font-medium text-forest truncate">{privacyMode ? "● ● ●" : (a.paciente?.nome_completo ?? "—")}</p>
                               <p className="text-sm text-forest-600 truncate">
                                 com {a.profissional?.profile?.nome_completo ?? "—"}
-                                {a.paciente?.telefone && <> · {a.paciente.telefone}</>}
+                                {!privacyMode && a.paciente?.telefone && <> · {a.paciente.telefone}</>}
                               </p>
                             </div>
                             <span className={`text-xs px-3 py-1 rounded-full font-medium shrink-0 ${STATUS_BADGE_LISTA[a.status] ?? STATUS_BADGE_LISTA.agendado}`}>
@@ -1096,7 +1269,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                     </div>
                   </div>
                   <div className="relative px-0.5">
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} />
+                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} privacyMode={privacyMode} />
                   </div>
                 </div>
               );
@@ -1145,6 +1318,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                   salaId={filtroSalaId}
                   expandedId={expandedId}
                   onExpand={setExpandedId}
+                  privacyMode={privacyMode}
                 />
               </div>
             </div>
@@ -1182,7 +1356,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                             <p className="text-xs text-forest-400">{format(new Date(ag.data_hora_fim),"HH:mm")}</p>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-forest truncate">{ag.paciente?.nome_completo??"—"}</p>
+                            <p className="text-sm font-medium text-forest truncate">{privacyMode ? "● ● ●" : (ag.paciente?.nome_completo??"—")}</p>
                             <p className="text-xs text-forest-500 truncate">
                               {ag.profissional?.profile?.nome_completo}{ag.sala?` · ${ag.sala.nome}`:""}
                             </p>
@@ -1215,6 +1389,15 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
             </span>
           )}
         </div>
+      )}
+
+      {/* Espelho de agendamento */}
+      {showEspelho && (
+        <EspelhoModal
+          dia={selectedDay}
+          agendamentos={agsParaDia(selectedDay)}
+          onClose={() => setShowEspelho(false)}
+        />
       )}
 
       {/* Modal de edição */}
