@@ -434,12 +434,20 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
   const cardRef = useRef<HTMLDivElement>(null);
-  const [openUpward, setOpenUpward] = useState(false);
+  const [popupPos, setPopupPos] = useState<React.CSSProperties>({});
 
   useEffect(() => {
     if (!expanded || !cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
-    setOpenUpward(window.innerHeight - rect.bottom < 340);
+    const POPUP_WIDTH = Math.max(220, rect.width);
+    const left = Math.max(4, Math.min(rect.left - 1, window.innerWidth - POPUP_WIDTH - 8));
+    const pos: React.CSSProperties = { position: "fixed", left, width: POPUP_WIDTH, zIndex: 9999 };
+    if (window.innerHeight - rect.bottom < 360) {
+      pos.bottom = window.innerHeight - rect.top + 4;
+    } else {
+      pos.top = rect.bottom + 4;
+    }
+    setPopupPos(pos);
   }, [expanded]);
 
   const bgColor = ag.status === "faltou" ? "#dc2626" : ag.status === "cancelado" ? "#ffffff" : profHex;
@@ -452,7 +460,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
     <div
       ref={cardRef}
       style={{ ...style, backgroundColor: bgColor, borderLeftColor: profHex }}
-      className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none ${expanded ? "z-30 shadow-lg overflow-visible" : "z-10 overflow-hidden"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
+      className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none overflow-hidden ${expanded ? "z-30 shadow-lg" : "z-10"} ${pending ? "opacity-60 pointer-events-none" : ""}`}
       onClick={onExpand}
     >
       <div className="px-1.5 pt-0.5 pb-0 leading-tight">
@@ -489,11 +497,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
       {expanded && (
         <div
           className="bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden"
-          style={{
-            position: "absolute",
-            ...(openUpward ? { bottom: "calc(100% + 4px)" } : { top: "calc(100% + 4px)" }),
-            left: "-1px", right: "-1px", zIndex: 40, minWidth: 180,
-          }}
+          style={popupPos}
           onClick={e => e.stopPropagation()}
         >
           {/* Info do agendamento */}
