@@ -600,15 +600,14 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
 
   const noColor = profHex === "#ffffff";
   const bgColor =
-    ag.status === "faltou"    ? hexToRgba("#dc2626", 0.12) :
-    ag.status === "cancelado" ? "#f9f9f9" :
+    ag.status === "faltou"    ? "#dc2626" :
+    ag.status === "cancelado" ? "#f8f8f8" :
     ag.status === "ausencia"  ? "#f3f4f6" :
-    noColor ? "#ffffff" :
-    hexToRgba(profHex, 0.14);
+    noColor ? "#ffffff" : profHex;
   const borderAccent = noColor ? "#d1d5db" : profHex;
-  const borderGeneral = noColor ? "#e5e7eb" : hexToRgba(profHex, 0.30);
-  const textColor = "#1a1a1a";
-  const textMuted = "rgba(0,0,0,0.5)";
+  const borderGeneral = noColor ? "#e5e7eb" : profHex;
+  const textColor = isColorDark(bgColor) ? "#ffffff" : "#1a1a1a";
+  const textMuted = isColorDark(bgColor) ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.5)";
 
   const durationMin = Math.round((new Date(ag.data_hora_fim).getTime() - new Date(ag.data_hora_inicio).getTime()) / 60000);
 
@@ -622,9 +621,15 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
       {/* ✓ Check de presença confirmada — canto superior direito */}
       {ag.status === "confirmado" && (
         <div className="absolute top-0.5 right-1 z-10 pointer-events-none">
-          <Check className="w-3 h-3" style={{ color: "rgba(0,0,0,0.7)" }} strokeWidth={3} />
+          <Check className="w-3 h-3" style={{ color: isColorDark(bgColor) ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.75)" }} strokeWidth={3} />
         </div>
       )}
+      {/* Dot de status — canto inferior esquerdo */}
+      <div
+        title={cfg.label}
+        className={`absolute bottom-1 left-1.5 w-2 h-2 rounded-full z-10 pointer-events-none ${cfg.dot}`}
+        style={{ boxShadow: isColorDark(bgColor) ? "0 0 0 1.5px rgba(255,255,255,0.4)" : "0 0 0 1.5px rgba(0,0,0,0.1)" }}
+      />
       {/* $ Pagamento — canto inferior direito */}
       {ag.status !== "ausencia" && ag.status !== "cancelado" && (
         <div className="absolute bottom-1 right-1 z-10 pointer-events-none">
