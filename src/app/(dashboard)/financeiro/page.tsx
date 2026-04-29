@@ -58,6 +58,8 @@ export default async function FinanceiroPage({
     { data: lancamentos },
     { data: todosMes },
     { data: profissionaisList },
+    { data: agsMesRaw },
+    { data: agsPeriodoRaw },
   ] = await Promise.all([
     q,
     supabase
@@ -70,7 +72,29 @@ export default async function FinanceiroPage({
       .select("id, valor_consulta, valor_aluguel_sala, profile:profiles(nome_completo)")
       .eq("ativo", true)
       .order("id"),
+    // Atendimentos pagos do mês atual (para KPIs)
+    supabase
+      .from("agendamentos")
+      .select("valor_sessao, profissional_id")
+      .eq("pago", true)
+      .in("status", ["realizado", "finalizado"])
+      .gte("data_hora_inicio", `${mesInicio}T00:00:00.000Z`)
+      .lte("data_hora_inicio", `${mesFim}T23:59:59.999Z`),
+    // Atendimentos pagos do período filtrado (para tabela)
+    supabase
+      .from("agendamentos")
+      .select("id, data_hora_inicio, valor_sessao, forma_pagamento, aluguel_cobrado, aluguel_valor, profissional_id, profissional:profissionais(id, profile:profiles(nome_completo)), paciente:pacientes(nome_completo)")
+      .eq("pago", true)
+      .in("status", ["realizado", "finalizado"])
+      .gte("data_hora_inicio", `${filtros.periodo_inicio}T00:00:00.000Z`)
+      .lte("data_hora_inicio", `${filtros.periodo_fim}T23:59:59.999Z`)
+      .order("data_hora_inicio", { ascending: false }),
   ]);
+
+  // Mapa profissional_id → valor_consulta para fallback
+  const profValorMap = new Map(
+    (profissionaisList ?? []).map((p: any) => [p.id, Number(p.valor_consulta ?? 0)])
+  );
 
   const totaisMes = (todosMes ?? []).reduce(
     (acc: { receitaPaga: number; pendente: number; inadimplente: number; despesasMes: number }, l: any) => {
@@ -86,6 +110,14 @@ export default async function FinanceiroPage({
     },
     { receitaPaga: 0, pendente: 0, inadimplente: 0, despesasMes: 0 }
   );
+
+  // Somar receita dos atendimentos pagos ao KPI do mês
+  const receitaAtendimentosMes = (agsMesRaw ?? []).reduce(
+    (s, a: any) => s + Number(a.valor_sessao ?? profValorMap.get(a.profissional_id) ?? 0), 0
+  );
+  totaisMes.receitaPaga += receitaAtendimentosMes;
+
+  const agsPeriodo = (agsPeriodoRaw ?? []) as any[];
 
   // ── Atendimentos do profissional selecionado ──
   let profAgendamentos: any[] = [];
@@ -139,6 +171,7 @@ export default async function FinanceiroPage({
         profAgendamentos={profAgendamentos}
         profSelecionado={profSelecionado}
         profTotais={profTotais}
+        agendamentosPeriodo={agsPeriodo}
       />
     </div>
   );

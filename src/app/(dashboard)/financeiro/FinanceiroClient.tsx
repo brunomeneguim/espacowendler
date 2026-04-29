@@ -61,6 +61,18 @@ interface AgendamentoProfissional {
   paciente: { nome_completo: string } | null;
 }
 
+interface AgendamentoPago {
+  id: string;
+  data_hora_inicio: string;
+  valor_sessao: number | null;
+  forma_pagamento: string | null;
+  aluguel_cobrado: boolean;
+  aluguel_valor: number | null;
+  profissional_id: string;
+  profissional: { id: string; profile: { nome_completo: string } | null } | null;
+  paciente: { nome_completo: string } | null;
+}
+
 interface ProfTotais {
   totalSessoes: number;
   totalReceita: number;
@@ -77,6 +89,7 @@ interface Props {
   profAgendamentos: AgendamentoProfissional[];
   profSelecionado: ProfissionalItem | null;
   profTotais: ProfTotais;
+  agendamentosPeriodo: AgendamentoPago[];
 }
 
 const FORMA_LABELS: Record<string, string> = {
@@ -116,7 +129,7 @@ function KpiCard({ label, value, icon: Icon, color, bg }: {
   );
 }
 
-export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, profissionais, profAgendamentos, profSelecionado, profTotais }: Props) {
+export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, profissionais, profAgendamentos, profSelecionado, profTotais, agendamentosPeriodo }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pagarId, setPagarId] = useState<string | null>(null);
@@ -291,6 +304,65 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
           </div>
         )}
       </div>
+
+      {/* ── Atendimentos pagos no período ── */}
+      {agendamentosPeriodo.length > 0 && (
+        <div className="card p-0 overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-3 bg-green-50 border-b border-sand/30">
+            <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+              <DollarSign className="w-4 h-4 text-green-600" />
+            </div>
+            <div>
+              <p className="font-display text-sm text-forest">Atendimentos pagos no período</p>
+              <p className="text-xs text-forest-400">{agendamentosPeriodo.length} atendimento{agendamentosPeriodo.length !== 1 ? "s" : ""} · registrados via card da agenda</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-sand/20 text-left text-xs text-forest-500 uppercase tracking-wider bg-forest/5">
+                  <th className="px-5 py-3">Data</th>
+                  <th className="px-5 py-3">Paciente</th>
+                  <th className="px-5 py-3 hidden sm:table-cell">Profissional</th>
+                  <th className="px-5 py-3">Forma</th>
+                  <th className="px-5 py-3 text-right">Valor</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-sand/20">
+                {agendamentosPeriodo.map(ag => (
+                  <tr key={ag.id} className="hover:bg-cream/40 transition-colors">
+                    <td className="px-5 py-3 text-forest whitespace-nowrap">
+                      {format(new Date(ag.data_hora_inicio), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </td>
+                    <td className="px-5 py-3 text-forest">
+                      {ag.paciente?.nome_completo ?? "—"}
+                    </td>
+                    <td className="px-5 py-3 text-forest-500 text-xs hidden sm:table-cell">
+                      {(ag.profissional as any)?.profile?.nome_completo ?? "—"}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="text-xs text-green-700 font-medium">
+                        {FORMA_LABELS[ag.forma_pagamento ?? ""] ?? ag.forma_pagamento ?? "—"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-right font-medium text-green-600">
+                      +{fmt(Number(ag.valor_sessao ?? 0))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-sand/30 bg-green-50/50">
+                  <td colSpan={4} className="px-5 py-3 text-sm font-semibold text-forest">Total atendimentos</td>
+                  <td className="px-5 py-3 text-right font-bold text-green-600">
+                    +{fmt(agendamentosPeriodo.reduce((s, a) => s + Number(a.valor_sessao ?? 0), 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Atendimentos do profissional selecionado ── */}
       {profSelecionado && (
