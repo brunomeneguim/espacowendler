@@ -421,13 +421,13 @@ function PaymentForm({
       </div>
 
       {/* Método de pagamento */}
-      <div className="flex flex-wrap gap-1">
+      <div className="flex gap-1">
         {FORMAS_PAGAMENTO.map(f => (
           <button
             key={f.value}
             type="button"
             onClick={() => setForma(f.value)}
-            className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+            className={`flex-1 py-1 rounded-full text-xs font-medium transition-colors ${
               forma === f.value
                 ? "bg-forest text-white shadow-sm"
                 : "bg-gray-100 text-gray-500 hover:bg-gray-200"
@@ -561,39 +561,38 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
 
           {/* Botões de ação — linha de ícones */}
           <div className="p-2 flex flex-col gap-1">
-            <div className="flex items-center gap-1">
+            <div className="flex gap-1">
               {ativo && ag.status === "agendado" && (
-                <button title="Confirmar" onClick={() => onStatus("confirmado")} className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
+                <button title="Confirmar" onClick={() => onStatus("confirmado")} className="flex-1 flex items-center justify-center h-8 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
                   <Check className="w-4 h-4" />
                 </button>
               )}
               {ativo && ag.status === "confirmado" && (
-                <button title="Finalizar sessão" onClick={() => onStatus("finalizado")} className="flex items-center justify-center w-8 h-8 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors">
+                <button title="Finalizar sessão" onClick={() => onStatus("finalizado")} className="flex-1 flex items-center justify-center h-8 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors">
                   <Check className="w-4 h-4" />
                 </button>
               )}
               {ativo && (
                 <>
-                  <button title="Falta Cobrada" onClick={() => onStatus("faltou")} className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors">
+                  <button title="Falta Cobrada" onClick={() => onStatus("faltou")} className="flex-1 flex items-center justify-center h-8 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors">
                     <UserX className="w-4 h-4" />
                   </button>
-                  <button title="Falta Justificada" onClick={() => onStatus("cancelado")} className="flex items-center justify-center w-8 h-8 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                  <button title="Falta Justificada" onClick={() => onStatus("cancelado")} className="flex-1 flex items-center justify-center h-8 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
                     <XCircle className="w-4 h-4" />
                   </button>
                 </>
               )}
               {(ag.status === "faltou" || ag.status === "cancelado" || ag.status === "confirmado") && (
-                <button title="Desfazer" onClick={() => onStatus("agendado")} className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                <button title="Desfazer" onClick={() => onStatus("agendado")} className="flex-1 flex items-center justify-center h-8 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
                   <RotateCcw className="w-4 h-4" />
                 </button>
               )}
               {canEdit && (
                 <>
-                  <div className="flex-1" />
-                  <button title="Editar" onClick={onEdit} className="flex items-center justify-center w-8 h-8 rounded-lg bg-forest/10 text-forest hover:bg-forest/20 transition-colors">
+                  <button title="Editar" onClick={onEdit} className="flex-1 flex items-center justify-center h-8 rounded-lg bg-forest/10 text-forest hover:bg-forest/20 transition-colors">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button title="Excluir" onClick={onDelete} className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                  <button title="Excluir" onClick={onDelete} className="flex-1 flex items-center justify-center h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </>
