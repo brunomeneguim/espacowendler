@@ -598,11 +598,15 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
     };
   }, [expanded]);
 
+  const noColor = profHex === "#ffffff";
   const bgColor =
     ag.status === "faltou"    ? hexToRgba("#dc2626", 0.12) :
     ag.status === "cancelado" ? "#f9f9f9" :
     ag.status === "ausencia"  ? "#f3f4f6" :
+    noColor ? "#ffffff" :
     hexToRgba(profHex, 0.14);
+  const borderAccent = noColor ? "#d1d5db" : profHex;
+  const borderGeneral = noColor ? "#e5e7eb" : hexToRgba(profHex, 0.30);
   const textColor = "#1a1a1a";
   const textMuted = "rgba(0,0,0,0.5)";
 
@@ -611,7 +615,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
   return (
     <div
       ref={cardRef}
-      style={{ ...style, backgroundColor: bgColor, borderLeftColor: profHex, borderColor: hexToRgba(profHex, 0.30) }}
+      style={{ ...style, backgroundColor: bgColor, borderLeftColor: borderAccent, borderColor: borderGeneral }}
       className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none overflow-hidden ${expanded ? "z-30 shadow-lg" : "z-10"} ${pending ? "pointer-events-none" : ""}`}
       onClick={onExpand}
     >
@@ -891,7 +895,7 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
             ag={ag}
             style={{ top:Math.max(0,top), height, left:`${(col/total)*100}%`, width:`calc(${100/total}% - 2px)` }}
             bordaProf={profColorMap.get(ag.profissional?.id ?? "") ?? BORDA_PROF[0]}
-            profHex={profHexMap.get(ag.profissional?.id ?? "") ?? PROF_CORES[0].hex}
+            profHex={profHexMap.get(ag.profissional?.id ?? "") ?? "#ffffff"}
             profValorConsulta={profValorConsultaMap.get(ag.profissional?.id ?? "")}
             onEdit={() => onEdit(ag)}
             onDelete={() => onDelete(ag.id)}
@@ -1195,18 +1199,18 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     });
   }, [startTransition, agendamentos, profissionais]);
 
-  // Usa a cor cadastrada do profissional, ou fallback por índice
-  const profColorMap = new Map(profissionais.map((p, i) => [
+  // Usa a cor cadastrada do profissional; sem cor → branco (#ffffff)
+  const profColorMap = new Map(profissionais.map(p => [
     p.id,
-    p.cor ? getCorById(p.cor).border : BORDA_PROF[i % BORDA_PROF.length],
+    p.cor ? getCorById(p.cor).border : "border-l-gray-300",
   ]));
-  const profBgMap = new Map(profissionais.map((p, i) => [
+  const profBgMap = new Map(profissionais.map(p => [
     p.id,
-    p.cor ? getCorById(p.cor).bg : BG_PROF[i % BG_PROF.length],
+    p.cor ? getCorById(p.cor).bg : "bg-gray-300",
   ]));
-  const profHexMap = new Map(profissionais.map((p, i) => [
+  const profHexMap = new Map(profissionais.map(p => [
     p.id,
-    p.cor ? getCorById(p.cor).hex : PROF_CORES[i % PROF_CORES.length].hex,
+    p.cor ? getCorById(p.cor).hex : "#ffffff",
   ]));
   const profValorConsultaMap = new Map(profissionais.map(p => [p.id, p.valor_consulta ?? null]));
 
@@ -1593,7 +1597,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                         {itens.map(a => {
                           const ativo = a.status === "agendado" || a.status === "confirmado";
                           const isExpanded = expandedListId === a.id;
-                          const profHex = profHexMap.get(a.profissional?.id ?? "") ?? PROF_CORES[0].hex;
+                          const profHex = profHexMap.get(a.profissional?.id ?? "") ?? "#ffffff";
                           const profValorConsulta = profValorConsultaMap.get(a.profissional?.id ?? "");
                           return (
                             <li key={a.id} className="border-b border-sand/20 last:border-b-0">
@@ -1603,7 +1607,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                                 onClick={() => setExpandedListId(isExpanded ? null : a.id)}
                               >
                                 {/* Barra colorida do profissional */}
-                                <div className="w-1 h-10 rounded-full shrink-0" style={{ backgroundColor: profHex }} />
+                                <div className="w-1 h-10 rounded-full shrink-0" style={{ backgroundColor: profHex === "#ffffff" ? "#d1d5db" : profHex }} />
                                 <div className="w-14 text-center shrink-0">
                                   <p className="text-sm font-semibold text-forest">{format(new Date(a.data_hora_inicio), "HH:mm")}</p>
                                   <p className="text-xs text-forest-400">{format(new Date(a.data_hora_fim), "HH:mm")}</p>
