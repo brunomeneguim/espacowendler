@@ -762,7 +762,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
 
 // ── Slot vazio clicável ───────────────────────────────────────────
 interface ReagendarInfo {
-  pacienteId: string;
+  pacienteId?: string;
   pacienteNome: string;
   profissionalId: string;
   profissionalNome: string;
