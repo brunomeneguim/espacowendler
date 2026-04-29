@@ -47,7 +47,7 @@ interface Agendamento {
   forma_pagamento?: string | null;
   valor_sessao?: number | null;
   paciente: { id: string; nome_completo: string; telefone?: string } | null;
-  profissional: { id: string; profile: { nome_completo: string } | null } | null;
+  profissional: { id: string; cor?: string | null; profile: { nome_completo: string } | null } | null;
   sala: { id: number; nome: string } | null;
 }
 interface Profissional { id: string; cor?: string | null; valor_consulta?: number | null; duracao_consulta?: number | null; profile: { nome_completo: string } | null }
@@ -895,7 +895,7 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
             ag={ag}
             style={{ top:Math.max(0,top), height, left:`${(col/total)*100}%`, width:`calc(${100/total}% - 2px)` }}
             bordaProf={profColorMap.get(ag.profissional?.id ?? "") ?? BORDA_PROF[0]}
-            profHex={profHexMap.get(ag.profissional?.id ?? "") ?? "#ffffff"}
+            profHex={ag.profissional?.cor ? getCorById(ag.profissional.cor).hex : "#ffffff"}
             profValorConsulta={profValorConsultaMap.get(ag.profissional?.id ?? "")}
             onEdit={() => onEdit(ag)}
             onDelete={() => onDelete(ag.id)}
@@ -1597,7 +1597,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                         {itens.map(a => {
                           const ativo = a.status === "agendado" || a.status === "confirmado";
                           const isExpanded = expandedListId === a.id;
-                          const profHex = profHexMap.get(a.profissional?.id ?? "") ?? "#ffffff";
+                          const profHex = a.profissional?.cor ? getCorById(a.profissional.cor).hex : "#ffffff";
                           const profValorConsulta = profValorConsultaMap.get(a.profissional?.id ?? "");
                           return (
                             <li key={a.id} className="border-b border-sand/20 last:border-b-0">
