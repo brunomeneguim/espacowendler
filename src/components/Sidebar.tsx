@@ -23,7 +23,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
 
 // ── Quais hrefs cada role pode ver ───────────────────────────────
 const ROLE_ACCESS: Record<UserRole, string[]> = {
-  admin:       ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/equipe", "/salas", "/financeiro", "/relatorios"],
+  admin:       ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
   supervisor:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
   profissional:["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
   secretaria:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
@@ -74,10 +74,16 @@ export function Sidebar({
     return access.includes(href);
   }
 
-  // "Gerenciar Conta" é visível por padrão; só oculta se houver custom permission explicitamente false
+  // Itens de configuração: visíveis por padrão (ou para admin), respeitam custom permissions
   const podeVerConta = hasCustomPermissions
     ? (permissoes["/configuracoes/conta"]?.podeVer ?? false)
     : true;
+  const podeOcultar = hasCustomPermissions
+    ? (permissoes["/configuracoes/ocultar-informacoes"]?.podeVer ?? true)
+    : true;
+  const podeEditarSistema = hasCustomPermissions
+    ? (permissoes["/configuracoes/editar-sistema"]?.podeVer ?? isAdmin)
+    : isAdmin;
 
   const visibleItems = menuConfig
     .filter(item => isPageVisible(item.href))
@@ -248,18 +254,20 @@ export function Sidebar({
 
           {configAberto && (
             <div className="mt-0.5 ml-4 space-y-0.5">
-              <button
-                type="button"
-                onClick={() => setPrivacyMode(v => !v)}
-                className={`flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm transition-colors ${
-                  privacyMode
-                    ? "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
-                    : "text-cream/70 hover:text-cream hover:bg-cream/5"
-                }`}
-              >
-                {privacyMode ? <Eye className="w-4 h-4" strokeWidth={1.5} /> : <EyeOff className="w-4 h-4" strokeWidth={1.5} />}
-                {privacyMode ? "Mostrar informações" : "Ocultar informações"}
-              </button>
+              {podeOcultar && (
+                <button
+                  type="button"
+                  onClick={() => setPrivacyMode(v => !v)}
+                  className={`flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm transition-colors ${
+                    privacyMode
+                      ? "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+                      : "text-cream/70 hover:text-cream hover:bg-cream/5"
+                  }`}
+                >
+                  {privacyMode ? <Eye className="w-4 h-4" strokeWidth={1.5} /> : <EyeOff className="w-4 h-4" strokeWidth={1.5} />}
+                  {privacyMode ? "Mostrar informações" : "Ocultar informações"}
+                </button>
+              )}
 
               {podeVerConta && (
                 <Link
@@ -271,7 +279,7 @@ export function Sidebar({
                 </Link>
               )}
 
-              {isAdmin && !editMode && (
+              {podeEditarSistema && !editMode && (
                 <>
                   <button
                     onClick={() => { setConfigAberto(false); enterEditMode(); window.scrollTo({ top: 0, behavior: "smooth" }); }}

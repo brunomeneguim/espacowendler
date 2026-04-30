@@ -13,7 +13,7 @@ export default async function ControleAcessoPage() {
   const [{ data: profiles }, { data: todasPermissoes }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, nome_completo, email, role, ativo")
+      .select("id, nome_completo, email, role, ativo, telefone")
       .order("nome_completo"),
     supabase
       .from("permissoes_usuario")

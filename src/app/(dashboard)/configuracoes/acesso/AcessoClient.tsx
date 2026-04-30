@@ -1,22 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo, useRef } from "react";
 import {
   ShieldCheck, Loader2, Check, ChevronDown, ChevronUp,
-  RotateCcw, Eye, Pencil, AlertCircle,
+  RotateCcw, Eye, Pencil, AlertCircle, Trash2, UserPlus,
+  Search, AlertTriangle,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
-import { atualizarRole, salvarTodasPermissoes, resetarPermissoes } from "./actions";
+import {
+  atualizarRole, salvarTodasPermissoes, resetarPermissoes,
+  toggleAtivo, excluirMembro, criarUsuario, editarUsuarioCompleto,
+} from "./actions";
 
-interface Profile {
-  id: string;
-  nome_completo: string;
-  email: string;
-  role: UserRole;
-  ativo: boolean;
-}
+// ── Constantes ────────────────────────────────────────────────────────────────
 
-type PermissaoMap = Record<string, { podeVer: boolean; podeEditar: boolean }>;
+const ROLES = [
+  { value: "admin",        label: "Administrador" },
+  { value: "supervisor",   label: "Supervisor"    },
+  { value: "profissional", label: "Profissional"  },
+  { value: "secretaria",   label: "Secretaria"    },
+] as const;
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin:        "Administrador",
@@ -32,33 +35,29 @@ const ROLE_CORES: Record<UserRole, string> = {
   secretaria:   "bg-amber-100 text-amber-700 border-amber-200",
 };
 
-const ROLE_DESCRICAO: Record<UserRole, string> = {
-  admin:        "Acesso total ao sistema, incluindo configurações.",
-  supervisor:   "Gerencia pacientes, profissionais, agenda e financeiro.",
-  profissional: "Acessa sua agenda, pacientes, salas e financeiro.",
-  secretaria:   "Gerencia agenda, pacientes, salas e financeiro.",
-};
-
 const ROLE_ACCESS_DEFAULT: Record<UserRole, string[]> = {
-  admin:        ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/equipe", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta"],
-  supervisor:   ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta"],
-  profissional: ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta"],
-  secretaria:   ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta"],
+  admin:        ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/equipe", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta", "/configuracoes/acesso", "/configuracoes/metodos-pagamento", "/configuracoes/editar-sistema", "/configuracoes/ocultar-informacoes"],
+  supervisor:   ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta", "/configuracoes/ocultar-informacoes"],
+  profissional: ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta", "/configuracoes/ocultar-informacoes"],
+  secretaria:   ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta", "/configuracoes/ocultar-informacoes"],
 };
 
 const PAGINAS = [
-  { href: "/dashboard",                        label: "Dashboard",            grupo: "Principal" },
-  { href: "/pacientes",                        label: "Pacientes",            grupo: "Principal" },
-  { href: "/profissionais",                    label: "Profissionais",        grupo: "Principal" },
-  { href: "/tarefas",                          label: "Tarefas",              grupo: "Principal" },
-  { href: "/equipe",                           label: "Equipe",               grupo: "Principal" },
-  { href: "/salas",                            label: "Salas",                grupo: "Principal" },
-  { href: "/financeiro",                       label: "Financeiro",           grupo: "Principal" },
-  { href: "/relatorios",                       label: "Relatórios",           grupo: "Principal" },
-  { href: "/configuracoes/conta",              label: "Gerenciar Conta",      grupo: "Configurações" },
-  { href: "/configuracoes/acesso",             label: "Controle de Acesso",   grupo: "Configurações" },
-  { href: "/configuracoes/metodos-pagamento",  label: "Métodos de Pagamento", grupo: "Configurações" },
+  { href: "/dashboard",                          label: "Dashboard",            grupo: "Principal" },
+  { href: "/pacientes",                          label: "Pacientes",            grupo: "Principal" },
+  { href: "/profissionais",                      label: "Profissionais",        grupo: "Principal" },
+  { href: "/tarefas",                            label: "Tarefas",              grupo: "Principal" },
+  { href: "/salas",                              label: "Salas",                grupo: "Principal" },
+  { href: "/financeiro",                         label: "Financeiro",           grupo: "Principal" },
+  { href: "/relatorios",                         label: "Relatórios",           grupo: "Principal" },
+  { href: "/configuracoes/ocultar-informacoes",  label: "Ocultar Informações",  grupo: "Configurações" },
+  { href: "/configuracoes/conta",                label: "Gerenciar Conta",      grupo: "Configurações" },
+  { href: "/configuracoes/editar-sistema",       label: "Editar Sistema",       grupo: "Configurações" },
+  { href: "/configuracoes/acesso",               label: "Controle de Acesso",   grupo: "Configurações" },
+  { href: "/configuracoes/metodos-pagamento",    label: "Métodos de Pagamento", grupo: "Configurações" },
 ];
+
+type PermissaoMap = Record<string, { podeVer: boolean; podeEditar: boolean }>;
 
 function buildRoleDefaults(role: UserRole): PermissaoMap {
   const defaults = ROLE_ACCESS_DEFAULT[role] ?? [];
@@ -70,7 +69,220 @@ function buildRoleDefaults(role: UserRole): PermissaoMap {
   );
 }
 
-// ── Grid de permissões por usuário ────────────────────────────────────────────
+// ── Interfaces ────────────────────────────────────────────────────────────────
+
+interface Profile {
+  id: string;
+  nome_completo: string;
+  email: string;
+  role: UserRole;
+  ativo: boolean;
+  telefone?: string | null;
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function ToastSistema({ mensagem, visivel }: { mensagem: string; visivel: boolean }) {
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] transition-all duration-300 ease-in-out ${
+      visivel ? "translate-y-0 opacity-100" : "translate-y-16 opacity-0 pointer-events-none"
+    }`}>
+      <div className="flex items-center gap-2.5 bg-forest text-cream px-5 py-3 rounded-2xl shadow-xl text-sm font-medium">
+        <Check className="w-4 h-4 text-peach shrink-0" strokeWidth={2.5} />
+        {mensagem}
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Excluir ─────────────────────────────────────────────────────────────
+
+function ModalExcluir({ profile, onClose }: { profile: Profile; onClose: () => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+
+  function handleConfirm() {
+    startTransition(async () => {
+      const res = await excluirMembro(profile.id);
+      if (res.error) setErro(res.error);
+      else onClose();
+    });
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-rust/10 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-rust" />
+            </div>
+            <div>
+              <p className="font-display text-lg text-forest">Excluir usuário</p>
+              <p className="text-sm text-forest-600 mt-1">
+                Tem certeza que deseja excluir <strong>{profile.nome_completo}</strong>? Esta ação é irreversível e removerá o acesso ao sistema.
+              </p>
+            </div>
+          </div>
+          {erro && <p className="text-sm text-rust">{erro}</p>}
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleConfirm}
+              disabled={isPending}
+              className="flex-1 bg-rust text-cream px-4 py-2 rounded-xl text-sm font-medium hover:bg-rust/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              {isPending ? "Excluindo…" : "Sim, excluir"}
+            </button>
+            <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Modal Novo Usuário ────────────────────────────────────────────────────────
+
+function ModalNovoUsuario({ onClose }: { onClose: () => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const password = fd.get("password") as string;
+    const confirm  = fd.get("confirm_password") as string;
+    if (password !== confirm) { setErro("As senhas não coincidem."); return; }
+    setErro(null);
+    startTransition(async () => {
+      const res = await criarUsuario(fd);
+      if (res.error) setErro(res.error);
+      else onClose();
+    });
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+          <div>
+            <p className="font-display text-lg text-forest">Novo Usuário</p>
+            <p className="text-sm text-forest-500 mt-1">Preencha os dados para criar o acesso.</p>
+          </div>
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="label">Nome completo *</label>
+              <input name="nome_completo" required className="input-field" placeholder="Nome completo" />
+            </div>
+            <div>
+              <label className="label">Email *</label>
+              <input name="email" type="email" required className="input-field" placeholder="email@exemplo.com" />
+            </div>
+            <div>
+              <label className="label">Telefone</label>
+              <input name="telefone" type="tel" className="input-field" placeholder="(00) 00000-0000" />
+            </div>
+            <div>
+              <label className="label">Papel</label>
+              <select name="role" defaultValue="secretaria" className="input-field">
+                {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Senha *</label>
+              <input name="password" type="password" required minLength={6} className="input-field" placeholder="Mínimo 6 caracteres" />
+            </div>
+            <div>
+              <label className="label">Confirmar Senha *</label>
+              <input name="confirm_password" type="password" required minLength={6} className="input-field" placeholder="Repita a senha" />
+            </div>
+            {erro && <p className="text-sm text-rust">{erro}</p>}
+            <div className="flex gap-3 pt-1">
+              <button type="submit" disabled={isPending} className="btn-primary flex items-center gap-2 flex-1 justify-center">
+                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                {isPending ? "Criando…" : "Criar usuário"}
+              </button>
+              <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Modal Editar Usuário ──────────────────────────────────────────────────────
+
+function ModalEditarUsuario({ profile, onClose }: { profile: Profile; onClose: () => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setErro(null);
+    startTransition(async () => {
+      const res = await editarUsuarioCompleto(profile.id, fd);
+      if (res.error) setErro(res.error);
+      else onClose();
+    });
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+          <div>
+            <p className="font-display text-lg text-forest">Editar Usuário</p>
+            <p className="text-sm text-forest-500 mt-1">Altere os dados do membro da equipe.</p>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="label">Nome completo *</label>
+              <input name="nome_completo" required defaultValue={profile.nome_completo} className="input-field" />
+            </div>
+            <div>
+              <label className="label">Email *</label>
+              <input name="email" type="email" required defaultValue={profile.email} className="input-field" />
+            </div>
+            <div>
+              <label className="label">Telefone</label>
+              <input name="telefone" type="tel" defaultValue={profile.telefone ?? ""} className="input-field" placeholder="(00) 00000-0000" />
+            </div>
+            <div>
+              <label className="label">Papel</label>
+              <select name="role" defaultValue={profile.role} className="input-field">
+                {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Status</label>
+              <select name="ativo" defaultValue={profile.ativo ? "true" : "false"} className="input-field">
+                <option value="true">Ativo</option>
+                <option value="false">Inativo</option>
+              </select>
+            </div>
+            {erro && <p className="text-sm text-rust">{erro}</p>}
+            <div className="flex gap-3 pt-1">
+              <button type="submit" disabled={isPending} className="btn-primary flex items-center gap-2 flex-1 justify-center">
+                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
+                {isPending ? "Salvando…" : "Salvar alterações"}
+              </button>
+              <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Grid de Permissões ────────────────────────────────────────────────────────
 
 function PermissaoGrid({
   profileId,
@@ -82,16 +294,11 @@ function PermissaoGrid({
   dbPermissoes: PermissaoMap;
 }) {
   const dbHasCustom = Object.keys(dbPermissoes).length > 0;
-
-  // tudo-ou-nada: ou o usuário usa a role, ou tem um conjunto completo customizado
   const [localHasCustom, setLocalHasCustom] = useState(dbHasCustom);
   const [isActivating, setIsActivating] = useState(false);
-
-  // estado local dos checkboxes — iniciado com DB ou defaults da role
   const [localPermissoes, setLocalPermissoes] = useState<PermissaoMap>(() =>
     dbHasCustom ? { ...dbPermissoes } : buildRoleDefaults(role)
   );
-
   const [saving, startSaveTransition] = useTransition();
   const [resetting, startResetTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -99,7 +306,7 @@ function PermissaoGrid({
 
   const gridVisible = localHasCustom || isActivating;
 
-  function handleAtiviar() {
+  function handleAtivar() {
     setLocalPermissoes(buildRoleDefaults(role));
     setIsActivating(true);
     setErro(null);
@@ -116,7 +323,6 @@ function PermissaoGrid({
       const atual = prev[href] ?? { podeVer: false, podeEditar: false };
       let novoVer = atual.podeVer;
       let novoEditar = atual.podeEditar;
-
       if (campo === "podeVer") {
         novoVer = !novoVer;
         if (!novoVer) novoEditar = false;
@@ -124,7 +330,6 @@ function PermissaoGrid({
         novoEditar = !novoEditar;
         if (novoEditar) novoVer = true;
       }
-
       return { ...prev, [href]: { podeVer: novoVer, podeEditar: novoEditar } };
     });
   }
@@ -165,8 +370,7 @@ function PermissaoGrid({
 
   return (
     <div className="border-t border-sand/20 bg-cream/30 px-5 py-4 space-y-4">
-
-      {/* Cabeçalho do estado */}
+      {/* Estado atual */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {localHasCustom || isActivating ? (
@@ -185,10 +389,9 @@ function PermissaoGrid({
             </>
           )}
         </div>
-
         {!gridVisible && (
           <button
-            onClick={handleAtiviar}
+            onClick={handleAtivar}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors"
           >
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -197,7 +400,7 @@ function PermissaoGrid({
         )}
       </div>
 
-      {/* Grid de páginas */}
+      {/* Grid */}
       {gridVisible && (
         <>
           {grupos.map(grupo => (
@@ -208,12 +411,8 @@ function PermissaoGrid({
               <div className="rounded-xl border border-sand/30 overflow-hidden bg-white">
                 <div className="grid grid-cols-[1fr_64px_64px] text-[10px] text-forest-400 uppercase tracking-wider px-3 py-1.5 bg-gray-50 border-b border-sand/20">
                   <span>Página</span>
-                  <span className="flex items-center justify-center gap-1">
-                    <Eye className="w-3 h-3" /> Ver
-                  </span>
-                  <span className="flex items-center justify-center gap-1">
-                    <Pencil className="w-3 h-3" /> Editar
-                  </span>
+                  <span className="flex items-center justify-center gap-1"><Eye className="w-3 h-3" /> Ver</span>
+                  <span className="flex items-center justify-center gap-1"><Pencil className="w-3 h-3" /> Editar</span>
                 </div>
                 {PAGINAS.filter(p => p.grupo === grupo).map(({ href, label }) => {
                   const perm = localPermissoes[href] ?? { podeVer: false, podeEditar: false };
@@ -224,21 +423,13 @@ function PermissaoGrid({
                     >
                       <span className="text-sm text-forest">{label}</span>
                       <div className="flex justify-center">
-                        <input
-                          type="checkbox"
-                          checked={perm.podeVer}
-                          onChange={() => handleToggle(href, "podeVer")}
-                          className="w-4 h-4 rounded accent-forest cursor-pointer"
-                        />
+                        <input type="checkbox" checked={perm.podeVer} onChange={() => handleToggle(href, "podeVer")}
+                          className="w-4 h-4 rounded accent-forest cursor-pointer" />
                       </div>
                       <div className="flex justify-center">
-                        <input
-                          type="checkbox"
-                          checked={perm.podeEditar}
-                          onChange={() => handleToggle(href, "podeEditar")}
+                        <input type="checkbox" checked={perm.podeEditar} onChange={() => handleToggle(href, "podeEditar")}
                           disabled={!perm.podeVer}
-                          className="w-4 h-4 rounded accent-forest cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                        />
+                          className="w-4 h-4 rounded accent-forest cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" />
                       </div>
                     </div>
                   );
@@ -247,31 +438,20 @@ function PermissaoGrid({
             </div>
           ))}
 
-          {/* Erro */}
           {erro && (
             <div className="flex items-center gap-2 text-xs text-rust">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              {erro}
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />{erro}
             </div>
           )}
 
-          {/* Ações */}
           <div className="flex items-center justify-between pt-1">
-            {/* Desativar (só quando já tem custom salvo) */}
             {localHasCustom ? (
-              <button
-                onClick={handleDesativar}
-                disabled={resetting}
-                className="flex items-center gap-1.5 text-xs text-forest-400 hover:text-rust transition-colors disabled:opacity-50"
-              >
-                {resetting
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <RotateCcw className="w-3.5 h-3.5" />}
+              <button onClick={handleDesativar} disabled={resetting}
+                className="flex items-center gap-1.5 text-xs text-forest-400 hover:text-rust transition-colors disabled:opacity-50">
+                {resetting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
                 Voltar ao padrão da role
               </button>
-            ) : (
-              <div /> /* spacer */
-            )}
+            ) : <div />}
 
             <div className="flex items-center gap-2">
               {savedFeedback && (
@@ -279,25 +459,15 @@ function PermissaoGrid({
                   <Check className="w-3.5 h-3.5" /> Salvo
                 </span>
               )}
-
-              {/* Cancelar (só quando ativando pela primeira vez, sem custom salvo) */}
               {isActivating && !localHasCustom && (
-                <button
-                  onClick={handleCancelar}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-sand/40 text-forest-400 hover:text-forest transition-colors"
-                >
+                <button onClick={handleCancelar}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-sand/40 text-forest-400 hover:text-forest transition-colors">
                   Cancelar
                 </button>
               )}
-
-              <button
-                onClick={handleSalvar}
-                disabled={saving || resetting}
-                className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-lg bg-forest text-cream hover:bg-forest/90 transition-colors disabled:opacity-50 font-medium"
-              >
-                {saving
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Check className="w-3.5 h-3.5" />}
+              <button onClick={handleSalvar} disabled={saving || resetting}
+                className="flex items-center gap-1.5 text-xs px-4 py-1.5 rounded-lg bg-forest text-cream hover:bg-forest/90 transition-colors disabled:opacity-50 font-medium">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 Salvar permissões
               </button>
             </div>
@@ -308,7 +478,7 @@ function PermissaoGrid({
   );
 }
 
-// ── Componente principal ──────────────────────────────────────────────────────
+// ── Componente Principal ──────────────────────────────────────────────────────
 
 export function AcessoClient({
   profiles,
@@ -319,177 +489,254 @@ export function AcessoClient({
   currentId: string;
   permissoesPorPerfil: Record<string, PermissaoMap>;
 }) {
-  const [isPending, startTransition] = useTransition();
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [feedbacks, setFeedbacks] = useState<Record<string, string | null>>({});
+  const [busca, setBusca] = useState("");
+  const [excluindo, setExcluindo]   = useState<Profile | null>(null);
+  const [novoUsuario, setNovoUsuario] = useState(false);
+  const [editando, setEditando]     = useState<Profile | null>(null);
+  const [toast, setToast]           = useState<string | null>(null);
+  const [toastVisivel, setToastVisivel] = useState(false);
+  const [expanded, setExpanded]     = useState<Set<string>>(new Set());
   const [localRoles, setLocalRoles] = useState<Record<string, UserRole>>(
     () => Object.fromEntries(profiles.map(p => [p.id, p.role]))
   );
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [localAtivo, setLocalAtivo] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(profiles.map(p => [p.id, p.ativo]))
+  );
+  const [pendingRole, setPendingRole] = useState<string | null>(null);
+  const [pendingAtivo, setPendingAtivo] = useState<string | null>(null);
+  const [roleErrors, setRoleErrors] = useState<Record<string, string | null>>({});
+  const [isPendingRole, startRoleTransition] = useTransition();
+  const [isPendingAtivo, startAtivoTransition] = useTransition();
+
+  function mostrarToast(msg: string) {
+    setToast(msg);
+    setToastVisivel(true);
+    setTimeout(() => setToastVisivel(false), 2500);
+    setTimeout(() => setToast(null), 3000);
+  }
 
   function toggleExpanded(id: string) {
     setExpanded(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
 
   function handleRoleChange(profileId: string, novoRole: UserRole) {
-    if (profileId === currentId) return;
-    setPendingId(profileId);
-    setFeedbacks(prev => ({ ...prev, [profileId]: null }));
-    startTransition(async () => {
+    setPendingRole(profileId);
+    setRoleErrors(prev => ({ ...prev, [profileId]: null }));
+    startRoleTransition(async () => {
       const res = await atualizarRole(profileId, novoRole);
-      setPendingId(null);
+      setPendingRole(null);
       if (res.error) {
-        setFeedbacks(prev => ({ ...prev, [profileId]: res.error }));
+        setRoleErrors(prev => ({ ...prev, [profileId]: res.error }));
       } else {
         setLocalRoles(prev => ({ ...prev, [profileId]: novoRole }));
-        setFeedbacks(prev => ({ ...prev, [profileId]: "ok" }));
-        setTimeout(() => setFeedbacks(prev => ({ ...prev, [profileId]: null })), 2000);
+        mostrarToast("Role atualizado!");
       }
     });
   }
 
-  const ativos   = profiles.filter(p => p.ativo);
-  const inativos = profiles.filter(p => !p.ativo);
+  function handleToggleAtivo(profileId: string) {
+    const novoAtivo = !localAtivo[profileId];
+    setPendingAtivo(profileId);
+    startAtivoTransition(async () => {
+      const res = await toggleAtivo(profileId, novoAtivo);
+      setPendingAtivo(null);
+      if (!res.error) {
+        setLocalAtivo(prev => ({ ...prev, [profileId]: novoAtivo }));
+        mostrarToast(novoAtivo ? "Usuário ativado!" : "Usuário desativado!");
+      }
+    });
+  }
+
+  const filtrados = useMemo(() =>
+    profiles.filter(p =>
+      !busca ||
+      p.nome_completo.toLowerCase().includes(busca.toLowerCase()) ||
+      p.email.toLowerCase().includes(busca.toLowerCase())
+    ), [profiles, busca]);
+
+  const ativos   = filtrados.filter(p => localAtivo[p.id] ?? p.ativo);
+  const inativos = filtrados.filter(p => !(localAtivo[p.id] ?? p.ativo));
+
+  function renderRow(p: Profile) {
+    const isMe       = p.id === currentId;
+    const isExpanded = expanded.has(p.id);
+    const currentRole = localRoles[p.id] ?? p.role;
+    const ativo = localAtivo[p.id] ?? p.ativo;
+    const isLoadingRole = pendingRole === p.id && isPendingRole;
+    const isLoadingAtivo = pendingAtivo === p.id && isPendingAtivo;
+    const roleError = roleErrors[p.id];
+
+    return (
+      <li key={p.id}>
+        <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-cream/20 transition-colors flex-wrap">
+          {/* Avatar */}
+          <div className="w-9 h-9 rounded-full bg-forest/10 flex items-center justify-center shrink-0">
+            <span className="text-sm font-semibold text-forest">
+              {p.nome_completo.charAt(0).toUpperCase()}
+            </span>
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-forest truncate">
+              {p.nome_completo}
+              {isMe && <span className="ml-2 text-[10px] bg-forest/10 text-forest px-1.5 py-0.5 rounded-full">você</span>}
+            </p>
+            <p className="text-xs text-forest-400 truncate">{p.email}</p>
+          </div>
+
+          {isMe ? (
+            /* Próprio usuário: só badges */
+            <div className="flex items-center gap-2 shrink-0">
+              <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${ROLE_CORES[currentRole]}`}>
+                {ROLE_LABELS[currentRole]}
+              </span>
+              <span className="text-xs text-forest-400">● Ativo</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {/* Role select */}
+              <div className="flex items-center gap-1.5">
+                {isLoadingRole && <Loader2 className="w-3.5 h-3.5 animate-spin text-forest-400" />}
+                <select
+                  value={currentRole}
+                  onChange={e => handleRoleChange(p.id, e.target.value as UserRole)}
+                  disabled={isLoadingRole}
+                  className="text-sm border border-sand/40 rounded-lg px-2.5 py-1.5 bg-white text-forest focus:outline-none focus:ring-2 focus:ring-forest/20 hover:border-forest/30 transition-colors"
+                >
+                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+
+              {/* Ativo toggle */}
+              <button
+                onClick={() => handleToggleAtivo(p.id)}
+                disabled={isLoadingAtivo}
+                title={ativo ? "Clique para desativar" : "Clique para ativar"}
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-50 ${
+                  ativo
+                    ? "bg-green-50 border-green-200 text-green-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                    : "bg-red-50 border-red-200 text-red-600 hover:bg-green-50 hover:border-green-200 hover:text-green-700"
+                }`}
+              >
+                {isLoadingAtivo
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+                {ativo ? "Ativo" : "Inativo"}
+              </button>
+
+              {/* Editar */}
+              <button
+                onClick={() => setEditando(p)}
+                title="Editar usuário"
+                className="p-1.5 rounded-lg border border-sand/40 hover:bg-forest/5 text-forest-400 hover:text-forest transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Excluir */}
+              <button
+                onClick={() => setExcluindo(p)}
+                title="Excluir usuário"
+                className="p-1.5 rounded-lg border border-sand/40 hover:bg-rust/5 text-forest-400 hover:text-rust transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Permissões */}
+              <button
+                onClick={() => toggleExpanded(p.id)}
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors shrink-0 ${
+                  isExpanded
+                    ? "bg-forest text-cream border-forest"
+                    : "border-sand/40 text-forest-400 hover:border-forest/30 hover:text-forest"
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Permissões
+                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+
+              {roleError && (
+                <p className="text-xs text-rust w-full text-right">{roleError}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {isExpanded && !isMe && (
+          <PermissaoGrid
+            profileId={p.id}
+            role={currentRole}
+            dbPermissoes={permissoesPorPerfil[p.id] ?? {}}
+          />
+        )}
+      </li>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Legenda de roles */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {(Object.entries(ROLE_LABELS) as [UserRole, string][]).map(([role, label]) => (
-          <div key={role} className={`rounded-xl border px-3 py-2.5 ${ROLE_CORES[role]}`}>
-            <p className="text-xs font-semibold">{label}</p>
-            <p className="text-[11px] opacity-75 mt-0.5 leading-tight">{ROLE_DESCRICAO[role]}</p>
-          </div>
-        ))}
-      </div>
+      <ToastSistema mensagem={toast ?? ""} visivel={toastVisivel} />
+      {excluindo  && <ModalExcluir   profile={excluindo} onClose={() => setExcluindo(null)} />}
+      {novoUsuario && <ModalNovoUsuario onClose={() => setNovoUsuario(false)} />}
+      {editando   && <ModalEditarUsuario profile={editando} onClose={() => setEditando(null)} />}
 
-      {/* Usuários ativos */}
-      <div className="card p-0 overflow-hidden">
-        <div className="px-5 py-3 bg-gray-50 border-b border-sand/20">
-          <p className="text-xs font-semibold text-forest-600 uppercase tracking-wider">
-            Usuários ativos ({ativos.length})
-          </p>
+      {/* Barra de busca + botão */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-forest-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Buscar por nome ou e-mail…"
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            className="input-field pl-9 h-9 text-sm"
+          />
         </div>
-        <ul className="divide-y divide-sand/20">
-          {ativos.map(p => {
-            const isMe = p.id === currentId;
-            const isLoading = pendingId === p.id && isPending;
-            const feedback = feedbacks[p.id];
-            const currentRole = localRoles[p.id] ?? p.role;
-            const isExpanded = expanded.has(p.id);
-
-            return (
-              <li key={p.id}>
-                <div className="flex items-center gap-4 px-5 py-3.5 hover:bg-cream/20 transition-colors">
-                  {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-forest/10 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-semibold text-forest">
-                      {p.nome_completo.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-forest truncate">
-                      {p.nome_completo}
-                      {isMe && (
-                        <span className="ml-2 text-[10px] bg-forest/10 text-forest px-1.5 py-0.5 rounded-full">
-                          você
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-forest-400 truncate">{p.email}</p>
-                  </div>
-
-                  {/* Role selector */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-forest-400" />
-                    ) : feedback === "ok" ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : null}
-                    <select
-                      value={currentRole}
-                      onChange={e => handleRoleChange(p.id, e.target.value as UserRole)}
-                      disabled={isMe || isLoading}
-                      className={`text-sm border rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-forest/20 transition-colors ${
-                        isMe
-                          ? "border-sand/30 text-forest-400 cursor-not-allowed"
-                          : "border-sand/40 text-forest hover:border-forest/30"
-                      }`}
-                    >
-                      {(Object.entries(ROLE_LABELS) as [UserRole, string][]).map(([role, label]) => (
-                        <option key={role} value={role}>{label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Toggle permissões */}
-                  {!isMe && (
-                    <button
-                      onClick={() => toggleExpanded(p.id)}
-                      className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors shrink-0 ${
-                        isExpanded
-                          ? "bg-forest text-cream border-forest"
-                          : "border-sand/40 text-forest-400 hover:border-forest/30 hover:text-forest"
-                      }`}
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      Permissões
-                      {isExpanded
-                        ? <ChevronUp className="w-3 h-3" />
-                        : <ChevronDown className="w-3 h-3" />}
-                    </button>
-                  )}
-
-                  {feedback && feedback !== "ok" && (
-                    <p className="text-xs text-rust shrink-0 max-w-36 text-right">{feedback}</p>
-                  )}
-                </div>
-
-                {isExpanded && !isMe && (
-                  <PermissaoGrid
-                    profileId={p.id}
-                    role={currentRole}
-                    dbPermissoes={permissoesPorPerfil[p.id] ?? {}}
-                  />
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <button
+          onClick={() => setNovoUsuario(true)}
+          className="btn-primary flex items-center gap-2 shrink-0"
+        >
+          <UserPlus className="w-4 h-4" />
+          Novo Usuário
+        </button>
       </div>
 
-      {/* Usuários inativos */}
+      {/* Ativos */}
+      {ativos.length > 0 && (
+        <div className="card p-0 overflow-hidden">
+          <div className="px-5 py-3 bg-gray-50 border-b border-sand/20">
+            <p className="text-xs font-semibold text-forest-600 uppercase tracking-wider">
+              Usuários ativos ({ativos.length})
+            </p>
+          </div>
+          <ul className="divide-y divide-sand/20">
+            {ativos.map(renderRow)}
+          </ul>
+        </div>
+      )}
+
+      {/* Inativos */}
       {inativos.length > 0 && (
-        <div className="card p-0 overflow-hidden opacity-60">
+        <div className="card p-0 overflow-hidden opacity-70">
           <div className="px-5 py-3 bg-gray-50 border-b border-sand/20">
             <p className="text-xs font-semibold text-forest-600 uppercase tracking-wider">
               Usuários inativos ({inativos.length})
             </p>
           </div>
           <ul className="divide-y divide-sand/20">
-            {inativos.map(p => (
-              <li key={p.id} className="flex items-center gap-4 px-5 py-3 text-forest-400">
-                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                  <span className="text-sm font-semibold">{p.nome_completo.charAt(0).toUpperCase()}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{p.nome_completo}</p>
-                  <p className="text-xs truncate">{p.email}</p>
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full border ${ROLE_CORES[p.role]}`}>
-                  {ROLE_LABELS[p.role]}
-                </span>
-              </li>
-            ))}
+            {inativos.map(renderRow)}
           </ul>
         </div>
+      )}
+
+      {filtrados.length === 0 && (
+        <p className="text-center text-sm text-forest-400 py-8">Nenhum usuário encontrado.</p>
       )}
     </div>
   );
