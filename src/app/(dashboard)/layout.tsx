@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { PrivacyProvider } from "./PrivacyContext";
+import { PermissoesProvider } from "./PermissoesContext";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -29,21 +30,32 @@ export default async function DashboardLayout({
     }
   }
 
-  // Fetch menu config (ordered)
-  const { data: menuConfig } = await supabase
-    .from("menu_config")
-    .select("id, href, label, icon_name, ordem")
-    .order("ordem", { ascending: true });
+  const [{ data: menuConfig }, { data: permissoesData }] = await Promise.all([
+    supabase
+      .from("menu_config")
+      .select("id, href, label, icon_name, ordem")
+      .order("ordem", { ascending: true }),
+    supabase
+      .from("permissoes_usuario")
+      .select("pagina, pode_ver, pode_editar")
+      .eq("profile_id", profile.id),
+  ]);
+
+  const permissoes = Object.fromEntries(
+    (permissoesData ?? []).map(p => [p.pagina, { podeVer: p.pode_ver, podeEditar: p.pode_editar }])
+  );
 
   return (
     <div className="flex min-h-screen bg-cream">
       <PrivacyProvider>
-        <Sidebar
-          role={profile.role}
-          nome={profile.nome_completo}
-          menuConfig={(menuConfig as any) ?? []}
-        />
-        <main className="flex-1 min-w-0">{children}</main>
+        <PermissoesProvider permissoes={permissoes}>
+          <Sidebar
+            role={profile.role}
+            nome={profile.nome_completo}
+            menuConfig={(menuConfig as any) ?? []}
+          />
+          <main className="flex-1 min-w-0">{children}</main>
+        </PermissoesProvider>
       </PrivacyProvider>
     </div>
   );

@@ -14,6 +14,7 @@ import { signOut } from "@/app/(auth)/actions";
 import { salvarMenuConfig } from "@/app/(dashboard)/menuConfigActions";
 import type { MenuItem } from "@/app/(dashboard)/menuConfigActions";
 import { usePrivacyMode } from "@/app/(dashboard)/PrivacyContext";
+import { usePermissoes } from "@/app/(dashboard)/PermissoesContext";
 
 // ── Mapeamento de ícones (string → componente) ────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -57,6 +58,7 @@ export function Sidebar({
   const dragIndexRef = useRef<number | null>(null);
 
   const { privacyMode, setPrivacyMode } = usePrivacyMode();
+  const { permissoes, hasCustomPermissions } = usePermissoes();
 
   const isAdmin = role === "admin";
   const access = ROLE_ACCESS[role] ?? ROLE_ACCESS.profissional;
@@ -67,9 +69,18 @@ export function Sidebar({
     setConfigAberto(false);
   }, [pathname]);
 
-  // Filter and sort menu items based on role access
+  function isPageVisible(href: string): boolean {
+    if (hasCustomPermissions) return permissoes[href]?.podeVer ?? false;
+    return access.includes(href);
+  }
+
+  // "Gerenciar Conta" é visível por padrão; só oculta se houver custom permission explicitamente false
+  const podeVerConta = hasCustomPermissions
+    ? (permissoes["/configuracoes/conta"]?.podeVer ?? false)
+    : true;
+
   const visibleItems = menuConfig
-    .filter(item => access.includes(item.href))
+    .filter(item => isPageVisible(item.href))
     .sort((a, b) => a.ordem - b.ordem);
 
   function enterEditMode() {
@@ -250,13 +261,15 @@ export function Sidebar({
                 {privacyMode ? "Mostrar informações" : "Ocultar informações"}
               </button>
 
-              <Link
-                href="/configuracoes/conta"
-                className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
-              >
-                <UserCircle className="w-4 h-4" strokeWidth={1.5} />
-                Gerenciar Conta
-              </Link>
+              {podeVerConta && (
+                <Link
+                  href="/configuracoes/conta"
+                  className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
+                >
+                  <UserCircle className="w-4 h-4" strokeWidth={1.5} />
+                  Gerenciar Conta
+                </Link>
+              )}
 
               {isAdmin && !editMode && (
                 <>
