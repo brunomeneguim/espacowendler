@@ -34,12 +34,14 @@ function SearchableSelect({
   placeholder,
   defaultId,
   defaultLabel,
+  readOnly,
 }: {
   name: string;
   items: SearchItem[];
   placeholder: string;
   defaultId?: string;
   defaultLabel?: string;
+  readOnly?: boolean;
 }) {
   const defaultItem = items.find(i => i.id === defaultId);
   const [selectedId, setSelectedId]       = useState(defaultId ?? "");
@@ -72,6 +74,18 @@ function SearchableSelect({
     setSelectedLabel("");
     setQuery("");
     setOpen(false);
+  }
+
+  // Modo somente-leitura (campos pré-preenchidos do reagendar)
+  if (readOnly) {
+    const displayLabel = selectedLabel || defaultLabel || "";
+    return (
+      <div className="input-field flex items-center gap-2 cursor-not-allowed bg-sand/20">
+        <input type="hidden" name={name} value={selectedId} />
+        <span className="flex-1 text-sm text-forest truncate">{displayLabel}</span>
+        <span className="text-xs text-forest-400 shrink-0">Preenchido automaticamente</span>
+      </div>
+    );
   }
 
   return (
@@ -328,6 +342,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
             items={profsItems}
             placeholder="Digite o nome do profissional…"
             defaultId={defaultProfissionalId}
+            readOnly={!!encaixeId}
           />
         )}
       </div>
@@ -350,15 +365,18 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
                   placeholder="Digite o nome do paciente…"
                   defaultId={defaultPacienteId}
                   defaultLabel={defaultPacienteNome}
+                  readOnly={!!encaixeId}
                 />
               </div>
-              <Link
-                href="/pacientes/novo?from=agenda"
-                className="shrink-0 flex items-center justify-center w-10 rounded-lg border border-sand/40 hover:bg-forest/5 text-forest-500 hover:text-forest transition-colors"
-                title="Cadastrar novo paciente"
-              >
-                <UserPlus className="w-4 h-4" />
-              </Link>
+              {!encaixeId && (
+                <Link
+                  href="/pacientes/novo?from=agenda"
+                  className="shrink-0 flex items-center justify-center w-10 rounded-lg border border-sand/40 hover:bg-forest/5 text-forest-500 hover:text-forest transition-colors"
+                  title="Cadastrar novo paciente"
+                >
+                  <UserPlus className="w-4 h-4" />
+                </Link>
+              )}
             </div>
           )}
         </div>

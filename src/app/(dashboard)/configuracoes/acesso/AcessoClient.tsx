@@ -47,15 +47,17 @@ const ROLE_ACCESS_DEFAULT: Record<UserRole, string[]> = {
 };
 
 const PAGINAS = [
-  { href: "/dashboard",           label: "Dashboard",         grupo: "Principal" },
-  { href: "/pacientes",           label: "Pacientes",         grupo: "Principal" },
-  { href: "/profissionais",       label: "Profissionais",     grupo: "Principal" },
-  { href: "/tarefas",             label: "Tarefas",           grupo: "Principal" },
-  { href: "/equipe",              label: "Equipe",            grupo: "Principal" },
-  { href: "/salas",               label: "Salas",             grupo: "Principal" },
-  { href: "/financeiro",          label: "Financeiro",        grupo: "Principal" },
-  { href: "/relatorios",          label: "Relatórios",        grupo: "Principal" },
-  { href: "/configuracoes/conta", label: "Gerenciar Conta",   grupo: "Configurações" },
+  { href: "/dashboard",                        label: "Dashboard",            grupo: "Principal" },
+  { href: "/pacientes",                        label: "Pacientes",            grupo: "Principal" },
+  { href: "/profissionais",                    label: "Profissionais",        grupo: "Principal" },
+  { href: "/tarefas",                          label: "Tarefas",              grupo: "Principal" },
+  { href: "/equipe",                           label: "Equipe",               grupo: "Principal" },
+  { href: "/salas",                            label: "Salas",                grupo: "Principal" },
+  { href: "/financeiro",                       label: "Financeiro",           grupo: "Principal" },
+  { href: "/relatorios",                       label: "Relatórios",           grupo: "Principal" },
+  { href: "/configuracoes/conta",              label: "Gerenciar Conta",      grupo: "Configurações" },
+  { href: "/configuracoes/acesso",             label: "Controle de Acesso",   grupo: "Configurações" },
+  { href: "/configuracoes/metodos-pagamento",  label: "Métodos de Pagamento", grupo: "Configurações" },
 ];
 
 function buildRoleDefaults(role: UserRole): PermissaoMap {
