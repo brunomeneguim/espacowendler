@@ -43,7 +43,7 @@ const ROLE_ACCESS_DEFAULT: Record<UserRole, string[]> = {
 };
 
 const PAGINAS = [
-  { href: "/dashboard",                          label: "Dashboard",            grupo: "Principal" },
+  { href: "/dashboard",                          label: "Agenda",               grupo: "Principal" },
   { href: "/pacientes",                          label: "Pacientes",            grupo: "Principal" },
   { href: "/profissionais",                      label: "Profissionais",        grupo: "Principal" },
   { href: "/tarefas",                            label: "Tarefas",              grupo: "Principal" },
@@ -52,7 +52,7 @@ const PAGINAS = [
   { href: "/relatorios",                         label: "Relatórios",           grupo: "Principal" },
   { href: "/configuracoes/ocultar-informacoes",  label: "Ocultar Informações",  grupo: "Configurações" },
   { href: "/configuracoes/conta",                label: "Gerenciar Conta",      grupo: "Configurações" },
-  { href: "/configuracoes/editar-sistema",       label: "Editar Sistema",       grupo: "Configurações" },
+  { href: "/configuracoes/editar-sistema",       label: "Editar Sidebar",       grupo: "Configurações" },
   { href: "/configuracoes/acesso",               label: "Controle de Acesso",   grupo: "Configurações" },
   { href: "/configuracoes/metodos-pagamento",    label: "Métodos de Pagamento", grupo: "Configurações" },
 ];

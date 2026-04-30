@@ -7,12 +7,31 @@ export async function adicionarEncaixeDireto(
   paciente_nome: string,
   profissional_id: string | null,
   telefone?: string | null
-): Promise<{ error: string | null; id: string | null }> {
+): Promise<{ error: string | null; id: string | null; jaExistia?: boolean }> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!paciente_nome.trim()) return { error: "Nome do paciente é obrigatório.", id: null };
+  const nome = paciente_nome.trim();
+  if (!nome) return { error: "Nome do paciente é obrigatório.", id: null };
+
+  // ── Verificar duplicata: mesmo nome (case-insensitive) + mesmo profissional ──
+  let dupeQuery = supabase
+    .from("lista_encaixe")
+    .select("id")
+    .eq("ativo", true)
+    .ilike("paciente_nome", nome);
+  if (profissional_id) {
+    dupeQuery = dupeQuery.eq("profissional_id", profissional_id);
+  } else {
+    dupeQuery = dupeQuery.is("profissional_id", null);
+  }
+  const { data: existente } = await dupeQuery.maybeSingle();
+  if (existente?.id) {
+    // Já está na lista — retorna o id existente sem inserir novamente
+    return { error: null, id: existente.id, jaExistia: true };
+  }
+
   const { data, error } = await supabase.from("lista_encaixe").insert({
-    paciente_nome: paciente_nome.trim(),
+    paciente_nome: nome,
     profissional_id: profissional_id || null,
     telefone: telefone || null,
     created_by: user?.id,
@@ -23,7 +42,7 @@ export async function adicionarEncaixeDireto(
   return { error: null, id: data?.id ?? null };
 }
 
-export async function adicionarEncaixe(formData: FormData): Promise<{ error: string | null }> {
+export async function adicionarEncaixe(formData: FormData): Promise<{ error: string | null; id: string | null }> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -32,20 +51,20 @@ export async function adicionarEncaixe(formData: FormData): Promise<{ error: str
   const observacoes     = (formData.get("observacoes") as string) || null;
   const profissional_id = (formData.get("profissional_id") as string) || null;
 
-  if (!paciente_nome) return { error: "Nome do paciente é obrigatório." };
+  if (!paciente_nome) return { error: "Nome do paciente é obrigatório.", id: null };
 
-  const { error } = await supabase.from("lista_encaixe").insert({
+  const { data, error } = await supabase.from("lista_encaixe").insert({
     paciente_nome,
     telefone,
     observacoes,
     profissional_id,
     created_by: user?.id,
     ativo: true,
-  });
+  }).select("id").single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: error.message, id: null };
   revalidatePath("/dashboard");
-  return { error: null };
+  return { error: null, id: data?.id ?? null };
 }
 
 export async function removerEncaixe(id: string): Promise<{ error: string | null }> {

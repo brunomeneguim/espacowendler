@@ -3,16 +3,7 @@
 import { useState, useTransition } from "react";
 import { UserPlus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Phone, FileText, User, Pencil, Check, X, CalendarPlus } from "lucide-react";
 import { adicionarEncaixe, removerEncaixe, editarEncaixe } from "./listaEncaixeActions";
-
-interface Encaixe {
-  id: string;
-  paciente_nome: string;
-  telefone: string | null;
-  observacoes: string | null;
-  profissional_id: string | null;
-  created_at: string;
-  profissional?: { profile: { nome_completo: string } | null } | null;
-}
+import type { Encaixe } from "./DashboardContent";
 
 interface Profissional {
   id: string;
@@ -28,9 +19,12 @@ interface ReagendarInfo {
 }
 
 interface Props {
-  encaixes: Encaixe[];
+  encaixes: Encaixe[];           // controlado pelo pai (DashboardContent)
   profissionais: Profissional[];
   onReagendar?: (info: ReagendarInfo) => void;
+  onAddEncaixe: (enc: Encaixe) => void;
+  onRemoveEncaixe: (id: string) => void;
+  onUpdateEncaixe: (enc: Encaixe) => void;
 }
 
 function maskPhone(v: string) {
@@ -43,9 +37,8 @@ function maskPhone(v: string) {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-export function ListaEncaixe({ encaixes: initialEncaixes, profissionais, onReagendar }: Props) {
+export function ListaEncaixe({ encaixes, profissionais, onReagendar, onAddEncaixe, onRemoveEncaixe, onUpdateEncaixe }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [encaixes, setEncaixes] = useState(initialEncaixes);
   const [aberto, setAberto] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [busca, setBusca] = useState("");
@@ -94,14 +87,18 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais, onReage
         profissional_id: editProfId || null,
       });
       if (res.error) { setEditErro(res.error); return; }
-      setEncaixes(prev => prev.map(e => e.id === id ? {
-        ...e,
-        paciente_nome: editNome.trim(),
-        telefone: editTel || null,
-        observacoes: editObs || null,
-        profissional_id: editProfId || null,
-        profissional: prof ? { profile: prof.profile } : null,
-      } : e));
+      // Notifica pai com item atualizado
+      const encAtual = encaixes.find(e => e.id === id);
+      if (encAtual) {
+        onUpdateEncaixe({
+          ...encAtual,
+          paciente_nome: editNome.trim(),
+          telefone: editTel || null,
+          observacoes: editObs || null,
+          profissional_id: editProfId || null,
+          profissional: prof ? { profile: prof.profile } : null,
+        });
+      }
       setEditandoId(null);
     });
   }
@@ -115,15 +112,16 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais, onReage
       if (res.error) { setErro(res.error); return; }
       const profId = fd.get("profissional_id") as string;
       const prof = profissionais.find(p => p.id === profId) ?? null;
-      setEncaixes(prev => [...prev, {
-        id: crypto.randomUUID(),
+      // Notifica pai com novo item (usa ID real do servidor)
+      onAddEncaixe({
+        id: res.id ?? crypto.randomUUID(),
         paciente_nome: fd.get("paciente_nome") as string,
         telefone: (fd.get("telefone") as string) || null,
         observacoes: (fd.get("observacoes") as string) || null,
         profissional_id: profId || null,
         created_at: new Date().toISOString(),
         profissional: prof ? { profile: prof.profile } : null,
-      }]);
+      });
       setShowForm(false);
       setTelefone("");
       (e.target as HTMLFormElement).reset();
@@ -131,7 +129,8 @@ export function ListaEncaixe({ encaixes: initialEncaixes, profissionais, onReage
   }
 
   function handleRemover(id: string) {
-    setEncaixes(prev => prev.filter(e => e.id !== id));
+    // Otimista: remove do pai imediatamente
+    onRemoveEncaixe(id);
     startTransition(async () => { await removerEncaixe(id); });
   }
 

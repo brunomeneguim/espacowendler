@@ -6,11 +6,18 @@ export default async function TarefasPage() {
   const supabase = createClient();
   const profile = await getCurrentProfile();
 
+  // ── Filtro de tarefas por usuário ────────────────────────────────
+  const isAdmin = ["admin", "supervisor"].includes(profile?.role ?? "");
+
   const [{ data: tarefasRaw }, { data: postits }, { data: profiles }] = await Promise.all([
-    supabase
-      .from("tarefas")
-      .select("id, titulo, descricao, concluida, prioridade, data_vencimento, criado_em, concluida_em, criado_por, atribuido_para, repeticao, criador:profiles!tarefas_criado_por_fkey(nome_completo), responsavel:profiles!tarefas_atribuido_para_fkey(nome_completo)")
-      .order("criado_em", { ascending: false }),
+    (() => {
+      let q = supabase
+        .from("tarefas")
+        .select("id, titulo, descricao, concluida, prioridade, data_vencimento, criado_em, concluida_em, criado_por, atribuido_para, repeticao, criador:profiles!tarefas_criado_por_fkey(nome_completo), responsavel:profiles!tarefas_atribuido_para_fkey(nome_completo)")
+        .order("criado_em", { ascending: false });
+      if (!isAdmin) q = q.or(`criado_por.eq.${profile.id},atribuido_para.eq.${profile.id}`);
+      return q;
+    })(),
     supabase
       .from("postits")
       .select("id, conteudo, cor, criado_em, criado_por, criador:profiles!postits_criado_por_fkey(nome_completo)")
@@ -51,10 +58,14 @@ export default async function TarefasPage() {
   }
 
   const { data: tarefas } = idsParaResetar.length > 0
-    ? await supabase
-        .from("tarefas")
-        .select("id, titulo, descricao, concluida, prioridade, data_vencimento, criado_em, concluida_em, criado_por, atribuido_para, repeticao, criador:profiles!tarefas_criado_por_fkey(nome_completo), responsavel:profiles!tarefas_atribuido_para_fkey(nome_completo)")
-        .order("criado_em", { ascending: false })
+    ? await (() => {
+        let q = supabase
+          .from("tarefas")
+          .select("id, titulo, descricao, concluida, prioridade, data_vencimento, criado_em, concluida_em, criado_por, atribuido_para, repeticao, criador:profiles!tarefas_criado_por_fkey(nome_completo), responsavel:profiles!tarefas_atribuido_para_fkey(nome_completo)")
+          .order("criado_em", { ascending: false });
+        if (!isAdmin) q = q.or(`criado_por.eq.${profile.id},atribuido_para.eq.${profile.id}`);
+        return q;
+      })()
     : { data: tarefasRaw };
 
   // ── Aniversários — criar lembretes automáticos ─────────────────

@@ -43,10 +43,14 @@ function SearchableSelect({
   defaultLabel?: string;
   readOnly?: boolean;
 }) {
-  const defaultItem = items.find(i => i.id === defaultId);
-  const [selectedId, setSelectedId]       = useState(defaultId ?? "");
+  // Se não há defaultId mas há defaultLabel, tenta encontrar o item pelo nome
+  const defaultItem = items.find(i =>
+    (defaultId && i.id === defaultId) ||
+    (!defaultId && defaultLabel && i.label.toLowerCase() === defaultLabel.toLowerCase())
+  );
+  const [selectedId, setSelectedId]       = useState(defaultItem?.id ?? defaultId ?? "");
   const [selectedLabel, setSelectedLabel] = useState(defaultItem?.label ?? "");
-  const [query, setQuery]                 = useState(!defaultId && defaultLabel ? defaultLabel : "");
+  const [query, setQuery]                 = useState(!defaultItem && !defaultId && defaultLabel ? defaultLabel : "");
   const [open, setOpen]                   = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -80,10 +84,9 @@ function SearchableSelect({
   if (readOnly) {
     const displayLabel = selectedLabel || defaultLabel || "";
     return (
-      <div className="input-field flex items-center gap-2 cursor-not-allowed bg-sand/20">
+      <div className="input-field flex items-center gap-2 bg-sand/20 cursor-default">
         <input type="hidden" name={name} value={selectedId} />
         <span className="flex-1 text-sm text-forest truncate">{displayLabel}</span>
-        <span className="text-xs text-forest-400 shrink-0">Preenchido automaticamente</span>
       </div>
     );
   }

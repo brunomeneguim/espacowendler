@@ -23,6 +23,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
 }
 import { atualizarStatusAgendamento, atualizarAgendamento, deletarAgendamentoClient, verificarHorarioIndisponivel, marcarPagamentoAgendamento } from "../agenda/actions";
 import { adicionarEncaixeDireto } from "./listaEncaixeActions";
+import type { Encaixe } from "./DashboardContent";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
 import { usePrivacyMode } from "@/app/(dashboard)/PrivacyContext";
 
@@ -75,8 +76,10 @@ interface Props {
   // Reagendar externo (controlado por DashboardContent)
   reagendarInfo?: ReagendarInfo | null;
   onSetReagendarInfo?: (info: ReagendarInfo | null) => void;
+  // Lista de encaixe atual (para desfazer mesmo após page refresh)
+  encaixes?: Encaixe[];
   // Callbacks para sincronizar lista de encaixe
-  onAddEncaixe?: (enc: { id: string; paciente_nome: string; telefone: string | null; observacoes: string | null; profissional_id: string | null; created_at: string; profissional?: { profile: { nome_completo: string } | null } | null }) => void;
+  onAddEncaixe?: (enc: Encaixe) => void;
   onRemoveEncaixe?: (id: string) => void;
 }
 
@@ -373,8 +376,10 @@ interface CardProps {
   onStatus: (s: Status) => void;
   onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
+  onMoveStart?: (agId: string, startMouseY: number, originalTopPx: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
+  canMove?: boolean;
   expanded: boolean;
   onExpand: () => void;
   privacyMode: boolean;
@@ -568,7 +573,7 @@ function FaltaJustificadaModal({
   );
 }
 
-function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, expanded, onExpand, privacyMode }: CardProps) {
+function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onEdit, onDelete, onStatus, onPayment, onResizeStart, onMoveStart, pending, canEdit, canMove, expanded, onExpand, privacyMode }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
   const cardRef = useRef<HTMLDivElement>(null);
@@ -614,12 +619,23 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
 
   const durationMin = Math.round((new Date(ag.data_hora_fim).getTime() - new Date(ag.data_hora_inicio).getTime()) / 60000);
 
+  const canBeMoved = canMove && !["realizado", "finalizado", "faltou", "cancelado"].includes(ag.status);
+
   return (
     <div
       ref={cardRef}
       style={{ ...style, backgroundColor: bgColor, borderLeftColor: borderAccent, borderColor: borderGeneral }}
-      className={`absolute rounded border-l-4 border cursor-pointer transition-shadow hover:shadow-md select-none overflow-hidden ${expanded ? "z-30 shadow-lg" : "z-10"} ${pending ? "pointer-events-none" : ""}`}
+      className={`absolute rounded border-l-4 border transition-shadow hover:shadow-md select-none overflow-hidden ${canBeMoved ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${expanded ? "z-30 shadow-lg" : "z-10"} ${pending ? "pointer-events-none" : ""}`}
       onClick={onExpand}
+      onMouseDown={e => {
+        if (e.button !== 0) return;
+        if ((e.target as HTMLElement).closest("[data-resize]")) return;
+        if ((e.target as HTMLElement).closest("button")) return;
+        if (expanded) return;
+        if (!canBeMoved || !onMoveStart || !cardRef.current) return;
+        const topPx = typeof style.top === "number" ? style.top : parseFloat(String(style.top || "0"));
+        onMoveStart(ag.id, e.clientY, topPx, durationMin, cardRef.current);
+      }}
     >
       {/* ✓ Check de presença confirmada — canto superior direito */}
       {ag.status === "confirmado" && (
@@ -768,9 +784,10 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
         </div>
       )}
 
-      {/* Handle de resize */}
-      {canEdit && ag.status !== "finalizado" && (
+      {/* Handle de resize — bloqueado para realizado e finalizado */}
+      {canEdit && !["finalizado", "realizado"].includes(ag.status) && (
         <div
+          data-resize="true"
           className="absolute bottom-0 left-0 right-0 h-2.5 cursor-s-resize flex items-center justify-center group/resize"
           onMouseDown={e => {
             e.stopPropagation();
@@ -859,6 +876,7 @@ interface ColunaProps {
   onStatus: (id: string, s: Status) => void;
   onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
+  onMoveStart?: (agId: string, startMouseY: number, originalTopPx: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
   canEdit: boolean;
   salaId: number | null;
@@ -869,7 +887,7 @@ interface ColunaProps {
   onReagendarSlotClick?: (dataStr: string, horaStr: string) => void;
 }
 
-function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, profValorConsultaMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, pending, canEdit, salaId, expandedId, onExpand, privacyMode, reagendarInfo, onReagendarSlotClick }: ColunaProps) {
+function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, profValorConsultaMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, onMoveStart, pending, canEdit, salaId, expandedId, onExpand, privacyMode, reagendarInfo, onReagendarSlotClick }: ColunaProps) {
   const colMap = calcularColunas(ags);
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
   const slotsOcupados = new Set(
@@ -916,8 +934,10 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
             onStatus={s => onStatus(ag.id, s)}
             onPayment={onPayment}
             onResizeStart={onResizeStart}
+            onMoveStart={onMoveStart}
             pending={pending}
             canEdit={canEdit}
+            canMove={canEdit}
             expanded={expandedId === ag.id}
             onExpand={() => onExpand(expandedId === ag.id ? null : ag.id)}
             privacyMode={privacyMode}
@@ -1075,7 +1095,7 @@ ${sorted.map(ag => {
 }
 
 // ── Componente principal ──────────────────────────────────────────
-export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole, reagendarInfo: externalReagendarInfo, onSetReagendarInfo, onAddEncaixe, onRemoveEncaixe }: Props) {
+export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole, encaixes: encaixesProp = [], reagendarInfo: externalReagendarInfo, onSetReagendarInfo, onAddEncaixe, onRemoveEncaixe }: Props) {
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
@@ -1133,6 +1153,22 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     ag: Agendamento;
   } | null>(null);
 
+  // ── Drag to move ─────────────────────────────────────────────────
+  const moveDragRef = useRef<{
+    agId: string;
+    startMouseY: number;
+    originalTopPx: number;
+    durationMin: number;
+    ag: Agendamento;
+    el: HTMLDivElement;
+    hasMoved: boolean;
+  } | null>(null);
+
+  // Suprimir o expand após um drag (para evitar abrir o popup ao soltar)
+  const suppressExpandRef = useRef<Set<string>>(new Set());
+
+  const [moveError, setMoveError] = useState<string | null>(null);
+
   const handleResizeStart = useCallback((agId: string, startY: number, durationMin: number, el: HTMLDivElement) => {
     const ag = agendamentos.find(a => a.id === agId);
     if (!ag) return;
@@ -1141,7 +1177,38 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     document.body.style.userSelect = "none";
   }, [agendamentos]);
 
+  const handleMoveStart = useCallback((agId: string, startMouseY: number, originalTopPx: number, durationMin: number, el: HTMLDivElement) => {
+    const ag = agendamentos.find(a => a.id === agId);
+    if (!ag || ["realizado", "finalizado"].includes(ag.status)) return;
+    moveDragRef.current = { agId, startMouseY, originalTopPx, durationMin, ag, el, hasMoved: false };
+    document.body.style.userSelect = "none";
+  }, [agendamentos]);
+
+  // Expand com supressão para evitar abrir popup após drag
+  const handleExpand = useCallback((id: string | null) => {
+    if (id && suppressExpandRef.current.has(id)) return;
+    setExpandedId(id);
+  }, []);
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // Drag para mover card
+    if (moveDragRef.current) {
+      const { startMouseY, originalTopPx, el, durationMin } = moveDragRef.current;
+      const deltaY = e.clientY - startMouseY;
+      if (!moveDragRef.current.hasMoved && Math.abs(deltaY) < 5) return;
+      moveDragRef.current.hasMoved = true;
+      document.body.style.cursor = "grabbing";
+      const rawTopPx = originalTopPx + deltaY;
+      // Snap para intervalos de 15 min
+      const step = PX_POR_HORA / 4;
+      const snappedTopPx = Math.round(rawTopPx / step) * step;
+      const maxTopPx = (TOTAL_HORAS - durationMin / 60) * PX_POR_HORA;
+      const clampedTopPx = Math.max(0, Math.min(maxTopPx, snappedTopPx));
+      el.style.top = `${clampedTopPx}px`;
+      el.style.opacity = "0.75";
+      el.style.zIndex = "50";
+      return;
+    }
     if (!dragRef.current) return;
     const { startY, startDurationMin, el, ag } = dragRef.current;
     const deltaY = e.clientY - startY;
@@ -1168,6 +1235,61 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   }, [agendamentos, profissionais]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    // Drop de mover card
+    if (moveDragRef.current) {
+      const { agId, startMouseY, originalTopPx, durationMin, ag, el, hasMoved } = moveDragRef.current;
+      moveDragRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+
+      if (!hasMoved) {
+        el.style.top = `${originalTopPx}px`;
+        el.style.opacity = "";
+        el.style.zIndex = "";
+        return;
+      }
+
+      // Suprimir expand após drag
+      suppressExpandRef.current.add(agId);
+      setTimeout(() => suppressExpandRef.current.delete(agId), 200);
+
+      // Calcular novo horário a partir da posição pixel
+      const finalTopPx = parseFloat(el.style.top) || originalTopPx;
+      const newStartMin = (finalTopPx / PX_POR_HORA) * 60; // minutos a partir de HORA_INICIO
+      const totalMinFromMidnight = HORA_INICIO * 60 + newStartMin;
+      const newHours = Math.floor(totalMinFromMidnight / 60);
+      const newMinutes = Math.round(totalMinFromMidnight % 60);
+      const newHora = `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`;
+      const oldDate = format(new Date(ag.data_hora_inicio), "yyyy-MM-dd");
+      const tzOffset = new Date().getTimezoneOffset();
+
+      el.style.opacity = "0.5";
+
+      startTransition(async () => {
+        const res = await atualizarAgendamento(
+          agId,
+          ag.profissional?.id ?? "",
+          ag.paciente?.id ?? "",
+          ag.sala?.id ? String(ag.sala.id) : null,
+          oldDate,
+          newHora,
+          durationMin,
+          ag.status,
+          ag.observacoes ?? null,
+          tzOffset,
+        );
+        el.style.opacity = "";
+        el.style.zIndex = "";
+        if (res?.error) {
+          // Restaura posição original em caso de conflito
+          el.style.top = `${originalTopPx}px`;
+          setMoveError(res.error);
+          setTimeout(() => setMoveError(null), 4000);
+        }
+      });
+      return;
+    }
+
     if (!dragRef.current) return;
     const { agId, startY, startDurationMin, ag } = dragRef.current;
     dragRef.current = null;
@@ -1279,32 +1401,49 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
       const ag = agendamentos.find(a => a.id === id);
       // Falta justificada → adicionar automaticamente à lista de encaixe
       if (novoStatus === "cancelado" && ag?.paciente) {
-        const res = await adicionarEncaixeDireto(
-          ag.paciente.nome_completo,
-          ag.profissional?.id ?? null,
-          ag.paciente.telefone ?? null,
-        );
-        if (res.id) {
-          setEncaixePorAg(prev => ({ ...prev, [id]: res.id! }));
-          // Notifica DashboardContent para atualizar ListaEncaixe
-          onAddEncaixe?.({
-            id: res.id!,
-            paciente_nome: ag.paciente.nome_completo,
-            telefone: ag.paciente.telefone ?? null,
-            observacoes: null,
-            profissional_id: ag.profissional?.id ?? null,
-            created_at: new Date().toISOString(),
-            profissional: ag.profissional ? { profile: ag.profissional.profile } : null,
-          });
+        // Só adiciona se este agendamento ainda não gerou um encaixe nesta sessão
+        if (!encaixePorAg[id]) {
+          const res = await adicionarEncaixeDireto(
+            ag.paciente.nome_completo,
+            ag.profissional?.id ?? null,
+            ag.paciente.telefone ?? null,
+          );
+          if (res.id) {
+            setEncaixePorAg(prev => ({ ...prev, [id]: res.id! }));
+            // Só notifica o pai se o registro é realmente novo (sem duplicata)
+            if (!res.jaExistia) {
+              onAddEncaixe?.({
+                id: res.id!,
+                paciente_nome: ag.paciente.nome_completo,
+                telefone: ag.paciente.telefone ?? null,
+                observacoes: null,
+                profissional_id: ag.profissional?.id ?? null,
+                created_at: new Date().toISOString(),
+                profissional: ag.profissional ? { profile: ag.profissional.profile } : null,
+              });
+            }
+          }
         }
       }
-      // Desfazer falta justificada → remover da lista de encaixe
-      if (novoStatus === "agendado" && encaixePorAg[id]) {
-        const encId = encaixePorAg[id];
-        const { removerEncaixe } = await import("./listaEncaixeActions");
-        await removerEncaixe(encId);
-        onRemoveEncaixe?.(encId);
-        setEncaixePorAg(prev => { const next = { ...prev }; delete next[id]; return next; });
+      // Desfazer (qualquer status → agendado) → remover o encaixe gerado por este ag
+      if (novoStatus === "agendado") {
+        // Tenta pelo mapa de sessão, depois pela lista atual (inclui dados pós-refresh)
+        let encId: string | undefined = encaixePorAg[id];
+        if (!encId && ag?.paciente) {
+          const pacNome = ag.paciente.nome_completo.toLowerCase();
+          const profId = ag.profissional?.id ?? null;
+          const match = encaixesProp.find(e =>
+            e.paciente_nome.toLowerCase() === pacNome &&
+            e.profissional_id === profId
+          );
+          encId = match?.id;
+        }
+        if (encId) {
+          const { removerEncaixe } = await import("./listaEncaixeActions");
+          await removerEncaixe(encId);
+          onRemoveEncaixe?.(encId);
+          setEncaixePorAg(prev => { const next = { ...prev }; delete next[id]; return next; });
+        }
       }
       if (novoStatus === "faltou" || novoStatus === "cancelado") {
         if (ag) {
@@ -1788,7 +1927,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                     </div>
                   </div>
                   <div className="relative px-0.5">
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} profValorConsultaMap={profValorConsultaMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={setExpandedId} privacyMode={privacyMode} reagendarInfo={reagendarInfo} onReagendarSlotClick={() => { if (reagendarInfo?.encaixeId) { startTransition(async () => { const { removerEncaixe } = await import("./listaEncaixeActions"); await removerEncaixe(reagendarInfo.encaixeId!); router.refresh(); }); } setReagendarInfo(null); }} />
+                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} profValorConsultaMap={profValorConsultaMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} onMoveStart={handleMoveStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={handleExpand} privacyMode={privacyMode} reagendarInfo={reagendarInfo} onReagendarSlotClick={() => { if (reagendarInfo?.encaixeId) { startTransition(async () => { const { removerEncaixe } = await import("./listaEncaixeActions"); await removerEncaixe(reagendarInfo.encaixeId!); router.refresh(); }); } setReagendarInfo(null); }} />
                   </div>
                 </div>
               );
@@ -1833,11 +1972,12 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                   onStatus={handleStatus}
                   onPayment={handlePayment}
                   onResizeStart={handleResizeStart}
+                  onMoveStart={handleMoveStart}
                   pending={isPending}
                   canEdit={canEdit}
                   salaId={filtroSalaId}
                   expandedId={expandedId}
-                  onExpand={setExpandedId}
+                  onExpand={handleExpand}
                   privacyMode={privacyMode}
                   reagendarInfo={reagendarInfo}
                   onReagendarSlotClick={() => { setReagendarInfo(null); }}
@@ -1961,6 +2101,8 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                 pacienteNome: faltaModal.paciente.nome_completo,
                 profissionalId: faltaModal.profissional.id,
                 profissionalNome: faltaModal.profissional.profile?.nome_completo ?? "Profissional",
+                // Passa o encaixeId para que o NovoAgendamentoForm o remova após salvar
+                encaixeId: encaixePorAg[faltaModal.agId],
               });
             }
             setFaltaModal(null);
@@ -1968,6 +2110,14 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
           }}
           onClose={() => { setFaltaModal(null); router.refresh(); }}
         />
+      )}
+
+      {/* Toast de erro ao mover card */}
+      {moveError && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] bg-red-600 text-white text-sm font-medium px-5 py-3 rounded-xl shadow-xl flex items-center gap-2">
+          <XCircle className="w-4 h-4 shrink-0" />
+          {moveError}
+        </div>
       )}
     </div>
   );
