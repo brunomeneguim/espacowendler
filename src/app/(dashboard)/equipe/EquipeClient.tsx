@@ -281,8 +281,10 @@ export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     startTransitionSalvar(async () => {
-      const res = await editarPerfil(profileId, fd);
-      if (!res?.error) mostrarToast("Alterações salvas com sucesso!");
+      try {
+        await editarPerfil(profileId, fd);
+        mostrarToast("Alterações salvas com sucesso!");
+      } catch {}
     });
   }
 
