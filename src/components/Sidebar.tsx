@@ -135,7 +135,7 @@ export function Sidebar({
   };
 
   return (
-    <aside className="hidden md:flex md:flex-col w-64 bg-forest text-cream min-h-screen sticky top-0">
+    <aside className="hidden md:flex md:flex-col w-64 bg-forest text-cream h-screen sticky top-0 overflow-y-auto">
       {/* Logo */}
       <div className="p-6 border-b border-forest-400/20">
         <Link href="/dashboard" className="flex items-center gap-2">

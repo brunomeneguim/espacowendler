@@ -75,6 +75,9 @@ interface Props {
   // Reagendar externo (controlado por DashboardContent)
   reagendarInfo?: ReagendarInfo | null;
   onSetReagendarInfo?: (info: ReagendarInfo | null) => void;
+  // Callbacks para sincronizar lista de encaixe
+  onAddEncaixe?: (enc: { id: string; paciente_nome: string; telefone: string | null; observacoes: string | null; profissional_id: string | null; created_at: string; profissional?: { profile: { nome_completo: string } | null } | null }) => void;
+  onRemoveEncaixe?: (id: string) => void;
 }
 
 // ── Status config ─────────────────────────────────────────────────
@@ -540,21 +543,21 @@ function FaltaJustificadaModal({
             <button
               type="button"
               onClick={onListaEncaixe}
-              className="btn-secondary flex items-center justify-center gap-2"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-rust text-white text-sm font-medium hover:bg-rust/90 transition-colors"
             >
               <List className="w-4 h-4" /> Ver Lista de Encaixe
             </button>
             <button
               type="button"
               onClick={onReagendar}
-              className="btn-secondary flex items-center justify-center gap-2"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-forest text-cream text-sm font-medium hover:bg-forest/90 transition-colors"
             >
               <CalendarPlus className="w-4 h-4" /> Reagendar
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="text-sm text-forest-500 hover:text-forest transition-colors py-1.5"
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-peach text-rust text-sm font-medium hover:bg-peach/80 transition-colors"
             >
               Cancelar
             </button>
@@ -628,7 +631,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
       <div
         title={cfg.label}
         className={`absolute bottom-1 left-1.5 w-2 h-2 rounded-full z-10 pointer-events-none ${cfg.dot}`}
-        style={{ boxShadow: isColorDark(bgColor) ? "0 0 0 1.5px rgba(255,255,255,0.4)" : "0 0 0 1.5px rgba(0,0,0,0.1)" }}
+        style={{ boxShadow: "0 0 0 1.5px rgba(0,0,0,0.40)" }}
       />
       {/* $ Pagamento — canto inferior direito */}
       {ag.status !== "ausencia" && ag.status !== "cancelado" && (
@@ -636,7 +639,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
           <span
             title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}
             className="w-4 h-4 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: ag.pago ? "rgba(34,197,94,0.85)" : "rgba(239,68,68,0.80)" }}
+            style={{ backgroundColor: ag.pago ? "rgba(34,197,94,0.85)" : "rgba(239,68,68,0.80)", boxShadow: "0 0 0 1.5px rgba(0,0,0,0.35)" }}
           >
             <DollarSign className="w-2.5 h-2.5 text-white" />
           </span>
@@ -805,7 +808,13 @@ function SlotVazio({
 
   if (reagendarInfo && onReagendarSlotClick) {
     // Modo reagendar: clique abre nova aba de agendamento com paciente+prof pré-preenchidos
-    const href = `/agenda/novo?data=${dataStr}&hora=${horaStr}${salaId ? `&sala_id=${salaId}` : ""}&paciente_id=${reagendarInfo.pacienteId}&profissional_id=${reagendarInfo.profissionalId}`;
+    const params = new URLSearchParams({ data: dataStr, hora: horaStr });
+    if (salaId) params.set("sala_id", String(salaId));
+    if (reagendarInfo.pacienteId) params.set("paciente_id", reagendarInfo.pacienteId);
+    if (reagendarInfo.pacienteNome) params.set("paciente_nome", reagendarInfo.pacienteNome);
+    params.set("profissional_id", reagendarInfo.profissionalId);
+    if (reagendarInfo.encaixeId) params.set("encaixe_id", reagendarInfo.encaixeId);
+    const href = `/agenda/novo?${params.toString()}`;
     return (
       <Link
         href={href}
@@ -1066,7 +1075,7 @@ ${sorted.map(ag => {
 }
 
 // ── Componente principal ──────────────────────────────────────────
-export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole, reagendarInfo: externalReagendarInfo, onSetReagendarInfo }: Props) {
+export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole, reagendarInfo: externalReagendarInfo, onSetReagendarInfo, onAddEncaixe, onRemoveEncaixe }: Props) {
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
@@ -1277,12 +1286,24 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
         );
         if (res.id) {
           setEncaixePorAg(prev => ({ ...prev, [id]: res.id! }));
+          // Notifica DashboardContent para atualizar ListaEncaixe
+          onAddEncaixe?.({
+            id: res.id!,
+            paciente_nome: ag.paciente.nome_completo,
+            telefone: ag.paciente.telefone ?? null,
+            observacoes: null,
+            profissional_id: ag.profissional?.id ?? null,
+            created_at: new Date().toISOString(),
+            profissional: ag.profissional ? { profile: ag.profissional.profile } : null,
+          });
         }
       }
       // Desfazer falta justificada → remover da lista de encaixe
       if (novoStatus === "agendado" && encaixePorAg[id]) {
+        const encId = encaixePorAg[id];
         const { removerEncaixe } = await import("./listaEncaixeActions");
-        await removerEncaixe(encaixePorAg[id]);
+        await removerEncaixe(encId);
+        onRemoveEncaixe?.(encId);
         setEncaixePorAg(prev => { const next = { ...prev }; delete next[id]; return next; });
       }
       if (novoStatus === "faltou" || novoStatus === "cancelado") {
@@ -1819,7 +1840,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                   onExpand={setExpandedId}
                   privacyMode={privacyMode}
                   reagendarInfo={reagendarInfo}
-                  onReagendarSlotClick={() => { if (reagendarInfo?.encaixeId) { startTransition(async () => { const { removerEncaixe } = await import("./listaEncaixeActions"); await removerEncaixe(reagendarInfo.encaixeId!); router.refresh(); }); } setReagendarInfo(null); }}
+                  onReagendarSlotClick={() => { setReagendarInfo(null); }}
                 />
               </div>
             </div>

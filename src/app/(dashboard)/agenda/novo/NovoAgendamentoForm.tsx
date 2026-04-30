@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RepeatIcon, Loader2, UserPlus, AlertTriangle, Search, X } from "lucide-react";
 import { criarAgendamento, verificarHorarioIndisponivel } from "../actions";
+import { removerEncaixe } from "../dashboard/listaEncaixeActions";
 
 interface Prof  { id: string; nome: string; especialidade?: string }
 interface Pac   { id: string; nome_completo: string; telefone?: string }
@@ -18,6 +19,9 @@ interface Props {
   defaultHora: string;
   defaultSalaId: string;
   defaultPacienteId?: string;
+  defaultPacienteNome?: string;
+  defaultProfissionalId?: string;
+  encaixeId?: string;
   error?: string;
 }
 
@@ -29,16 +33,18 @@ function SearchableSelect({
   items,
   placeholder,
   defaultId,
+  defaultLabel,
 }: {
   name: string;
   items: SearchItem[];
   placeholder: string;
   defaultId?: string;
+  defaultLabel?: string;
 }) {
   const defaultItem = items.find(i => i.id === defaultId);
   const [selectedId, setSelectedId]       = useState(defaultId ?? "");
   const [selectedLabel, setSelectedLabel] = useState(defaultItem?.label ?? "");
-  const [query, setQuery]                 = useState("");
+  const [query, setQuery]                 = useState(!defaultId && defaultLabel ? defaultLabel : "");
   const [open, setOpen]                   = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -135,7 +141,7 @@ function SearchableSelect({
 }
 
 // ── Formulário principal ───────────────────────────────────────────
-export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHora, defaultSalaId, defaultPacienteId, error }: Props) {
+export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHora, defaultSalaId, defaultPacienteId, defaultPacienteNome, defaultProfissionalId, encaixeId, error }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [tipoAg, setTipoAg] = useState<"consulta_avulsa" | "plano_mensal" | "ausencia">("consulta_avulsa");
@@ -198,6 +204,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       const res = await criarAgendamento(fd);
       if (res.error) { setSubmitError(res.error); return; }
       if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
+      if (encaixeId) await removerEncaixe(encaixeId);
       router.push("/dashboard");
     });
   }
@@ -211,6 +218,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       const res = await criarAgendamento(fd);
       if (res.error) { setSubmitError(res.error); return; }
       if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
+      if (encaixeId) await removerEncaixe(encaixeId);
       router.push("/dashboard");
     });
   }
@@ -319,6 +327,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
             name="profissional_id"
             items={profsItems}
             placeholder="Digite o nome do profissional…"
+            defaultId={defaultProfissionalId}
           />
         )}
       </div>
@@ -340,6 +349,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
                   items={pacsItems}
                   placeholder="Digite o nome do paciente…"
                   defaultId={defaultPacienteId}
+                  defaultLabel={defaultPacienteNome}
                 />
               </div>
               <Link

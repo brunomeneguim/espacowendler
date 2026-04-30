@@ -7,7 +7,7 @@ import { NovoAgendamentoForm } from "./NovoAgendamentoForm";
 export default async function NovoAgendamentoPage({
   searchParams,
 }: {
-  searchParams: { error?: string; data?: string; hora?: string; sala_id?: string; paciente_id?: string };
+  searchParams: { error?: string; data?: string; hora?: string; sala_id?: string; paciente_id?: string; paciente_nome?: string; profissional_id?: string; encaixe_id?: string };
 }) {
   const supabase = createClient();
 
@@ -59,6 +59,9 @@ export default async function NovoAgendamentoPage({
         defaultHora={searchParams.hora ?? "09:00"}
         defaultSalaId={searchParams.sala_id ?? ""}
         defaultPacienteId={searchParams.paciente_id}
+        defaultPacienteNome={searchParams.paciente_nome}
+        defaultProfissionalId={searchParams.profissional_id}
+        encaixeId={searchParams.encaixe_id}
         error={searchParams.error}
       />
     </div>

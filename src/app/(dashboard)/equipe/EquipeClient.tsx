@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useTransition, useRef } from "react";
-import { Search, Trash2, Loader2, AlertTriangle, Pencil, UserPlus } from "lucide-react";
+import { useState, useMemo, useTransition, useRef, useEffect } from "react";
+import { Search, Trash2, Loader2, AlertTriangle, Pencil, UserPlus, Check } from "lucide-react";
 import { editarPerfil, excluirMembro, criarUsuario, editarUsuarioCompleto } from "./actions";
 
 const ROLES = [
@@ -238,11 +238,29 @@ function ModalEditarUsuario({ profile, onClose }: { profile: Profile; onClose: (
   );
 }
 
+function ToastSistema({ mensagem, visivel }: { mensagem: string; visivel: boolean }) {
+  return (
+    <div
+      className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] transition-all duration-300 ease-in-out ${
+        visivel ? "translate-y-0 opacity-100" : "translate-y-16 opacity-0 pointer-events-none"
+      }`}
+    >
+      <div className="flex items-center gap-2.5 bg-forest text-cream px-5 py-3 rounded-2xl shadow-xl text-sm font-medium">
+        <Check className="w-4 h-4 text-peach shrink-0" strokeWidth={2.5} />
+        {mensagem}
+      </div>
+    </div>
+  );
+}
+
 export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props) {
   const [busca, setBusca] = useState("");
   const [excluindo, setExcluindo] = useState<Profile | null>(null);
   const [novoUsuario, setNovoUsuario] = useState(false);
   const [editando, setEditando] = useState<Profile | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastVisivel, setToastVisivel] = useState(false);
+  const [isPendingSalvar, startTransitionSalvar] = useTransition();
   const canManage = currentUserRole === "admin" || currentUserRole === "supervisor";
   const isAdmin = currentUserRole === "admin";
 
@@ -251,6 +269,22 @@ export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props
       !busca || p.nome_completo?.toLowerCase().includes(busca.toLowerCase()) ||
       p.email?.toLowerCase().includes(busca.toLowerCase())
     ), [profiles, busca]);
+
+  function mostrarToast(msg: string) {
+    setToast(msg);
+    setToastVisivel(true);
+    setTimeout(() => setToastVisivel(false), 2500);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  function handleSalvarPerfil(profileId: string, e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    startTransitionSalvar(async () => {
+      const res = await editarPerfil(profileId, fd);
+      if (!res?.error) mostrarToast("Alterações salvas com sucesso!");
+    });
+  }
 
   function handleLockedClick() {
     alert("Apenas o Administrador ou Supervisor podem alterar os papéis. Entre em contato com um deles.");
@@ -261,6 +295,7 @@ export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props
       {excluindo && <ModalExcluir profile={excluindo} onClose={() => setExcluindo(null)} />}
       {novoUsuario && <ModalNovoUsuario onClose={() => setNovoUsuario(false)} />}
       {editando && <ModalEditarUsuario profile={editando} onClose={() => setEditando(null)} />}
+      <ToastSistema mensagem={toast ?? ""} visivel={toastVisivel} />
 
       <div className="flex items-center gap-3 mb-6">
         <div className="relative flex-1">
@@ -287,7 +322,6 @@ export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props
       <div className="space-y-3">
         {filtrados.map(p => {
           const isSelf = p.id === currentUserId;
-          const action = editarPerfil.bind(null, p.id);
           return (
             <div key={p.id} className="card flex flex-wrap items-center gap-4 py-4">
               <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -324,7 +358,7 @@ export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props
                 </div>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <form action={action} className="flex items-center gap-2 flex-wrap">
+                  <form onSubmit={e => handleSalvarPerfil(p.id, e)} className="flex items-center gap-2 flex-wrap">
                     <select
                       name="role"
                       defaultValue={p.role}
@@ -344,9 +378,10 @@ export function EquipeClient({ profiles, currentUserId, currentUserRole }: Props
                     </select>
                     <button
                       type="submit"
-                      className="text-sm bg-forest text-cream px-3 py-1.5 rounded-lg hover:bg-forest/90 transition-colors"
+                      disabled={isPendingSalvar}
+                      className="text-sm bg-forest text-cream px-3 py-1.5 rounded-lg hover:bg-forest/90 transition-colors disabled:opacity-50"
                     >
-                      Salvar
+                      {isPendingSalvar ? "…" : "Salvar"}
                     </button>
                   </form>
                   {isAdmin && (

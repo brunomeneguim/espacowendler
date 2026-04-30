@@ -23,14 +23,21 @@ interface Encaixe {
 }
 
 interface Props {
-  // ListaEncaixe props
   encaixes: Encaixe[];
-  // CalendarioSemanal props (forwarded as-is)
-  calProps: Omit<React.ComponentProps<typeof CalendarioSemanal>, "reagendarInfo" | "onSetReagendarInfo">;
+  calProps: Omit<React.ComponentProps<typeof CalendarioSemanal>, "reagendarInfo" | "onSetReagendarInfo" | "onAddEncaixe" | "onRemoveEncaixe">;
 }
 
-export function DashboardContent({ encaixes, calProps }: Props) {
+export function DashboardContent({ encaixes: initialEncaixes, calProps }: Props) {
   const [reagendarInfo, setReagendarInfo] = useState<ReagendarInfo | null>(null);
+  const [encaixes, setEncaixes] = useState<Encaixe[]>(initialEncaixes);
+
+  function handleAddEncaixe(enc: Encaixe) {
+    setEncaixes(prev => [...prev, enc]);
+  }
+
+  function handleRemoveEncaixe(id: string) {
+    setEncaixes(prev => prev.filter(e => e.id !== id));
+  }
 
   return (
     <>
@@ -43,6 +50,8 @@ export function DashboardContent({ encaixes, calProps }: Props) {
         {...calProps}
         reagendarInfo={reagendarInfo}
         onSetReagendarInfo={setReagendarInfo}
+        onAddEncaixe={handleAddEncaixe}
+        onRemoveEncaixe={handleRemoveEncaixe}
       />
     </>
   );
