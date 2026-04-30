@@ -228,6 +228,52 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
   return { error: null, ignoradas, datasIgnoradas };
 }
 
+// ── Reagendar automaticamente (sem navegar para /agenda/novo) ────
+export async function reagendarAgendamentoRapido(params: {
+  profissionalId: string;
+  pacienteId: string | null;
+  salaId: number | null;
+  data: string;
+  hora: string;
+  duracaoMin: number;
+  tipoAgendamento: string;
+  observacoes: string | null;
+  tzOffset: number;
+}): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { profissionalId, pacienteId, salaId, data, hora, duracaoMin, tipoAgendamento, observacoes, tzOffset } = params;
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const inicio = new Date(`${data}T${hora}:00`);
+  inicio.setMinutes(inicio.getMinutes() + tzOffset);
+  const fim = new Date(inicio.getTime() + duracaoMin * 60_000);
+
+  const erroHorario = await verificarHorarioProfissional(supabase, profissionalId, hora, duracaoMin);
+  if (erroHorario) return { error: erroHorario };
+
+  const conflito = await verificarConflito(supabase, profissionalId, pacienteId, salaId, inicio, fim);
+  if (conflito) return { error: conflito };
+
+  const { error } = await supabase.from("agendamentos").insert({
+    profissional_id: profissionalId,
+    paciente_id: pacienteId,
+    sala_id: salaId,
+    data_hora_inicio: inicio.toISOString(),
+    data_hora_fim: fim.toISOString(),
+    status: "agendado",
+    tipo_agendamento: tipoAgendamento,
+    observacoes,
+    created_by: user?.id,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function atualizarStatusAgendamento(
   id: string,
   status: "agendado" | "confirmado" | "realizado" | "finalizado" | "cancelado" | "faltou" | "ausencia"

@@ -10,6 +10,11 @@ export interface ReagendarInfo {
   profissionalId: string;
   profissionalNome: string;
   encaixeId?: string;
+  // Dados do ag original para reagendamento automático (sem navegar ao formulário)
+  salaId?: number | null;
+  duracaoMin?: number;
+  tipoAgendamento?: string;
+  observacoes?: string | null;
 }
 
 export interface Encaixe {
