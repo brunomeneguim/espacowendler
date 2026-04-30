@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RepeatIcon, Loader2, UserPlus, AlertTriangle, Search, X } from "lucide-react";
 import { criarAgendamento, verificarHorarioIndisponivel } from "../actions";
-import { removerEncaixe } from "../dashboard/listaEncaixeActions";
+import { removerEncaixe } from "../../dashboard/listaEncaixeActions";
 
 interface Prof  { id: string; nome: string; especialidade?: string }
 interface Pac   { id: string; nome_completo: string; telefone?: string }
