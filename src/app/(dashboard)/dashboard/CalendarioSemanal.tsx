@@ -1095,12 +1095,15 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
 
   const totalAgs = agendamentos.filter(ag => ag.profissional?.id === profId && (!salaFiltro || ag.sala?.id === salaFiltro)).length;
 
+  const horasEspelho = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
+  const PX = 56; // px por hora no espelho (ligeiramente menor para caber no modal)
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[88vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30 shrink-0">
           <p className="text-xs text-forest-400 uppercase tracking-wider font-medium">Espelho de agendamento</p>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-sand/30 text-forest-400 transition-colors">
             <X className="w-4 h-4" />
@@ -1108,25 +1111,21 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
         </div>
 
         {/* Filtros */}
-        <div className="px-6 py-3 border-b border-sand/20 flex gap-3 flex-wrap items-center">
-          {/* Profissional — select nativo (bloqueado para role profissional) */}
+        <div className="px-6 py-3 border-b border-sand/20 flex gap-3 flex-wrap items-center shrink-0">
+          {/* Profissional */}
           <select
             value={profId}
             onChange={e => !isProfissional && setProfId(e.target.value)}
             disabled={isProfissional}
             className={`input-field text-sm py-1.5 flex-1 min-w-52 ${isProfissional ? "opacity-70 cursor-not-allowed bg-sand/30" : ""}`}
           >
-            {profissionais.length === 0 && (
-              <option value="">Nenhum profissional cadastrado</option>
-            )}
+            {profissionais.length === 0 && <option value="">Nenhum profissional cadastrado</option>}
             {profissionais.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.profile?.nome_completo ?? p.id}
-              </option>
+              <option key={p.id} value={p.id}>{p.profile?.nome_completo ?? p.id}</option>
             ))}
           </select>
 
-          {/* Sala filter — sem opção "todas" */}
+          {/* Sala */}
           <select
             value={salaFiltro ?? ""}
             onChange={e => setSalaFiltro(e.target.value ? Number(e.target.value) : null)}
@@ -1136,63 +1135,110 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
           </select>
         </div>
 
-        {/* Grade semanal */}
-        <div className="flex-1 overflow-auto">
-          <div className="flex divide-x divide-sand/20 min-w-[700px] h-full">
+        {/* Cabeçalho dos dias (fixo) */}
+        <div className="flex shrink-0 border-b border-sand/20 bg-white">
+          {/* espaço das horas */}
+          <div className="w-10 shrink-0" />
+          {dias.map(dia => {
+            const isHoje = isSameDay(dia, new Date());
+            return (
+              <div key={dia.toISOString()} className={`flex-1 min-w-0 px-1 py-2 text-center border-l border-sand/20 ${isHoje ? "bg-forest/5" : ""}`}>
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${isHoje ? "text-forest" : "text-forest-400"}`}>
+                  {format(dia, "EEE", { locale: ptBR })}
+                </p>
+                <p className={`text-xs font-bold ${isHoje ? "text-forest" : "text-forest-600"}`}>
+                  {format(dia, "d/MM")}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Grade de horários (scrollável) */}
+        <div className="flex-1 overflow-y-auto overflow-x-auto">
+          <div className="flex min-w-[600px]" style={{ height: TOTAL_HORAS * PX }}>
+
+            {/* Coluna de horas */}
+            <div className="w-10 shrink-0 relative select-none" style={{ height: TOTAL_HORAS * PX }}>
+              {horasEspelho.map(h => (
+                <div
+                  key={h}
+                  className="absolute right-1.5 text-[9px] text-gray-400 leading-none"
+                  style={{ top: (h - HORA_INICIO) * PX - 5 }}
+                >
+                  {h}:00
+                </div>
+              ))}
+            </div>
+
+            {/* Colunas dos dias */}
             {dias.map(dia => {
               const ags = agsParaDia(dia);
               const horarios = horariosParaDia(dia);
-              const isHoje = isSameDay(dia, new Date());
 
               return (
-                <div key={dia.toISOString()} className="flex-1 flex flex-col min-w-0">
-                  {/* Cabeçalho do dia */}
-                  <div className={`px-2 py-2 text-center border-b border-sand/20 shrink-0 ${isHoje ? "bg-forest/5" : "bg-sand/5"}`}>
-                    <p className={`text-[10px] font-semibold uppercase tracking-wider ${isHoje ? "text-forest" : "text-forest-400"}`}>
-                      {format(dia, "EEE", { locale: ptBR })}
-                    </p>
-                    <p className={`text-sm font-bold ${isHoje ? "text-forest" : "text-forest-600"}`}>
-                      {format(dia, "d/MM")}
-                    </p>
-                  </div>
+                <div
+                  key={dia.toISOString()}
+                  className="flex-1 min-w-0 border-l border-sand/20 relative"
+                  style={{ height: TOTAL_HORAS * PX }}
+                >
+                  {/* Linhas de hora */}
+                  {horasEspelho.map(h => (
+                    <div
+                      key={h}
+                      className="absolute left-0 right-0 border-t border-gray-100"
+                      style={{ top: (h - HORA_INICIO) * PX }}
+                    />
+                  ))}
 
-                  {/* Conteúdo do dia */}
-                  <div className="flex-1 p-1.5 space-y-1 overflow-y-auto min-h-40">
-                    {/* Horários disponíveis */}
-                    {horarios.map((h, i) => (
-                      <div key={i} className="text-[10px] text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1 leading-tight">
-                        <span className="font-semibold">Disponível</span><br />
-                        {h.hora_inicio.slice(0,5)}–{h.hora_fim.slice(0,5)}
+                  {/* Faixas de horário disponível */}
+                  {horarios.map((h, i) => {
+                    const startMin = parseTimeToMinutes(h.hora_inicio) - HORA_INICIO * 60;
+                    const endMin   = parseTimeToMinutes(h.hora_fim)   - HORA_INICIO * 60;
+                    if (startMin >= TOTAL_HORAS * 60 || endMin <= 0) return null;
+                    const top    = (Math.max(0, startMin) / 60) * PX;
+                    const height = ((Math.min(TOTAL_HORAS * 60, endMin) - Math.max(0, startMin)) / 60) * PX;
+                    return (
+                      <div
+                        key={i}
+                        className="absolute left-0 right-0 bg-green-50 border-l-2 border-green-300"
+                        style={{ top, height, zIndex: 0 }}
+                      />
+                    );
+                  })}
+
+                  {/* Cards de agendamento */}
+                  {ags.map(ag => {
+                    const startDate  = new Date(ag.data_hora_inicio);
+                    const endDate    = new Date(ag.data_hora_fim);
+                    const startMin   = startDate.getHours() * 60 + startDate.getMinutes() - HORA_INICIO * 60;
+                    const endMin     = endDate.getHours() * 60 + endDate.getMinutes()   - HORA_INICIO * 60;
+                    const top        = Math.max(0, (startMin / 60) * PX);
+                    const height     = Math.max(18, ((endMin - startMin) / 60) * PX - 2);
+                    const cfg        = STATUS[ag.status] ?? STATUS.agendado;
+                    const isAusencia = ag.status === "ausencia";
+                    const isFalta    = ag.status === "faltou" || ag.status === "cancelado";
+
+                    return (
+                      <div
+                        key={ag.id}
+                        className={`absolute left-0.5 right-0.5 rounded px-1 py-0.5 overflow-hidden border text-[10px] leading-tight ${
+                          isAusencia ? "bg-gray-100 border-gray-300 text-gray-500" :
+                          isFalta    ? "bg-red-50 border-red-300 text-red-700" :
+                                       cfg.card
+                        }`}
+                        style={{ top, height, zIndex: 2 }}
+                      >
+                        <p className="font-semibold truncate">{format(startDate, "HH:mm")}–{format(endDate, "HH:mm")}</p>
+                        {height > 28 && (
+                          <p className="truncate opacity-80">{ag.paciente?.nome_completo ?? (isAusencia ? "Ausência" : "—")}</p>
+                        )}
+                        {height > 44 && ag.sala && (
+                          <p className="truncate opacity-60 text-[9px]">{ag.sala.nome}</p>
+                        )}
                       </div>
-                    ))}
-
-                    {ags.length === 0 && horarios.length === 0 && (
-                      <p className="text-[10px] text-forest-300 text-center pt-4">—</p>
-                    )}
-
-                    {ags.map(ag => {
-                      const inicio = format(new Date(ag.data_hora_inicio), "HH:mm");
-                      const fim    = format(new Date(ag.data_hora_fim),    "HH:mm");
-                      const cfg    = STATUS[ag.status] ?? STATUS.agendado;
-                      const isAusencia = ag.status === "ausencia";
-                      const isFalta    = ag.status === "faltou" || ag.status === "cancelado";
-
-                      return (
-                        <div key={ag.id} className={`rounded-lg px-2 py-1.5 text-[11px] border leading-tight ${
-                          isAusencia ? "bg-gray-50 border-gray-200 text-gray-500" :
-                          isFalta    ? "bg-red-50 border-red-200 text-red-700" :
-                                       "bg-white border-sand/40 text-forest"
-                        }`}>
-                          <div className="flex items-center justify-between gap-1 mb-0.5">
-                            <span className="font-semibold text-[10px]">{inicio}–{fim}</span>
-                            <span className={`text-[9px] px-1 py-0.5 rounded-full font-medium shrink-0 ${cfg.badge}`}>{cfg.label}</span>
-                          </div>
-                          <p className="truncate font-medium">{ag.paciente?.nome_completo ?? (isAusencia ? "Ausência" : "—")}</p>
-                          {ag.sala && <p className="text-[10px] opacity-60 truncate">{ag.sala.nome}</p>}
-                        </div>
-                      );
-                    })}
-                  </div>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -1200,9 +1246,12 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-sand/20 text-xs text-forest-400 shrink-0">
-          {totalAgs} agendamento{totalAgs !== 1 ? "s" : ""} na semana
-          {profSelecionado && <span className="ml-1">· {profSelecionado.profile?.nome_completo}</span>}
+        <div className="px-6 py-3 border-t border-sand/20 text-xs text-forest-400 shrink-0 flex items-center gap-4">
+          <span>{totalAgs} agendamento{totalAgs !== 1 ? "s" : ""} na semana</span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-green-50 border-l-2 border-green-300 inline-block" />
+            Horário disponível
+          </span>
         </div>
       </div>
     </div>

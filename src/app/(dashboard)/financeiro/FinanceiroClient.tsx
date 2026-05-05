@@ -509,7 +509,7 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
       {/* Modal — marcar como pago */}
       {pagarId && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setPagarId(null)} />
+          <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setPagarId(null)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
               <h3 className="font-display text-base text-forest">Registrar pagamento</h3>
@@ -542,7 +542,7 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
       {/* Modal — excluir */}
       {excluirId && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setExcluirId(null)} />
+          <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setExcluirId(null)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
               <h3 className="font-display text-base text-forest">Excluir lançamento?</h3>
