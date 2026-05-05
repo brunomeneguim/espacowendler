@@ -3,12 +3,13 @@
 import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Upload, X, Loader2, User, FileText, Lock, AlertCircle, ChevronDown, Check,
+  Upload, X, Loader2, User, Lock, AlertCircle, ChevronDown, Check,
 } from "lucide-react";
 import { completarPerfilProfissional } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
 import { AddEspecialidadeButton } from "../AddEspecialidadeButton";
 import { ValorConsultaInput } from "../[id]/editar/ValorConsultaInput";
+import { DDISelector } from "../../pacientes/novo/DDISelector";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
 function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; value: string; onChange: (v: string) => void }) {
@@ -79,6 +80,27 @@ function maskPhone(v: string) {
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
+
+// ── Parse DDI de número armazenado ────────────────────────────────
+function parseTelDdi(val: string): string {
+  if (!val) return "+55";
+  const trimmed = val.trim();
+  if (trimmed.startsWith("+")) {
+    const m = trimmed.match(/^(\+\d{1,4})\s*/);
+    if (m) return m[1];
+  }
+  return "+55";
+}
+function parseTelNum(val: string): string {
+  if (!val) return "";
+  const trimmed = val.trim();
+  if (trimmed.startsWith("+")) {
+    const m = trimmed.match(/^(\+\d{1,4})\s*(.*)/);
+    if (m) return m[2];
+    return "";
+  }
+  return maskPhone(trimmed);
+}
 function maskCpf(v: string) {
   v = v.replace(/\D/g, "").substring(0, 11);
   return v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
@@ -130,13 +152,14 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
   const [foto, setFoto] = useState<string | null>(profReg?.foto_url ?? null);
   const [cpf, setCpf] = useState(profReg?.cpf ?? "");
   const [cnpj, setCnpj] = useState(profReg?.cnpj ?? "");
-  const [tel1, setTel1] = useState((profReg as any)?.telefone_1 ?? "(42) ");
-  const [tel2, setTel2] = useState((profReg as any)?.telefone_2 ?? "(42) ");
+  const [tel1, setTel1] = useState(() => parseTelNum((profReg as any)?.telefone_1 ?? ""));
+  const [tel2, setTel2] = useState(() => parseTelNum((profReg as any)?.telefone_2 ?? ""));
+  const [ddi1, setDdi1] = useState(() => parseTelDdi((profReg as any)?.telefone_1 ?? ""));
+  const [ddi2, setDdi2] = useState(() => parseTelDdi((profReg as any)?.telefone_2 ?? ""));
   const [corSelecionada, setCorSelecionada] = useState((profReg as any)?.cor ?? "");
   const [especialidadesList, setEspecialidadesList] = useState(especialidades);
   const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState(String(profReg?.especialidade_id ?? ""));
   const [senhaErro, setSenhaErro] = useState<string | null>(null);
-  const coresDisponiveis = PROF_CORES.filter(c => !coresUsadas.includes(c.id) || c.id === corSelecionada);
 
   const isReq = (c: string) => camposConfig.find(x => x.campo === c)?.obrigatorio ?? false;
 
@@ -290,32 +313,35 @@ export function CompletarPerfilForm({ profile, profReg, especialidades, camposCo
             </div>
           </div>
 
-          {/* Horários e tempo */}
-          <div className="grid sm:grid-cols-3 gap-4">
-            <div>
-              {req("Horário inicial de atendimento", "horario_inicio")}
-              <input name="horario_inicio" type="time" className="input-field" required={isReq("horario_inicio")} defaultValue={profReg?.horario_inicio?.slice(0, 5) ?? "08:00"} />
-            </div>
-            <div>
-              {req("Horário final de atendimento", "horario_fim")}
-              <input name="horario_fim" type="time" className="input-field" required={isReq("horario_fim")} defaultValue={profReg?.horario_fim?.slice(0, 5) ?? "18:00"} />
-            </div>
-            <div>
-              {req("Tempo de atendimento (min)", "tempo_atendimento")}
-              <input name="tempo_atendimento" type="number" min="5" step="5" className="input-field" required={isReq("tempo_atendimento")} placeholder="60" defaultValue={profReg?.tempo_atendimento ?? 60} />
-            </div>
-          </div>
-
+          {/* Telefones */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Telefone 1</label>
-              <input name="telefone_1" type="text" className="input-field" placeholder="(42) 00000-0000"
-                value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
+              <input type="hidden" name="telefone_1" value={ddi1 === "+55" ? tel1 : `${ddi1} ${tel1}`} />
+              <div className="flex border border-sand/40 rounded-lg focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40 bg-white">
+                <DDISelector value={ddi1} onChange={setDdi1} name="_ddi1" />
+                <input
+                  type="text"
+                  value={tel1}
+                  onChange={e => setTel1(ddi1 === "+55" ? maskPhone(e.target.value) : e.target.value.replace(/[^\d\s\-().]/g, ""))}
+                  placeholder={ddi1 === "+55" ? "(00) 00000-0000" : "Número"}
+                  className="flex-1 py-2.5 px-3 text-sm text-forest bg-transparent rounded-r-lg focus:outline-none border-0"
+                />
+              </div>
             </div>
             <div>
               <label className="label">Telefone 2</label>
-              <input name="telefone_2" type="text" className="input-field" placeholder="(42) 00000-0000"
-                value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
+              <input type="hidden" name="telefone_2" value={ddi2 === "+55" ? tel2 : `${ddi2} ${tel2}`} />
+              <div className="flex border border-sand/40 rounded-lg focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40 bg-white">
+                <DDISelector value={ddi2} onChange={setDdi2} name="_ddi2" />
+                <input
+                  type="text"
+                  value={tel2}
+                  onChange={e => setTel2(ddi2 === "+55" ? maskPhone(e.target.value) : e.target.value.replace(/[^\d\s\-().]/g, ""))}
+                  placeholder={ddi2 === "+55" ? "(00) 00000-0000" : "Número"}
+                  className="flex-1 py-2.5 px-3 text-sm text-forest bg-transparent rounded-r-lg focus:outline-none border-0"
+                />
+              </div>
             </div>
           </div>
 
