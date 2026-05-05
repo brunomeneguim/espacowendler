@@ -1237,6 +1237,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     ghostEl: HTMLDivElement | null;
     currentTargetDay: Date;
     currentTargetTopPx: number;
+    grabOffsetY: number; // distância do cursor ao topo do card no momento do clique
   } | null>(null);
 
   // Suprimir o expand após um drag (para evitar abrir o popup ao soltar)
@@ -1255,10 +1256,13 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const handleMoveStart = useCallback((agId: string, startMouseY: number, originalTopPx: number, durationMin: number, el: HTMLDivElement, dia: Date) => {
     const ag = agendamentos.find(a => a.id === agId);
     if (!ag || ["realizado", "finalizado"].includes(ag.status)) return;
+    // Offset entre o cursor e o topo do card — usado para posicionar pelo topo do card, não pelo cursor
+    const grabOffsetY = startMouseY - el.getBoundingClientRect().top;
     moveDragRef.current = {
       agId, startMouseY, originalTopPx, originalDia: dia,
       durationMin, ag, el, hasMoved: false,
       ghostEl: null, currentTargetDay: dia, currentTargetTopPx: originalTopPx,
+      grabOffsetY,
     };
     document.body.style.userSelect = "none";
   }, [agendamentos]);
@@ -1272,7 +1276,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // Drag para mover card
     if (moveDragRef.current) {
-      const { startMouseY, el, durationMin, ag } = moveDragRef.current;
+      const { startMouseY, el, durationMin, ag, grabOffsetY } = moveDragRef.current;
       const deltaY = e.clientY - startMouseY;
       if (!moveDragRef.current.hasMoved && Math.abs(deltaY) < 5) return;
 
@@ -1307,8 +1311,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
         moveDragRef.current.currentTargetDay = new Date(y, m - 1, d);
 
         // Snap para hora cheia dentro da coluna
+        // Subtrai grabOffsetY para usar o topo do card (não o cursor) como referência de posição
         const rect = colEl.getBoundingClientRect();
-        const rawTopPx = e.clientY - rect.top;
+        const rawTopPx = e.clientY - rect.top - grabOffsetY;
         const step = PX_POR_HORA; // snap em horas cheias (ex: 10h, 11h, 12h)
         const snappedTopPx = Math.round(rawTopPx / step) * step;
         const maxTopPx = (TOTAL_HORAS - durationMin / 60) * PX_POR_HORA;
