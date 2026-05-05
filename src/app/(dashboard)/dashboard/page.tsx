@@ -55,7 +55,7 @@ export default async function DashboardPage({
       .order("data_hora_inicio", { ascending: true }),
     supabase
       .from("profissionais")
-      .select("id, cor, valor_consulta, duracao_consulta, profile:profiles(nome_completo)")
+      .select("id, profile_id, cor, valor_consulta, duracao_consulta, profile:profiles(nome_completo)")
       .eq("ativo", true)
       .order("id"),
     supabase
@@ -138,6 +138,7 @@ export default async function DashboardPage({
           aniversariantes: (todosAniversariantes as any) ?? [],
           weekStartStr: format(weekStart, "yyyy-MM-dd"),
           userRole: profile.role,
+          currentUserId: profile.id,
         }}
       />
     </div>

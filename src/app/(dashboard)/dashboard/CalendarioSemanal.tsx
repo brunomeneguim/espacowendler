@@ -51,7 +51,7 @@ interface Agendamento {
   profissional: { id: string; cor?: string | null; profile: { nome_completo: string } | null } | null;
   sala: { id: number; nome: string } | null;
 }
-interface Profissional { id: string; cor?: string | null; valor_consulta?: number | null; duracao_consulta?: number | null; profile: { nome_completo: string } | null }
+interface Profissional { id: string; profile_id?: string | null; cor?: string | null; valor_consulta?: number | null; duracao_consulta?: number | null; profile: { nome_completo: string } | null }
 interface Paciente     { id: string; nome_completo: string; telefone?: string }
 interface HorarioDisponivel { profissional_id: string; dia_semana: number; hora_inicio: string; hora_fim: string }
 interface Sala         { id: number; nome: string }
@@ -73,6 +73,7 @@ interface Props {
   salas: Sala[];
   weekStartStr: string;
   userRole: string;
+  currentUserId?: string;
   // Reagendar externo (controlado por DashboardContent)
   reagendarInfo?: ReagendarInfo | null;
   onSetReagendarInfo?: (info: ReagendarInfo | null) => void;
@@ -1055,15 +1056,24 @@ const STATUS_BADGE_LISTA: Record<string, string> = {
 };
 
 // ── Espelho de agendamento ────────────────────────────────────────
-function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas, weekStart, onClose }: {
+function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas, weekStart, userRole, currentUserId, onClose }: {
   profissionais: Profissional[];
   agendamentos: Agendamento[];
   horariosDisponiveis: HorarioDisponivel[];
   salas: Sala[];
   weekStart: Date;
+  userRole?: string;
+  currentUserId?: string;
   onClose: () => void;
 }) {
-  const [profId, setProfId] = useState<string>(profissionais[0]?.id ?? "");
+  const isProfissional = userRole === "profissional";
+  // Para profissional: pré-seleciona o próprio registro; para outros: primeiro da lista
+  const profissionalPropio = isProfissional
+    ? profissionais.find(p => p.profile_id === currentUserId)
+    : null;
+  const defaultProfId = profissionalPropio?.id ?? profissionais[0]?.id ?? "";
+
+  const [profId, setProfId] = useState<string>(defaultProfId);
   const [salaFiltro, setSalaFiltro] = useState<number | null>(salas[0]?.id ?? null);
 
   const dias = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i));
@@ -1099,11 +1109,12 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
 
         {/* Filtros */}
         <div className="px-6 py-3 border-b border-sand/20 flex gap-3 flex-wrap items-center">
-          {/* Profissional — select nativo */}
+          {/* Profissional — select nativo (bloqueado para role profissional) */}
           <select
             value={profId}
-            onChange={e => setProfId(e.target.value)}
-            className="input-field text-sm py-1.5 flex-1 min-w-52"
+            onChange={e => !isProfissional && setProfId(e.target.value)}
+            disabled={isProfissional}
+            className={`input-field text-sm py-1.5 flex-1 min-w-52 ${isProfissional ? "opacity-70 cursor-not-allowed bg-sand/30" : ""}`}
           >
             {profissionais.length === 0 && (
               <option value="">Nenhum profissional cadastrado</option>
@@ -1199,7 +1210,7 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
 }
 
 // ── Componente principal ──────────────────────────────────────────
-export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole, encaixes: encaixesProp = [], reagendarInfo: externalReagendarInfo, onSetReagendarInfo, onAddEncaixe, onRemoveEncaixe }: Props) {
+export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole, currentUserId, encaixes: encaixesProp = [], reagendarInfo: externalReagendarInfo, onSetReagendarInfo, onAddEncaixe, onRemoveEncaixe }: Props) {
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
@@ -2275,6 +2286,8 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
           horariosDisponiveis={horariosDisponiveis}
           salas={salas}
           weekStart={weekStart}
+          userRole={userRole}
+          currentUserId={currentUserId}
           onClose={() => setShowEspelho(false)}
         />
       )}
