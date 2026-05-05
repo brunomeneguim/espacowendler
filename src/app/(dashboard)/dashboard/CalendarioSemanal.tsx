@@ -1135,110 +1135,108 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
           </select>
         </div>
 
-        {/* Cabeçalho dos dias (fixo) */}
-        <div className="flex shrink-0 border-b border-sand/20 bg-white">
-          {/* espaço das horas */}
-          <div className="w-10 shrink-0" />
-          {dias.map(dia => {
-            const isHoje = isSameDay(dia, new Date());
-            return (
-              <div key={dia.toISOString()} className={`flex-1 min-w-0 px-1 py-2 text-center border-l border-sand/20 ${isHoje ? "bg-forest/5" : ""}`}>
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${isHoje ? "text-forest" : "text-forest-400"}`}>
-                  {format(dia, "EEE", { locale: ptBR })}
-                </p>
-                <p className={`text-xs font-bold ${isHoje ? "text-forest" : "text-forest-600"}`}>
-                  {format(dia, "d/MM")}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Grade de horários (scrollável) */}
-        <div className="flex-1 overflow-y-auto overflow-x-auto">
-          <div className="flex min-w-[600px]" style={{ height: TOTAL_HORAS * PX }}>
+        {/* Grade completa: cabeçalhos sticky + horários — tudo no mesmo scroll para alinhamento perfeito */}
+        <div className="flex-1 overflow-auto">
+          <div className="flex min-w-[560px]">
 
             {/* Coluna de horas */}
-            <div className="w-10 shrink-0 relative select-none" style={{ height: TOTAL_HORAS * PX }}>
-              {horasEspelho.map(h => (
-                <div
-                  key={h}
-                  className="absolute right-1.5 text-[9px] text-gray-400 leading-none"
-                  style={{ top: (h - HORA_INICIO) * PX - 5 }}
-                >
-                  {h}:00
-                </div>
-              ))}
+            <div className="w-10 shrink-0 relative select-none">
+              {/* Espaço sticky do cabeçalho */}
+              <div className="sticky top-0 z-20 h-[48px] bg-white border-b border-sand/20" />
+              {/* Labels */}
+              <div className="relative" style={{ height: TOTAL_HORAS * PX }}>
+                {horasEspelho.map(h => (
+                  <div
+                    key={h}
+                    className="absolute right-1.5 text-[9px] text-gray-400 leading-none"
+                    style={{ top: (h - HORA_INICIO) * PX - 5 }}
+                  >
+                    {String(h).padStart(2, "0")}:00
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Colunas dos dias */}
             {dias.map(dia => {
-              const ags = agsParaDia(dia);
+              const ags      = agsParaDia(dia);
               const horarios = horariosParaDia(dia);
+              const isHoje   = isSameDay(dia, new Date());
 
               return (
-                <div
-                  key={dia.toISOString()}
-                  className="flex-1 min-w-0 border-l border-sand/20 relative"
-                  style={{ height: TOTAL_HORAS * PX }}
-                >
-                  {/* Linhas de hora */}
-                  {horasEspelho.map(h => (
-                    <div
-                      key={h}
-                      className="absolute left-0 right-0 border-t border-gray-100"
-                      style={{ top: (h - HORA_INICIO) * PX }}
-                    />
-                  ))}
+                <div key={dia.toISOString()} className="flex-1 min-w-0 border-l border-sand/20 flex flex-col">
 
-                  {/* Faixas de horário disponível */}
-                  {horarios.map((h, i) => {
-                    const startMin = parseTimeToMinutes(h.hora_inicio) - HORA_INICIO * 60;
-                    const endMin   = parseTimeToMinutes(h.hora_fim)   - HORA_INICIO * 60;
-                    if (startMin >= TOTAL_HORAS * 60 || endMin <= 0) return null;
-                    const top    = (Math.max(0, startMin) / 60) * PX;
-                    const height = ((Math.min(TOTAL_HORAS * 60, endMin) - Math.max(0, startMin)) / 60) * PX;
-                    return (
+                  {/* Cabeçalho sticky do dia */}
+                  <div className={`sticky top-0 z-20 h-[48px] flex flex-col items-center justify-center px-1 border-b border-sand/20 ${isHoje ? "bg-forest/5" : "bg-white"}`}>
+                    <p className={`text-[10px] font-semibold uppercase tracking-wider ${isHoje ? "text-forest" : "text-forest-400"}`}>
+                      {format(dia, "EEE", { locale: ptBR })}
+                    </p>
+                    <p className={`text-xs font-bold ${isHoje ? "text-forest" : "text-forest-600"}`}>
+                      {format(dia, "d/MM")}
+                    </p>
+                  </div>
+
+                  {/* Grid de horários */}
+                  <div className="relative" style={{ height: TOTAL_HORAS * PX }}>
+
+                    {/* Linhas de hora — z-index acima das faixas verdes */}
+                    {horasEspelho.map(h => (
                       <div
-                        key={i}
-                        className="absolute left-0 right-0 bg-green-50 border-l-2 border-green-300"
-                        style={{ top, height, zIndex: 0 }}
+                        key={h}
+                        className="absolute left-0 right-0 border-t border-gray-200"
+                        style={{ top: (h - HORA_INICIO) * PX, zIndex: 1 }}
                       />
-                    );
-                  })}
+                    ))}
 
-                  {/* Cards de agendamento */}
-                  {ags.map(ag => {
-                    const startDate  = new Date(ag.data_hora_inicio);
-                    const endDate    = new Date(ag.data_hora_fim);
-                    const startMin   = startDate.getHours() * 60 + startDate.getMinutes() - HORA_INICIO * 60;
-                    const endMin     = endDate.getHours() * 60 + endDate.getMinutes()   - HORA_INICIO * 60;
-                    const top        = Math.max(0, (startMin / 60) * PX);
-                    const height     = Math.max(18, ((endMin - startMin) / 60) * PX - 2);
-                    const cfg        = STATUS[ag.status] ?? STATUS.agendado;
-                    const isAusencia = ag.status === "ausencia";
-                    const isFalta    = ag.status === "faltou" || ag.status === "cancelado";
+                    {/* Faixas de horário disponível */}
+                    {horarios.map((h, i) => {
+                      const startMin = parseTimeToMinutes(h.hora_inicio) - HORA_INICIO * 60;
+                      const endMin   = parseTimeToMinutes(h.hora_fim)   - HORA_INICIO * 60;
+                      if (startMin >= TOTAL_HORAS * 60 || endMin <= 0) return null;
+                      const top    = (Math.max(0, startMin) / 60) * PX;
+                      const height = ((Math.min(TOTAL_HORAS * 60, endMin) - Math.max(0, startMin)) / 60) * PX;
+                      return (
+                        <div
+                          key={i}
+                          className="absolute left-0 right-0 bg-green-50 border-l-2 border-green-300"
+                          style={{ top, height, zIndex: 0 }}
+                        />
+                      );
+                    })}
 
-                    return (
-                      <div
-                        key={ag.id}
-                        className={`absolute left-0.5 right-0.5 rounded px-1 py-0.5 overflow-hidden border text-[10px] leading-tight ${
-                          isAusencia ? "bg-gray-100 border-gray-300 text-gray-500" :
-                          isFalta    ? "bg-red-50 border-red-300 text-red-700" :
-                                       cfg.card
-                        }`}
-                        style={{ top, height, zIndex: 2 }}
-                      >
-                        <p className="font-semibold truncate">{format(startDate, "HH:mm")}–{format(endDate, "HH:mm")}</p>
-                        {height > 28 && (
-                          <p className="truncate opacity-80">{ag.paciente?.nome_completo ?? (isAusencia ? "Ausência" : "—")}</p>
-                        )}
-                        {height > 44 && ag.sala && (
-                          <p className="truncate opacity-60 text-[9px]">{ag.sala.nome}</p>
-                        )}
-                      </div>
-                    );
-                  })}
+                    {/* Cards de agendamento */}
+                    {ags.map(ag => {
+                      const startDate  = new Date(ag.data_hora_inicio);
+                      const endDate    = new Date(ag.data_hora_fim);
+                      const startMin   = startDate.getHours() * 60 + startDate.getMinutes() - HORA_INICIO * 60;
+                      const endMin     = endDate.getHours() * 60 + endDate.getMinutes()   - HORA_INICIO * 60;
+                      const top        = Math.max(0, (startMin / 60) * PX);
+                      const height     = Math.max(18, ((endMin - startMin) / 60) * PX - 2);
+                      const cfg        = STATUS[ag.status] ?? STATUS.agendado;
+                      const isAusencia = ag.status === "ausencia";
+                      const isFalta    = ag.status === "faltou" || ag.status === "cancelado";
+
+                      return (
+                        <div
+                          key={ag.id}
+                          className={`absolute left-0.5 right-0.5 rounded px-1 py-0.5 overflow-hidden border text-[10px] leading-tight ${
+                            isAusencia ? "bg-gray-100 border-gray-300 text-gray-500" :
+                            isFalta    ? "bg-red-50 border-red-300 text-red-700" :
+                                         cfg.card
+                          }`}
+                          style={{ top, height, zIndex: 2 }}
+                        >
+                          <p className="font-semibold truncate">{format(startDate, "HH:mm")}–{format(endDate, "HH:mm")}</p>
+                          {height > 28 && (
+                            <p className="truncate opacity-80">{ag.paciente?.nome_completo ?? (isAusencia ? "Ausência" : "—")}</p>
+                          )}
+                          {height > 44 && ag.sala && (
+                            <p className="truncate opacity-60 text-[9px]">{ag.sala.nome}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })}
