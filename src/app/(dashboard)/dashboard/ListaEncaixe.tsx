@@ -16,6 +16,9 @@ interface ReagendarInfo {
   profissionalId: string;
   profissionalNome: string;
   encaixeId?: string;
+  duracaoMin?: number;
+  tipoAgendamento?: string;
+  observacoes?: string | null;
 }
 
 interface Props {
@@ -321,6 +324,9 @@ export function ListaEncaixe({ encaixes, profissionais, onReagendar, onAddEncaix
                                 profissionalId: e.profissional_id!,
                                 profissionalNome: e.profissional?.profile?.nome_completo ?? "Profissional",
                                 encaixeId: e.id,
+                                duracaoMin: 60,
+                                tipoAgendamento: "consulta_avulsa",
+                                observacoes: e.observacoes ?? null,
                               });
                               // Fecha a lista para o usuário ver a agenda
                               setAberto(false);
