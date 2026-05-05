@@ -1065,7 +1065,6 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
 }) {
   const [profId, setProfId] = useState<string>(profissionais[0]?.id ?? "");
   const [salaFiltro, setSalaFiltro] = useState<number | null>(salas[0]?.id ?? null);
-  const [profNome, setProfNome] = useState(profissionais[0]?.profile?.nome_completo ?? "");
 
   const dias = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i));
   const profSelecionado = profissionais.find(p => p.id === profId);
@@ -1100,37 +1099,28 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
 
         {/* Filtros */}
         <div className="px-6 py-3 border-b border-sand/20 flex gap-3 flex-wrap items-center">
-          {/* Profissional searchable — datalist nativo */}
-          <div className="relative flex-1 min-w-52">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-forest-400 pointer-events-none z-10" />
-            <input
-              type="text"
-              list="espelho-profissionais"
-              placeholder="Selecione um profissional…"
-              value={profNome}
-              onChange={e => {
-                setProfNome(e.target.value);
-                const encontrado = profissionais.find(
-                  p => (p.profile?.nome_completo ?? "") === e.target.value
-                );
-                if (encontrado) setProfId(encontrado.id);
-              }}
-              className="input-field text-sm py-1.5 pl-8 w-full"
-            />
-            <datalist id="espelho-profissionais">
-              {profissionais.map(p => (
-                <option key={p.id} value={p.profile?.nome_completo ?? p.id} />
-              ))}
-            </datalist>
-          </div>
+          {/* Profissional — select nativo */}
+          <select
+            value={profId}
+            onChange={e => setProfId(e.target.value)}
+            className="input-field text-sm py-1.5 flex-1 min-w-52"
+          >
+            {profissionais.length === 0 && (
+              <option value="">Nenhum profissional cadastrado</option>
+            )}
+            {profissionais.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.profile?.nome_completo ?? p.id}
+              </option>
+            ))}
+          </select>
 
-          {/* Sala filter */}
+          {/* Sala filter — sem opção "todas" */}
           <select
             value={salaFiltro ?? ""}
             onChange={e => setSalaFiltro(e.target.value ? Number(e.target.value) : null)}
             className="text-sm border border-sand/40 rounded-lg px-3 py-1.5 bg-white text-forest focus:outline-none focus:ring-2 focus:ring-forest/20 shrink-0"
           >
-            <option value="">Todas as salas</option>
             {salas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
           </select>
         </div>
