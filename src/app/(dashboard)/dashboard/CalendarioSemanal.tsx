@@ -915,6 +915,7 @@ function SlotVazio({
 interface ColunaProps {
   dia: Date;
   ags: Agendamento[];
+  agsOutros?: Agendamento[]; // agendamentos de outros profissionais (para mostrar "Horário Indisponível")
   horariosParaDia: HorarioDisponivel[];
   mostrarHorarios: boolean;
   profColorMap: Map<string,string>;
@@ -936,7 +937,7 @@ interface ColunaProps {
   onReagendarSlotClick?: (dataStr: string, horaStr: string) => void;
 }
 
-function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, profValorConsultaMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, onMoveStart, pending, canEdit, salaId, expandedId, onExpand, privacyMode, reagendarInfo, onReagendarSlotClick }: ColunaProps) {
+function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, profValorConsultaMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, onMoveStart, pending, canEdit, salaId, expandedId, onExpand, privacyMode, reagendarInfo, onReagendarSlotClick }: ColunaProps) {
   const colMap = calcularColunas(ags);
   // Injeta dia no onMoveStart para que o handler pai saiba em qual coluna o drag começou
   const onMoveStartWithDia = onMoveStart
@@ -952,6 +953,12 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
   const slotsOcupados = new Set(
     ags.filter(a=>!["cancelado","faltou"].includes(a.status))
        .map(a => new Date(a.data_hora_inicio).getHours())
+  );
+  // Horas ocupadas por outros profissionais (para exibir "Horário Indisponível")
+  const horasConflito = new Set(
+    (agsOutros ?? [])
+      .filter(a => !["cancelado","faltou","ausencia"].includes(a.status))
+      .map(a => new Date(a.data_hora_inicio).getHours())
   );
 
   return (
@@ -972,6 +979,18 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
       {horas.map(h => {
         if (slotsOcupados.has(h)) return null;
         const isMetade = slotsMetade.has(h);
+        // Slot ocupado por outro profissional
+        if (horasConflito.has(h) && !isMetade) {
+          return (
+            <div
+              key={h}
+              className="absolute left-0 right-0 flex items-center justify-center bg-gray-50 border-t border-gray-100"
+              style={{ top: (h - HORA_INICIO) * PX_POR_HORA, height: PX_POR_HORA - 1, zIndex: 1 }}
+            >
+              <span className="text-[10px] text-gray-400 italic select-none">Horário Indisponível</span>
+            </div>
+          );
+        }
         return (
           <SlotVazio key={h} dia={dia} hora={h} salaId={salaId}
             reagendarInfo={reagendarInfo} onReagendarSlotClick={onReagendarSlotClick}
@@ -1149,7 +1168,7 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
                   <div
                     key={h}
                     className="absolute right-1.5 text-[9px] text-gray-400 leading-none"
-                    style={{ top: (h - HORA_INICIO) * PX - 5 }}
+                    style={{ top: Math.max(0, (h - HORA_INICIO) * PX - 5) }}
                   >
                     {String(h).padStart(2, "0")}:00
                   </div>
@@ -1187,6 +1206,26 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
                         style={{ top: (h - HORA_INICIO) * PX, zIndex: 1 }}
                       />
                     ))}
+
+                    {/* Horário Indisponível — horas não cobertas pelos horários do profissional */}
+                    {horasEspelho.map(h => {
+                      const horaCoberta = horarios.some(hr => {
+                        const s = parseTimeToMinutes(hr.hora_inicio);
+                        const e = parseTimeToMinutes(hr.hora_fim);
+                        return s <= h * 60 && e > h * 60;
+                      });
+                      const temAg = ags.some(ag => new Date(ag.data_hora_inicio).getHours() === h);
+                      if (horaCoberta || temAg) return null;
+                      return (
+                        <div
+                          key={h}
+                          className="absolute left-0 right-0 flex items-center justify-center bg-gray-50/70"
+                          style={{ top: (h - HORA_INICIO) * PX, height: PX - 1, zIndex: 0 }}
+                        >
+                          <span className="text-[9px] text-gray-400 italic select-none">Horário Indisponível</span>
+                        </div>
+                      );
+                    })}
 
                     {/* Faixas de horário disponível */}
                     {horarios.map((h, i) => {
@@ -1637,6 +1676,15 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   });
 
   const agsParaDia  = (dia:Date) => agsFiltrados.filter(a=>isSameDay(new Date(a.data_hora_inicio),dia));
+  // Agendamentos de OUTROS profissionais (para mostrar "Horário Indisponível" quando userRole=profissional)
+  const agsOutrosParaDia = (dia: Date) => {
+    if (userRole !== "profissional" || filtroProf === "todos") return [];
+    return agsDaSemana.filter(a =>
+      isSameDay(new Date(a.data_hora_inicio), dia) &&
+      a.profissional?.id !== filtroProf &&
+      (filtroSalaId === null || a.sala?.id === filtroSalaId)
+    );
+  };
   const horariosParaDia = (dia:Date) => {
     if (filtroProf==="todos") return [];
     return horariosDisponiveis.filter(h=>h.profissional_id===filtroProf && h.dia_semana===dia.getDay());
@@ -2231,6 +2279,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                 <DiaColuna
                   dia={selectedDay}
                   ags={agsParaDia(selectedDay)}
+                  agsOutros={agsOutrosParaDia(selectedDay)}
                   horariosParaDia={horariosParaDia(selectedDay)}
                   mostrarHorarios={filtroProf!=="todos"}
                   profColorMap={profColorMap}
