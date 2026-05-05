@@ -425,28 +425,28 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
             <div>
               <label className="label">Telefone 1</label>
               <input type="hidden" name="telefone_1" value={ddi1 === "+55" ? tel1 : `${ddi1} ${tel1}`} />
-              <div className="flex border border-sand/40 rounded-lg focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40 bg-white">
+              <div className="flex rounded-lg overflow-hidden border border-sand/40 focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40">
                 <DDISelector value={ddi1} onChange={setDdi1} name="_ddi1" />
                 <input
                   type="text"
                   value={tel1}
                   onChange={e => setTel1(ddi1 === "+55" ? maskPhone(e.target.value) : e.target.value.replace(/[^\d\s\-().]/g, ""))}
                   placeholder={ddi1 === "+55" ? "(00) 00000-0000" : "Número"}
-                  className="flex-1 py-2.5 px-3 text-sm text-forest bg-transparent rounded-r-lg focus:outline-none border-0"
+                  className="flex-1 px-3 py-2.5 text-sm text-forest focus:outline-none bg-white border-l border-sand/40"
                 />
               </div>
             </div>
             <div>
               <label className="label">Telefone 2</label>
               <input type="hidden" name="telefone_2" value={ddi2 === "+55" ? tel2 : `${ddi2} ${tel2}`} />
-              <div className="flex border border-sand/40 rounded-lg focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40 bg-white">
+              <div className="flex rounded-lg overflow-hidden border border-sand/40 focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40">
                 <DDISelector value={ddi2} onChange={setDdi2} name="_ddi2" />
                 <input
                   type="text"
                   value={tel2}
                   onChange={e => setTel2(ddi2 === "+55" ? maskPhone(e.target.value) : e.target.value.replace(/[^\d\s\-().]/g, ""))}
                   placeholder={ddi2 === "+55" ? "(00) 00000-0000" : "Número"}
-                  className="flex-1 py-2.5 px-3 text-sm text-forest bg-transparent rounded-r-lg focus:outline-none border-0"
+                  className="flex-1 px-3 py-2.5 text-sm text-forest focus:outline-none bg-white border-l border-sand/40"
                 />
               </div>
             </div>
