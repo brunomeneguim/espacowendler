@@ -839,13 +839,22 @@ interface ReagendarInfo {
 function SlotVazio({
   dia, hora, salaId,
   reagendarInfo, onReagendarSlotClick,
+  leftPct = 0, widthPct = 100,
 }: {
   dia: Date; hora: number; salaId: number | null;
   reagendarInfo?: ReagendarInfo | null;
   onReagendarSlotClick?: (dataStr: string, horaStr: string) => void;
+  leftPct?: number; widthPct?: number;
 }) {
   const dataStr = format(dia, "yyyy-MM-dd");
   const horaStr = `${String(hora).padStart(2,"0")}:00`;
+  const posStyle: React.CSSProperties = {
+    top: (hora - HORA_INICIO) * PX_POR_HORA + 1,
+    height: PX_POR_HORA - 2,
+    left: `${leftPct}%`,
+    width: `${widthPct}%`,
+    zIndex: 1,
+  };
 
   if (reagendarInfo && onReagendarSlotClick) {
     // Modo reagendar com dados completos → agenda direto sem formulário
@@ -853,8 +862,8 @@ function SlotVazio({
       return (
         <button
           onClick={() => onReagendarSlotClick(dataStr, horaStr)}
-          className="absolute left-0 right-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity group border-2 border-dashed rounded border-blue-300 hover:bg-blue-50 hover:border-blue-500"
-          style={{ top: (hora - HORA_INICIO) * PX_POR_HORA + 1, height: PX_POR_HORA - 2, zIndex: 1 }}
+          className="absolute flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity group border-2 border-dashed rounded border-blue-300 hover:bg-blue-50 hover:border-blue-500"
+          style={posStyle}
           title={`Reagendar ${reagendarInfo.pacienteNome} às ${horaStr}`}
         >
           <span className="flex items-center gap-1 text-xs text-blue-500 group-hover:text-blue-700 font-medium">
@@ -875,8 +884,8 @@ function SlotVazio({
       <Link
         href={href}
         onClick={() => onReagendarSlotClick(dataStr, horaStr)}
-        className="absolute left-0 right-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity group border-2 border-dashed rounded border-blue-300 hover:bg-blue-50 hover:border-blue-500"
-        style={{ top:(hora-HORA_INICIO)*PX_POR_HORA+1, height:PX_POR_HORA-2, zIndex:1 }}
+        className="absolute flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity group border-2 border-dashed rounded border-blue-300 hover:bg-blue-50 hover:border-blue-500"
+        style={posStyle}
         title={`Reagendar ${reagendarInfo.pacienteNome} às ${horaStr}`}
       >
         <span className="flex items-center gap-1 text-xs text-blue-500 group-hover:text-blue-700 font-medium">
@@ -890,8 +899,8 @@ function SlotVazio({
   return (
     <Link
       href={href}
-      className="absolute left-0 right-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity group border border-dashed rounded border-gray-200 hover:bg-forest/5 hover:border-forest/30"
-      style={{ top:(hora-HORA_INICIO)*PX_POR_HORA+1, height:PX_POR_HORA-2, zIndex:1 }}
+      className="absolute flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity group border border-dashed rounded border-gray-200 hover:bg-forest/5 hover:border-forest/30"
+      style={posStyle}
       title={`Agendar às ${horaStr}`}
     >
       <span className="flex items-center gap-1 text-xs text-forest/60 group-hover:text-forest font-medium">
@@ -934,6 +943,11 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
         onMoveStart(agId, startY, topPx, durMin, el, dia)
     : undefined;
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
+  // Slots com card de meia largura (faltou/cancelado) mas sem card normal por cima
+  const slotsMetade = new Set(
+    ags.filter(a => ["cancelado","faltou"].includes(a.status))
+       .map(a => new Date(a.data_hora_inicio).getHours())
+  );
   const slotsOcupados = new Set(
     ags.filter(a=>!["cancelado","faltou"].includes(a.status))
        .map(a => new Date(a.data_hora_inicio).getHours())
@@ -954,9 +968,16 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
         return <div key={i} className="absolute left-0 right-0 bg-green-50 border-l-2 border-green-200" style={{ top, height, zIndex:0 }} />;
       })}
 
-      {horas.map(h => slotsOcupados.has(h) ? null : (
-        <SlotVazio key={h} dia={dia} hora={h} salaId={salaId} reagendarInfo={reagendarInfo} onReagendarSlotClick={onReagendarSlotClick} />
-      ))}
+      {horas.map(h => {
+        if (slotsOcupados.has(h)) return null;
+        const isMetade = slotsMetade.has(h);
+        return (
+          <SlotVazio key={h} dia={dia} hora={h} salaId={salaId}
+            reagendarInfo={reagendarInfo} onReagendarSlotClick={onReagendarSlotClick}
+            leftPct={isMetade ? 50 : 0} widthPct={isMetade ? 50 : 100}
+          />
+        );
+      })}
 
       {ags.map(ag => {
         const ini = new Date(ag.data_hora_inicio), fim = new Date(ag.data_hora_fim);
