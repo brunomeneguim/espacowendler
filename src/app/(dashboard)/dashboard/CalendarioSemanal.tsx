@@ -964,15 +964,14 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
         const duracaoMin = (fim.getTime()-ini.getTime())/60000;
         const top = (inicioMin/60)*PX_POR_HORA;
         const isAusenciaFalta = ["ausencia", "faltou", "cancelado"].includes(ag.status);
-        const height = isAusenciaFalta
-          ? Math.max(16, (duracaoMin/60)*PX_POR_HORA / 2 - 1)
-          : Math.max(22, (duracaoMin/60)*PX_POR_HORA - 2);
+        const height = Math.max(22, (duracaoMin/60)*PX_POR_HORA - 2);
         const { col, total } = colMap.get(ag.id) ?? { col:0, total:1 };
+        const widthPct = isAusenciaFalta ? 50 / total : 100 / total;
         return (
           <AgendamentoCard
             key={ag.id}
             ag={ag}
-            style={{ top:Math.max(0,top), height, left:`${(col/total)*100}%`, width:`calc(${100/total}% - 2px)` }}
+            style={{ top:Math.max(0,top), height, left:`${(col/total)*100}%`, width:`calc(${widthPct}% - 2px)` }}
             bordaProf={profColorMap.get(ag.profissional?.id ?? "") ?? BORDA_PROF[0]}
             profHex={ag.profissional?.cor ? getCorById(ag.profissional.cor).hex : "#ffffff"}
             profValorConsulta={profValorConsultaMap.get(ag.profissional?.id ?? "")}
