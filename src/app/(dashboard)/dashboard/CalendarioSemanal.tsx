@@ -1065,15 +1065,10 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
 }) {
   const [profId, setProfId] = useState<string>(profissionais[0]?.id ?? "");
   const [salaFiltro, setSalaFiltro] = useState<number | null>(salas[0]?.id ?? null);
-  const [busca, setBusca] = useState("");          // texto que o usuário está digitando
-  const [dropdownAberto, setDropdownAberto] = useState(false);
+  const [profNome, setProfNome] = useState(profissionais[0]?.profile?.nome_completo ?? "");
 
   const dias = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i));
   const profSelecionado = profissionais.find(p => p.id === profId);
-  // Mostra todos quando busca vazia, filtra quando o usuário digita
-  const profsFiltrados = busca.trim()
-    ? profissionais.filter(p => (p.profile?.nome_completo ?? "").toLowerCase().includes(busca.toLowerCase()))
-    : profissionais;
 
   function agsParaDia(dia: Date) {
     return agendamentos
@@ -1105,40 +1100,28 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
 
         {/* Filtros */}
         <div className="px-6 py-3 border-b border-sand/20 flex gap-3 flex-wrap items-center">
-          {/* Profissional searchable */}
+          {/* Profissional searchable — datalist nativo */}
           <div className="relative flex-1 min-w-52">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-forest-400 pointer-events-none" />
-            {/* Campo de busca: mostra o nome selecionado quando fechado, limpa ao abrir */}
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-forest-400 pointer-events-none z-10" />
             <input
               type="text"
+              list="espelho-profissionais"
               placeholder="Selecione um profissional…"
-              value={dropdownAberto ? busca : (profSelecionado?.profile?.nome_completo ?? "")}
-              onFocus={() => { setBusca(""); setDropdownAberto(true); }}
-              onChange={e => setBusca(e.target.value)}
-              onBlur={() => setTimeout(() => { setDropdownAberto(false); setBusca(""); }, 160)}
-              className="input-field text-sm py-1.5 pl-8 w-full cursor-pointer"
-              readOnly={!dropdownAberto}
+              value={profNome}
+              onChange={e => {
+                setProfNome(e.target.value);
+                const encontrado = profissionais.find(
+                  p => (p.profile?.nome_completo ?? "") === e.target.value
+                );
+                if (encontrado) setProfId(encontrado.id);
+              }}
+              className="input-field text-sm py-1.5 pl-8 w-full"
             />
-            {dropdownAberto && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-sand/40 rounded-xl shadow-lg z-[100] max-h-52 overflow-y-auto">
-                {profsFiltrados.length === 0 ? (
-                  <p className="px-3 py-2 text-sm text-forest-400">Nenhum profissional encontrado.</p>
-                ) : profsFiltrados.map(p => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onMouseDown={() => {
-                      setProfId(p.id);
-                      setBusca("");
-                      setDropdownAberto(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-sand/20 ${p.id === profId ? "text-forest font-semibold bg-sand/10" : "text-forest-700"}`}
-                  >
-                    {p.profile?.nome_completo ?? p.id}
-                  </button>
-                ))}
-              </div>
-            )}
+            <datalist id="espelho-profissionais">
+              {profissionais.map(p => (
+                <option key={p.id} value={p.profile?.nome_completo ?? p.id} />
+              ))}
+            </datalist>
           </div>
 
           {/* Sala filter */}
