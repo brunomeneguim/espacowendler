@@ -984,15 +984,44 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
         const inicioMin = (ini.getHours()-HORA_INICIO)*60 + ini.getMinutes();
         const duracaoMin = (fim.getTime()-ini.getTime())/60000;
         const top = (inicioMin/60)*PX_POR_HORA;
-        const isAusenciaFalta = ["ausencia", "faltou", "cancelado"].includes(ag.status);
         const height = Math.max(22, (duracaoMin/60)*PX_POR_HORA - 2);
-        const { col, total } = colMap.get(ag.id) ?? { col:0, total:1 };
-        const widthPct = isAusenciaFalta ? 50 / total : 100 / total;
+        const isAF = ["ausencia", "faltou", "cancelado"].includes(ag.status);
+        const agIni = ini.getTime(), agFim = fim.getTime();
+        const overlaps = ags.filter(o => {
+          if (o.id === ag.id) return false;
+          return new Date(o.data_hora_inicio).getTime() < agFim && new Date(o.data_hora_fim).getTime() > agIni;
+        });
+        const normalOverlaps = overlaps.filter(o => !["ausencia","faltou","cancelado"].includes(o.status));
+        const afOverlaps    = overlaps.filter(o =>  ["ausencia","faltou","cancelado"].includes(o.status));
+
+        let cardLeft: string, cardWidth: string;
+        if (isAF && normalOverlaps.length > 0) {
+          // AF card alongside normal cards → always left half, sub-divided among AF cards
+          const allAF = [ag, ...afOverlaps].sort((a,b) => a.id < b.id ? -1 : 1);
+          const idx = allAF.findIndex(a => a.id === ag.id);
+          const tot = allAF.length;
+          cardLeft  = `${(idx / tot) * 50}%`;
+          cardWidth = `calc(${50 / tot}% - 2px)`;
+        } else if (!isAF && afOverlaps.length > 0) {
+          // Normal card alongside AF cards → always right half, sub-divided among normal cards
+          const allNormal = [ag, ...normalOverlaps].sort((a,b) => a.id < b.id ? -1 : 1);
+          const idx = allNormal.findIndex(a => a.id === ag.id);
+          const tot = allNormal.length;
+          cardLeft  = `${50 + (idx / tot) * 50}%`;
+          cardWidth = `calc(${50 / tot}% - 2px)`;
+        } else {
+          // Homogeneous overlap (all AF or all normal): regular column split
+          const { col, total } = colMap.get(ag.id) ?? { col:0, total:1 };
+          cardLeft  = `${(col / total) * 100}%`;
+          cardWidth = isAF && total === 1
+            ? "calc(50% - 2px)"                      // solo AF card → left half
+            : `calc(${100 / total}% - 2px)`;         // multiple of same type → full split
+        }
         return (
           <AgendamentoCard
             key={ag.id}
             ag={ag}
-            style={{ top:Math.max(0,top), height, left:`${(col/total)*100}%`, width:`calc(${widthPct}% - 2px)` }}
+            style={{ top:Math.max(0,top), height, left: cardLeft, width: cardWidth }}
             bordaProf={profColorMap.get(ag.profissional?.id ?? "") ?? BORDA_PROF[0]}
             profHex={ag.profissional?.cor ? getCorById(ag.profissional.cor).hex : "#ffffff"}
             profValorConsulta={profValorConsultaMap.get(ag.profissional?.id ?? "")}
@@ -1026,135 +1055,161 @@ const STATUS_BADGE_LISTA: Record<string, string> = {
 };
 
 // ── Espelho de agendamento ────────────────────────────────────────
-function EspelhoModal({ dia, agendamentos, onClose }: {
-  dia: Date;
+function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas, weekStart, onClose }: {
+  profissionais: Profissional[];
   agendamentos: Agendamento[];
+  horariosDisponiveis: HorarioDisponivel[];
+  salas: Sala[];
+  weekStart: Date;
   onClose: () => void;
 }) {
-  const sorted = [...agendamentos].sort(
-    (a, b) => new Date(a.data_hora_inicio).getTime() - new Date(b.data_hora_inicio).getTime()
-  );
-  const diaLabel = format(dia, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
+  const [profId, setProfId] = useState<string>(profissionais[0]?.id ?? "");
+  const [salaFiltro, setSalaFiltro] = useState<number | null>(null);
+  const [busca, setBusca] = useState("");
+  const [dropdownAberto, setDropdownAberto] = useState(false);
 
-  function handlePrint() {
-    const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8"/>
-<title>Espelho – ${diaLabel}</title>
-<style>
-  body { font-family: sans-serif; padding: 32px; color: #1a2e1a; font-size: 13px; }
-  h1 { font-size: 18px; margin-bottom: 2px; }
-  p.sub { color: #6b7280; margin-bottom: 20px; font-size: 12px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #f3f4f0; text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #4b6347; border-bottom: 2px solid #d1d9cf; }
-  td { padding: 8px 12px; border-bottom: 1px solid #e9ede8; vertical-align: top; }
-  tr:last-child td { border-bottom: none; }
-  .status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-  .agendado   { background:#dbeafe; color:#1d4ed8; }
-  .confirmado { background:#dcfce7; color:#166534; }
-  .realizado  { background:#ccfbf1; color:#0f766e; }
-  .finalizado { background:#f3f4f6; color:#4b5563; }
-  .cancelado  { background:#fee2e2; color:#991b1b; }
-  .faltou     { background:#ffedd5; color:#c2410c; }
-  @media print { body { padding: 16px; } }
-</style>
-</head>
-<body>
-<h1>espaço wendler</h1>
-<p class="sub">Espelho de agendamento · ${diaLabel}</p>
-<table>
-<thead><tr>
-  <th>Horário</th>
-  <th>Paciente</th>
-  <th>Profissional</th>
-  <th>Sala</th>
-  <th>Status</th>
-</tr></thead>
-<tbody>
-${sorted.map(ag => {
-  const inicio = format(new Date(ag.data_hora_inicio), "HH:mm");
-  const fim    = format(new Date(ag.data_hora_fim),    "HH:mm");
-  const paciente = ag.paciente?.nome_completo ?? "—";
-  const prof     = ag.profissional?.profile?.nome_completo ?? "—";
-  const sala     = ag.sala?.nome ?? "—";
-  const status   = ag.status;
-  return `<tr>
-    <td>${inicio} – ${fim}</td>
-    <td>${paciente}</td>
-    <td>${prof}</td>
-    <td>${sala}</td>
-    <td><span class="status ${status}">${STATUS[ag.status]?.label ?? ag.status}</span></td>
-  </tr>`;
-}).join("")}
-</tbody>
-</table>
-<p style="margin-top:24px;font-size:11px;color:#9ca3af;">
-  Gerado em ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-</p>
-<script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }</script>
-</body></html>`;
-    const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
+  const dias = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i));
+  const profSelecionado = profissionais.find(p => p.id === profId);
+  const profsFiltrados = profissionais.filter(p =>
+    (p.profile?.nome_completo ?? "").toLowerCase().includes(busca.toLowerCase())
+  );
+
+  function agsParaDia(dia: Date) {
+    return agendamentos
+      .filter(ag => {
+        if (ag.profissional?.id !== profId) return false;
+        if (salaFiltro && ag.sala?.id !== salaFiltro) return false;
+        return isSameDay(new Date(ag.data_hora_inicio), dia);
+      })
+      .sort((a, b) => new Date(a.data_hora_inicio).getTime() - new Date(b.data_hora_inicio).getTime());
   }
+
+  function horariosParaDia(dia: Date) {
+    return horariosDisponiveis.filter(h => h.profissional_id === profId && h.dia_semana === dia.getDay());
+  }
+
+  const totalAgs = agendamentos.filter(ag => ag.profissional?.id === profId && (!salaFiltro || ag.sala?.id === salaFiltro)).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[88vh] flex flex-col" onClick={e => e.stopPropagation()}>
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30">
-          <div>
-            <p className="text-xs text-forest-400 uppercase tracking-wider mb-0.5">Espelho de agendamento</p>
-            <h2 className="font-display text-lg font-semibold text-forest capitalize">{diaLabel}</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-forest text-cream text-sm font-medium hover:bg-forest/90 transition-colors"
-            >
-              <FileText className="w-3.5 h-3.5" /> Imprimir
-            </button>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-sand/30 text-forest-400 transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          <p className="text-xs text-forest-400 uppercase tracking-wider font-medium">Espelho de agendamento</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-sand/30 text-forest-400 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto flex-1 px-6 py-4">
-          {sorted.length === 0 ? (
-            <p className="text-sm text-forest-400 text-center py-8">Nenhum agendamento neste dia.</p>
-          ) : (
-            <div className="divide-y divide-sand/20">
-              {sorted.map(ag => {
-                const inicio = format(new Date(ag.data_hora_inicio), "HH:mm");
-                const fim    = format(new Date(ag.data_hora_fim),    "HH:mm");
-                const cfg    = STATUS[ag.status] ?? STATUS.agendado;
-                return (
-                  <div key={ag.id} className="flex items-center gap-4 py-3">
-                    <div className="text-center shrink-0 w-16">
-                      <p className="text-sm font-medium text-forest">{inicio}</p>
-                      <p className="text-xs text-forest-400">{fim}</p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-forest truncate">{ag.paciente?.nome_completo ?? "—"}</p>
-                      <p className="text-xs text-forest-500 truncate">
-                        {ag.profissional?.profile?.nome_completo}{ag.sala ? ` · ${ag.sala.nome}` : ""}
-                      </p>
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${cfg.badge}`}>{cfg.label}</span>
+        {/* Filtros */}
+        <div className="px-6 py-3 border-b border-sand/20 flex gap-3 flex-wrap items-center">
+          {/* Profissional searchable */}
+          <div className="relative flex-1 min-w-52">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-forest-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar profissional…"
+              value={dropdownAberto ? busca : (profSelecionado?.profile?.nome_completo ?? "")}
+              onFocus={() => { setBusca(""); setDropdownAberto(true); }}
+              onChange={e => { setBusca(e.target.value); setDropdownAberto(true); }}
+              onBlur={() => setTimeout(() => setDropdownAberto(false), 150)}
+              className="input-field text-sm py-1.5 pl-8 w-full"
+            />
+            {dropdownAberto && profsFiltrados.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-sand/40 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto">
+                {profsFiltrados.map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onMouseDown={() => { setProfId(p.id); setBusca(""); setDropdownAberto(false); }}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-sand/20 ${p.id === profId ? "text-forest font-semibold bg-sand/10" : "text-forest-700"}`}
+                  >
+                    {p.profile?.nome_completo ?? p.id}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sala filter */}
+          <select
+            value={salaFiltro ?? ""}
+            onChange={e => setSalaFiltro(e.target.value ? Number(e.target.value) : null)}
+            className="text-sm border border-sand/40 rounded-lg px-3 py-1.5 bg-white text-forest focus:outline-none focus:ring-2 focus:ring-forest/20 shrink-0"
+          >
+            <option value="">Todas as salas</option>
+            {salas.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          </select>
+        </div>
+
+        {/* Grade semanal */}
+        <div className="flex-1 overflow-auto">
+          <div className="flex divide-x divide-sand/20 min-w-[700px] h-full">
+            {dias.map(dia => {
+              const ags = agsParaDia(dia);
+              const horarios = horariosParaDia(dia);
+              const isHoje = isSameDay(dia, new Date());
+
+              return (
+                <div key={dia.toISOString()} className="flex-1 flex flex-col min-w-0">
+                  {/* Cabeçalho do dia */}
+                  <div className={`px-2 py-2 text-center border-b border-sand/20 shrink-0 ${isHoje ? "bg-forest/5" : "bg-sand/5"}`}>
+                    <p className={`text-[10px] font-semibold uppercase tracking-wider ${isHoje ? "text-forest" : "text-forest-400"}`}>
+                      {format(dia, "EEE", { locale: ptBR })}
+                    </p>
+                    <p className={`text-sm font-bold ${isHoje ? "text-forest" : "text-forest-600"}`}>
+                      {format(dia, "d/MM")}
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          )}
+
+                  {/* Conteúdo do dia */}
+                  <div className="flex-1 p-1.5 space-y-1 overflow-y-auto min-h-40">
+                    {/* Horários disponíveis */}
+                    {horarios.map((h, i) => (
+                      <div key={i} className="text-[10px] text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-1 leading-tight">
+                        <span className="font-semibold">Disponível</span><br />
+                        {h.hora_inicio.slice(0,5)}–{h.hora_fim.slice(0,5)}
+                      </div>
+                    ))}
+
+                    {ags.length === 0 && horarios.length === 0 && (
+                      <p className="text-[10px] text-forest-300 text-center pt-4">—</p>
+                    )}
+
+                    {ags.map(ag => {
+                      const inicio = format(new Date(ag.data_hora_inicio), "HH:mm");
+                      const fim    = format(new Date(ag.data_hora_fim),    "HH:mm");
+                      const cfg    = STATUS[ag.status] ?? STATUS.agendado;
+                      const isAusencia = ag.status === "ausencia";
+                      const isFalta    = ag.status === "faltou" || ag.status === "cancelado";
+
+                      return (
+                        <div key={ag.id} className={`rounded-lg px-2 py-1.5 text-[11px] border leading-tight ${
+                          isAusencia ? "bg-gray-50 border-gray-200 text-gray-500" :
+                          isFalta    ? "bg-red-50 border-red-200 text-red-700" :
+                                       "bg-white border-sand/40 text-forest"
+                        }`}>
+                          <div className="flex items-center justify-between gap-1 mb-0.5">
+                            <span className="font-semibold text-[10px]">{inicio}–{fim}</span>
+                            <span className={`text-[9px] px-1 py-0.5 rounded-full font-medium shrink-0 ${cfg.badge}`}>{cfg.label}</span>
+                          </div>
+                          <p className="truncate font-medium">{ag.paciente?.nome_completo ?? (isAusencia ? "Ausência" : "—")}</p>
+                          {ag.sala && <p className="text-[10px] opacity-60 truncate">{ag.sala.nome}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-sand/20 text-xs text-forest-400">
-          {sorted.length} agendamento{sorted.length !== 1 ? "s" : ""}
+        <div className="px-6 py-3 border-t border-sand/20 text-xs text-forest-400 shrink-0">
+          {totalAgs} agendamento{totalAgs !== 1 ? "s" : ""} na semana
+          {profSelecionado && <span className="ml-1">· {profSelecionado.profile?.nome_completo}</span>}
         </div>
       </div>
     </div>
@@ -2233,8 +2288,11 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
       {/* Espelho de agendamento */}
       {showEspelho && (
         <EspelhoModal
-          dia={selectedDay}
-          agendamentos={agsParaDia(selectedDay)}
+          profissionais={profissionais}
+          agendamentos={agendamentos}
+          horariosDisponiveis={horariosDisponiveis}
+          salas={salas}
+          weekStart={weekStart}
           onClose={() => setShowEspelho(false)}
         />
       )}
