@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   TrendingUp, TrendingDown, Clock, AlertCircle,
-  Check, Pencil, Trash2, Loader2, Filter,
+  Check, Pencil, Trash2, Loader2,
   Calendar, DollarSign, UserCircle,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -139,16 +139,24 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
   const [pagarId, setPagarId] = useState<string | null>(null);
   const [pagarForma, setPagarForma] = useState("pix");
   const [excluirId, setExcluirId] = useState<string | null>(null);
+  const [localFiltros, setLocalFiltros] = useState<Filtros>(filtros);
 
-  function applyFilter(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+  const navegar = useCallback((novo: Filtros) => {
     const params = new URLSearchParams();
-    (["periodo_inicio", "periodo_fim", "tipo", "status", "profissional_id", "sala_id"] as const).forEach(k => {
-      const v = fd.get(k) as string;
-      if (v) params.set(k, v);
-    });
+    (Object.keys(novo) as (keyof Filtros)[]).forEach(k => { if (novo[k]) params.set(k, novo[k]); });
     router.push(`/financeiro?${params.toString()}`);
+  }, [router]);
+
+  function handleChange(key: keyof Filtros, value: string) {
+    const novo = { ...localFiltros, [key]: value };
+    setLocalFiltros(novo);
+    navegar(novo);
+  }
+
+  function handleDateChange(key: keyof Filtros, value: string) {
+    const novo = { ...localFiltros, [key]: value };
+    setLocalFiltros(novo);
+    if (value === "" || value.length === 10) navegar(novo);
   }
 
   return (
@@ -166,20 +174,22 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
       </div>
 
       {/* Filtros */}
-      <form onSubmit={applyFilter} className="flex flex-wrap gap-2 items-end">
+      <div className="flex flex-wrap gap-2 items-end">
         <div>
           <label className="label text-xs">De</label>
-          <input type="date" name="periodo_inicio" defaultValue={filtros.periodo_inicio}
+          <input type="date" value={localFiltros.periodo_inicio}
+            onChange={e => handleDateChange("periodo_inicio", e.target.value)}
             className="input-field py-1.5 text-sm" />
         </div>
         <div>
           <label className="label text-xs">Até</label>
-          <input type="date" name="periodo_fim" defaultValue={filtros.periodo_fim}
+          <input type="date" value={localFiltros.periodo_fim}
+            onChange={e => handleDateChange("periodo_fim", e.target.value)}
             className="input-field py-1.5 text-sm" />
         </div>
         <div>
           <label className="label text-xs">Tipo</label>
-          <select name="tipo" defaultValue={filtros.tipo} className="input-field py-1.5 text-sm">
+          <select value={localFiltros.tipo} onChange={e => handleChange("tipo", e.target.value)} className="input-field py-1.5 text-sm">
             <option value="">Todos</option>
             <option value="receita">Receita</option>
             <option value="despesa">Despesa</option>
@@ -187,7 +197,7 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
         </div>
         <div>
           <label className="label text-xs">Status</label>
-          <select name="status" defaultValue={filtros.status} className="input-field py-1.5 text-sm">
+          <select value={localFiltros.status} onChange={e => handleChange("status", e.target.value)} className="input-field py-1.5 text-sm">
             <option value="">Todos</option>
             <option value="pendente">Pendente</option>
             <option value="pago">Pago</option>
@@ -197,7 +207,7 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
         {profissionais.length > 0 && (
           <div>
             <label className="label text-xs">Profissional</label>
-            <select name="profissional_id" defaultValue={filtros.profissional_id} className="input-field py-1.5 text-sm">
+            <select value={localFiltros.profissional_id} onChange={e => handleChange("profissional_id", e.target.value)} className="input-field py-1.5 text-sm">
               <option value="">Todos</option>
               {profissionais.map(p => (
                 <option key={p.id} value={p.id}>
@@ -210,7 +220,7 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
         {salas.length > 0 && (
           <div>
             <label className="label text-xs">Sala</label>
-            <select name="sala_id" defaultValue={filtros.sala_id} className="input-field py-1.5 text-sm">
+            <select value={localFiltros.sala_id} onChange={e => handleChange("sala_id", e.target.value)} className="input-field py-1.5 text-sm">
               <option value="">Todas</option>
               {salas.map(s => (
                 <option key={s.id} value={String(s.id)}>{s.nome}</option>
@@ -218,10 +228,7 @@ export function FinanceiroClient({ lancamentos, totaisMes, filtros, isAdmin, pro
             </select>
           </div>
         )}
-        <button type="submit" className="btn-secondary py-1.5 text-sm flex items-center gap-1.5">
-          <Filter className="w-3.5 h-3.5" /> Filtrar
-        </button>
-      </form>
+      </div>
 
       {/* Tabela */}
       <div className="card p-0 overflow-hidden">

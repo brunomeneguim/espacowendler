@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import {
-  Upload, X, Loader2, User, ChevronDown, Check, Eye, EyeOff, KeyRound, Stethoscope, Clock,
+  Upload, X, Loader2, User, ChevronDown, Check, Eye, EyeOff, KeyRound, Stethoscope,
 } from "lucide-react";
 import { editarProfissionalCompleto } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
 import { EspecialidadesMultiSelect } from "../../EspecialidadesMultiSelect";
+import { DDISelector } from "../../../pacientes/novo/DDISelector";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
 function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; value: string; onChange: (v: string) => void }) {
@@ -112,6 +113,27 @@ function maskCnpj(v: string) {
     .replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
 }
 
+// ── Parse DDI de número armazenado ────────────────────────────────
+function parseTelDdi(val: string): string {
+  if (!val) return "+55";
+  const trimmed = val.trim();
+  if (trimmed.startsWith("+")) {
+    const m = trimmed.match(/^(\+\d{1,4})\s*/);
+    if (m) return m[1];
+  }
+  return "+55";
+}
+function parseTelNum(val: string): string {
+  if (!val) return "";
+  const trimmed = val.trim();
+  if (trimmed.startsWith("+")) {
+    const m = trimmed.match(/^(\+\d{1,4})\s*(.*)/);
+    if (m) return m[2];
+    return "";
+  }
+  return maskPhone(trimmed);
+}
+
 // ── Input de valor monetário ──────────────────────────────────────
 function MoneyInput({ name, defaultValue, placeholder }: { name: string; defaultValue?: number | null; placeholder?: string }) {
   const toDisplay = (v: number | string | null | undefined) => {
@@ -151,8 +173,8 @@ function MoneyInput({ name, defaultValue, placeholder }: { name: string; default
 
 function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
   return (
-    <div className="card p-0 overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-3 bg-forest/5 border-b border-sand/30">
+    <div className="card p-0">
+      <div className="flex items-center gap-3 px-5 py-3 bg-forest/5 border-b border-sand/30 rounded-t-2xl overflow-hidden">
         <Icon className="w-4 h-4 text-forest" />
         <h2 className="font-display text-base text-forest">{title}</h2>
       </div>
@@ -192,8 +214,10 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
   const [cpf, setCpf] = useState(prof.cpf ?? "");
   const [cnpj, setCnpj] = useState(prof.cnpj ?? "");
   const [corSelecionada, setCorSelecionada] = useState(prof.cor ?? "");
-  const [tel1, setTel1] = useState(prof.telefone_1 ?? "");
-  const [tel2, setTel2] = useState(prof.telefone_2 ?? "");
+  const [tel1, setTel1] = useState(() => parseTelNum(prof.telefone_1 ?? ""));
+  const [tel2, setTel2] = useState(() => parseTelNum(prof.telefone_2 ?? ""));
+  const [ddi1, setDdi1] = useState(() => parseTelDdi(prof.telefone_1 ?? ""));
+  const [ddi2, setDdi2] = useState(() => parseTelDdi(prof.telefone_2 ?? ""));
   const [especialidadesList, setEspecialidadesList] = useState(especialidades);
   const [especialidadesSelecionadas, setEspecialidadesSelecionadas] = useState<number[]>(initialSelecionadas);
 
@@ -400,13 +424,31 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Telefone 1</label>
-              <input name="telefone_1" type="text" className="input-field" placeholder="(00) 00000-0000"
-                value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
+              <input type="hidden" name="telefone_1" value={ddi1 === "+55" ? tel1 : `${ddi1} ${tel1}`} />
+              <div className="flex border border-sand/40 rounded-lg focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40 bg-white">
+                <DDISelector value={ddi1} onChange={setDdi1} name="_ddi1" />
+                <input
+                  type="text"
+                  value={tel1}
+                  onChange={e => setTel1(ddi1 === "+55" ? maskPhone(e.target.value) : e.target.value.replace(/[^\d\s\-().]/g, ""))}
+                  placeholder={ddi1 === "+55" ? "(00) 00000-0000" : "Número"}
+                  className="flex-1 py-2.5 px-3 text-sm text-forest bg-transparent rounded-r-lg focus:outline-none border-0"
+                />
+              </div>
             </div>
             <div>
               <label className="label">Telefone 2</label>
-              <input name="telefone_2" type="text" className="input-field" placeholder="(00) 00000-0000"
-                value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
+              <input type="hidden" name="telefone_2" value={ddi2 === "+55" ? tel2 : `${ddi2} ${tel2}`} />
+              <div className="flex border border-sand/40 rounded-lg focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40 bg-white">
+                <DDISelector value={ddi2} onChange={setDdi2} name="_ddi2" />
+                <input
+                  type="text"
+                  value={tel2}
+                  onChange={e => setTel2(ddi2 === "+55" ? maskPhone(e.target.value) : e.target.value.replace(/[^\d\s\-().]/g, ""))}
+                  placeholder={ddi2 === "+55" ? "(00) 00000-0000" : "Número"}
+                  className="flex-1 py-2.5 px-3 text-sm text-forest bg-transparent rounded-r-lg focus:outline-none border-0"
+                />
+              </div>
             </div>
           </div>
 
@@ -445,36 +487,6 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
               <MoneyInput name="valor_plano" defaultValue={prof.valor_plano} />
             </div>
           </div>
-        </Section>
-
-        {/* ── Janela de agendamento ── */}
-        <Section icon={Clock} title="Janela de agendamento">
-          <p className="text-sm text-forest-500">
-            Define o horário diário dentro do qual este profissional pode receber atendimentos. Agendamentos fora deste intervalo serão bloqueados.
-          </p>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Horário de início</label>
-              <input
-                name="horario_inicio"
-                type="time"
-                className="input-field"
-                defaultValue={prof.horario_inicio?.slice(0, 5) ?? ""}
-              />
-            </div>
-            <div>
-              <label className="label">Horário de término</label>
-              <input
-                name="horario_fim"
-                type="time"
-                className="input-field"
-                defaultValue={prof.horario_fim?.slice(0, 5) ?? ""}
-              />
-            </div>
-          </div>
-          <p className="text-xs text-forest-400">
-            Deixe em branco para não aplicar restrição de horário.
-          </p>
         </Section>
 
       </form>

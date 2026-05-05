@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { FileDown } from "lucide-react";
 
 interface ProfRow {
@@ -58,16 +59,17 @@ function BarChart({ rows }: { rows: { label: string; value: number; max: number 
 
 export function RelatoriosClient({ periodo, resumo, porProfissional, pacientesPorMes, porSala, meuResumo }: Props) {
   const router = useRouter();
+  const [localPeriodo, setLocalPeriodo] = useState(periodo);
 
-  function applyPeriod(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const params = new URLSearchParams();
-    const ini = fd.get("inicio") as string;
-    const fim = fd.get("fim") as string;
-    if (ini) params.set("inicio", ini);
-    if (fim) params.set("fim", fim);
-    router.push(`/relatorios?${params.toString()}`);
+  function handleDateChange(key: "inicio" | "fim", value: string) {
+    const novo = { ...localPeriodo, [key]: value };
+    setLocalPeriodo(novo);
+    if (value === "" || value.length === 10) {
+      const params = new URLSearchParams();
+      if (novo.inicio) params.set("inicio", novo.inicio);
+      if (novo.fim) params.set("fim", novo.fim);
+      router.push(`/relatorios?${params.toString()}`);
+    }
   }
 
   const maxSessoes = Math.max(...porProfissional.map(p => p.total), 1);
@@ -90,17 +92,20 @@ export function RelatoriosClient({ periodo, resumo, porProfissional, pacientesPo
 
       {/* Filtro de período + botão exportar */}
       <div className="print-hidden flex flex-wrap gap-3 items-end justify-between">
-        <form onSubmit={applyPeriod} className="flex flex-wrap gap-3 items-end">
+        <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="label text-xs">De</label>
-            <input type="date" name="inicio" defaultValue={periodo.inicio} className="input-field py-1.5 text-sm" />
+            <input type="date" value={localPeriodo.inicio}
+              onChange={e => handleDateChange("inicio", e.target.value)}
+              className="input-field py-1.5 text-sm" />
           </div>
           <div>
             <label className="label text-xs">Até</label>
-            <input type="date" name="fim" defaultValue={periodo.fim} className="input-field py-1.5 text-sm" />
+            <input type="date" value={localPeriodo.fim}
+              onChange={e => handleDateChange("fim", e.target.value)}
+              className="input-field py-1.5 text-sm" />
           </div>
-          <button type="submit" className="btn-primary py-1.5 text-sm">Aplicar</button>
-        </form>
+        </div>
         <button
           type="button"
           onClick={() => window.print()}

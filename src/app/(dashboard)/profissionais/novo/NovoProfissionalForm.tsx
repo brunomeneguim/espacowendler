@@ -8,6 +8,7 @@ import {
 import { cadastrarProfissionalCompleto, buscarDadosProfissionalPorProfile } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
 import { EspecialidadesMultiSelect } from "../EspecialidadesMultiSelect";
+import { DDISelector } from "../../pacientes/novo/DDISelector";
 
 // ── Dropdown de cor ───────────────────────────────────────────────
 function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; value: string; onChange: (v: string) => void }) {
@@ -146,8 +147,8 @@ function MoneyInput({ name, defaultValue, placeholder }: { name: string; default
 // ── Section ────────────────────────────────────────────────────────
 function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
   return (
-    <div className="card p-0 overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-3 bg-forest/5 border-b border-sand/30">
+    <div className="card p-0">
+      <div className="flex items-center gap-3 px-5 py-3 bg-forest/5 border-b border-sand/30 rounded-t-2xl overflow-hidden">
         <Icon className="w-4 h-4 text-forest" />
         <h2 className="font-display text-base text-forest">{title}</h2>
       </div>
@@ -176,6 +177,8 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   const [cnpj, setCnpj] = useState("");
   const [tel1, setTel1] = useState("");
   const [tel2, setTel2] = useState("");
+  const [ddi1, setDdi1] = useState("+55");
+  const [ddi2, setDdi2] = useState("+55");
   const [dataNascimento, setDataNascimento] = useState("");
   const [sexo, setSexo] = useState("");
   const [registroProfissional, setRegistroProfissional] = useState("");
@@ -207,8 +210,22 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
         if (d.nome_completo) setNomeCompleto(d.nome_completo);
         if (d.cpf) setCpf(maskCpf(d.cpf));
         if (d.cnpj) setCnpj(maskCnpj(d.cnpj));
-        if (d.telefone_1) setTel1(maskPhone(d.telefone_1));
-        if (d.telefone_2) setTel2(maskPhone(d.telefone_2));
+        if (d.telefone_1) {
+          const raw = d.telefone_1.trim();
+          if (raw.startsWith("+")) {
+            const match = raw.match(/^(\+\d{1,4})\s*(.*)/);
+            if (match) { setDdi1(match[1]); setTel1(maskPhone(match[2])); }
+            else setTel1(maskPhone(raw));
+          } else setTel1(maskPhone(raw));
+        }
+        if (d.telefone_2) {
+          const raw = d.telefone_2.trim();
+          if (raw.startsWith("+")) {
+            const match = raw.match(/^(\+\d{1,4})\s*(.*)/);
+            if (match) { setDdi2(match[1]); setTel2(maskPhone(match[2])); }
+            else setTel2(maskPhone(raw));
+          } else setTel2(maskPhone(raw));
+        }
         if (d.data_nascimento) setDataNascimento(d.data_nascimento);
         if (d.sexo) setSexo(d.sexo);
         if (d.registro_profissional) setRegistroProfissional(d.registro_profissional);
@@ -409,15 +426,31 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Telefone 1</label>
-              <input name="telefone_1" type="text" className="input-field" placeholder="(00) 00000-0000"
-                value={tel1} onChange={e => setTel1(maskPhone(e.target.value))} />
-              <p className="text-xs text-forest-400 mt-1">Para número internacional, comece com +</p>
+              <input type="hidden" name="telefone_1" value={ddi1 === "+55" ? tel1 : `${ddi1} ${tel1}`} />
+              <div className="flex border border-sand/40 rounded-lg focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40 bg-white">
+                <DDISelector value={ddi1} onChange={setDdi1} name="_ddi1" />
+                <input
+                  type="text"
+                  value={tel1}
+                  onChange={e => setTel1(ddi1 === "+55" ? maskPhone(e.target.value) : e.target.value.replace(/[^\d\s\-().]/g, ""))}
+                  placeholder={ddi1 === "+55" ? "(00) 00000-0000" : "Número"}
+                  className="flex-1 py-2.5 px-3 text-sm text-forest bg-transparent rounded-r-lg focus:outline-none border-0"
+                />
+              </div>
             </div>
             <div>
               <label className="label">Telefone 2</label>
-              <input name="telefone_2" type="text" className="input-field" placeholder="(00) 00000-0000"
-                value={tel2} onChange={e => setTel2(maskPhone(e.target.value))} />
-              <p className="text-xs text-forest-400 mt-1">Para número internacional, comece com +</p>
+              <input type="hidden" name="telefone_2" value={ddi2 === "+55" ? tel2 : `${ddi2} ${tel2}`} />
+              <div className="flex border border-sand/40 rounded-lg focus-within:ring-2 focus-within:ring-forest/20 focus-within:border-forest/40 bg-white">
+                <DDISelector value={ddi2} onChange={setDdi2} name="_ddi2" />
+                <input
+                  type="text"
+                  value={tel2}
+                  onChange={e => setTel2(ddi2 === "+55" ? maskPhone(e.target.value) : e.target.value.replace(/[^\d\s\-().]/g, ""))}
+                  placeholder={ddi2 === "+55" ? "(00) 00000-0000" : "Número"}
+                  className="flex-1 py-2.5 px-3 text-sm text-forest bg-transparent rounded-r-lg focus:outline-none border-0"
+                />
+              </div>
             </div>
           </div>
 
