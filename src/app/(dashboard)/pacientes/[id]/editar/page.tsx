@@ -50,7 +50,7 @@ export default async function EditarPacientePage({
   })).filter((p: any) => p.id);
 
   return (
-    <div className="p-6 md:p-10 max-w-4xl">
+    <div className="p-6 md:p-10 max-w-5xl">
       <Link
         href="/pacientes"
         className="inline-flex items-center gap-2 text-sm text-forest-600 hover:text-forest mb-4"

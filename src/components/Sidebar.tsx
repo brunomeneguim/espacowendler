@@ -86,8 +86,10 @@ export function Sidebar({
     : isAdmin;
 
   const visibleItems = menuConfig
-    .filter(item => isPageVisible(item.href))
+    .filter(item => isPageVisible(item.href) && item.href !== "/salas")
     .sort((a, b) => a.ordem - b.ordem);
+
+  const podeSalas = isPageVisible("/salas");
 
   function enterEditMode() {
     // Clone full menuConfig for editing (all items, not just visible)
@@ -269,6 +271,20 @@ export function Sidebar({
                 </button>
               )}
 
+              {podeSalas && (
+                <Link
+                  href="/salas"
+                  className={`flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm transition-colors ${
+                    pathname.startsWith("/salas")
+                      ? "bg-cream/10 text-peach font-medium"
+                      : "text-cream/70 hover:text-cream hover:bg-cream/5"
+                  }`}
+                >
+                  <Building2 className="w-4 h-4" strokeWidth={1.5} />
+                  Salas
+                </Link>
+              )}
+
               {podeVerConta && (
                 <Link
                   href="/configuracoes/conta"
@@ -286,7 +302,7 @@ export function Sidebar({
                     className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
                   >
                     <Pencil className="w-4 h-4" strokeWidth={1.5} />
-                    Editar Sidebar
+                    Editar Menu Lateral
                   </button>
                   <Link
                     href="/configuracoes/acesso"

@@ -6,16 +6,13 @@ export default async function TarefasPage() {
   const supabase = createClient();
   const profile = await getCurrentProfile();
 
-  // ── Filtro de tarefas por usuário ────────────────────────────────
-  const isAdmin = ["admin", "supervisor"].includes(profile?.role ?? "");
-
   const [{ data: tarefasRaw }, { data: postits }, { data: profiles }] = await Promise.all([
     (() => {
       let q = supabase
         .from("tarefas")
         .select("id, titulo, descricao, concluida, prioridade, data_vencimento, criado_em, concluida_em, criado_por, atribuido_para, repeticao, criador:profiles!tarefas_criado_por_fkey(nome_completo), responsavel:profiles!tarefas_atribuido_para_fkey(nome_completo)")
         .order("criado_em", { ascending: false });
-      if (!isAdmin) q = q.or(`criado_por.eq.${profile.id},atribuido_para.eq.${profile.id}`);
+      q = q.or(`criado_por.eq.${profile.id},atribuido_para.eq.${profile.id}`);
       return q;
     })(),
     supabase
@@ -63,7 +60,7 @@ export default async function TarefasPage() {
           .from("tarefas")
           .select("id, titulo, descricao, concluida, prioridade, data_vencimento, criado_em, concluida_em, criado_por, atribuido_para, repeticao, criador:profiles!tarefas_criado_por_fkey(nome_completo), responsavel:profiles!tarefas_atribuido_para_fkey(nome_completo)")
           .order("criado_em", { ascending: false });
-        if (!isAdmin) q = q.or(`criado_por.eq.${profile.id},atribuido_para.eq.${profile.id}`);
+        q = q.or(`criado_por.eq.${profile.id},atribuido_para.eq.${profile.id}`);
         return q;
       })()
     : { data: tarefasRaw };

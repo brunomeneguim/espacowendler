@@ -172,6 +172,7 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
   const [avisoPendente, setAvisoPendente] = useState(false);
   const tzOffset = typeof window !== "undefined" ? new Date().getTimezoneOffset() : 0;
   const isAusencia = tipoAg === "ausencia";
+  const bloqueiaHorario = ["ausencia", "faltou", "cancelado"].includes(ag.status);
 
   type PendingArgs = Parameters<typeof atualizarAgendamento>;
   const pendingArgsRef = useRef<PendingArgs | null>(null);
@@ -310,22 +311,35 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Data</label>
-              <input name="data" type="date" required className="input-field" defaultValue={format(inicio, "yyyy-MM-dd")} />
+          {!bloqueiaHorario && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Data</label>
+                <input name="data" type="date" required className="input-field" defaultValue={format(inicio, "yyyy-MM-dd")} />
+              </div>
+              <div>
+                <label className="label">Horário</label>
+                <input name="hora" type="time" required className="input-field" defaultValue={format(inicio, "HH:mm")} />
+              </div>
             </div>
-            <div>
-              <label className="label">Horário</label>
-              <input name="hora" type="time" required className="input-field" defaultValue={format(inicio, "HH:mm")} />
-            </div>
-          </div>
+          )}
+          {bloqueiaHorario && (
+            <>
+              <input type="hidden" name="data" value={format(inicio, "yyyy-MM-dd")} />
+              <input type="hidden" name="hora" value={format(inicio, "HH:mm")} />
+            </>
+          )}
 
+          {bloqueiaHorario && (
+            <input type="hidden" name="duracao" value={duracaoInicial} />
+          )}
           <div className="grid grid-cols-2 gap-3">
+            {!bloqueiaHorario && (
             <div>
               <label className="label">Duração (min)</label>
               <input name="duracao" type="number" min="15" step="5" required className="input-field" defaultValue={duracaoInicial} />
             </div>
+            )}
             {!isAusencia && (
               <div>
                 <label className="label">Status</label>
@@ -412,6 +426,11 @@ function PaymentForm({
     defaultValor != null ? Math.round(defaultValor * 100) : 0
   );
   const [outrosDesc, setOutrosDesc] = useState("");
+
+  // Sync centavos when defaultValor changes (e.g. when card re-opens)
+  useEffect(() => {
+    setCentavos(defaultValor != null ? Math.round(defaultValor * 100) : 0);
+  }, [defaultValor]);
 
   const valorNum = centavos > 0 ? centavos / 100 : null;
 
@@ -619,7 +638,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
 
   const durationMin = Math.round((new Date(ag.data_hora_fim).getTime() - new Date(ag.data_hora_inicio).getTime()) / 60000);
 
-  const canBeMoved = canMove && !["realizado", "finalizado", "faltou", "cancelado"].includes(ag.status);
+  const canBeMoved = canMove && !["realizado", "finalizado", "faltou", "cancelado", "ausencia"].includes(ag.status);
 
   return (
     <div
@@ -784,8 +803,8 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
         </div>
       )}
 
-      {/* Handle de resize — bloqueado para realizado e finalizado */}
-      {canEdit && !["finalizado", "realizado"].includes(ag.status) && (
+      {/* Handle de resize — bloqueado para realizado, finalizado, ausencia e faltas */}
+      {canEdit && !["finalizado", "realizado", "ausencia", "faltou", "cancelado"].includes(ag.status) && (
         <div
           data-resize="true"
           className="absolute bottom-0 left-0 right-0 h-2.5 cursor-s-resize flex items-center justify-center group/resize"
@@ -944,7 +963,10 @@ function DiaColuna({ dia, ags, horariosParaDia, mostrarHorarios, profColorMap, p
         const inicioMin = (ini.getHours()-HORA_INICIO)*60 + ini.getMinutes();
         const duracaoMin = (fim.getTime()-ini.getTime())/60000;
         const top = (inicioMin/60)*PX_POR_HORA;
-        const height = Math.max(22, (duracaoMin/60)*PX_POR_HORA - 2);
+        const isAusenciaFalta = ["ausencia", "faltou", "cancelado"].includes(ag.status);
+        const height = isAusenciaFalta
+          ? Math.max(16, (duracaoMin/60)*PX_POR_HORA / 2 - 1)
+          : Math.max(22, (duracaoMin/60)*PX_POR_HORA - 2);
         const { col, total } = colMap.get(ag.id) ?? { col:0, total:1 };
         return (
           <AgendamentoCard
