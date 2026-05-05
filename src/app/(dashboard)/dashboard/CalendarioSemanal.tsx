@@ -51,7 +51,7 @@ interface Agendamento {
   profissional: { id: string; cor?: string | null; profile: { nome_completo: string } | null } | null;
   sala: { id: number; nome: string } | null;
 }
-interface Profissional { id: string; profile_id?: string | null; cor?: string | null; valor_consulta?: number | null; duracao_consulta?: number | null; profile: { nome_completo: string } | null }
+interface Profissional { id: string; profile_id?: string | null; cor?: string | null; valor_consulta?: number | null; tempo_atendimento?: number | null; profile: { nome_completo: string } | null }
 interface Paciente     { id: string; nome_completo: string; telefone?: string }
 interface HorarioDisponivel { profissional_id: string; dia_semana: number; hora_inicio: string; hora_fim: string }
 interface Sala         { id: number; nome: string }
@@ -1428,9 +1428,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     const { startY, startDurationMin, el, ag } = dragRef.current;
     const deltaY = e.clientY - startY;
     const rawMin = startDurationMin + deltaY;
-    // Minimum duration = duracao_consulta do profissional ou 15min
+    // Minimum duration = tempo_atendimento do profissional ou 15min
     const prof = profissionais.find(p => p.id === (ag.profissional?.id ?? ""));
-    const minDur = prof?.duracao_consulta ?? 15;
+    const minDur = prof?.tempo_atendimento ?? 15;
     // Maximum duration = até o próximo agendamento do mesmo profissional
     const agInicio = new Date(ag.data_hora_inicio).getTime();
     const proximoInicio = agendamentos
@@ -1520,7 +1520,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     const deltaY = e.clientY - startY;
     const rawMin = startDurationMin + deltaY;
     const prof = profissionais.find(p => p.id === (ag.profissional?.id ?? ""));
-    const minDur = prof?.duracao_consulta ?? 15;
+    const minDur = prof?.tempo_atendimento ?? 15;
     const agInicio = new Date(ag.data_hora_inicio).getTime();
     const proximoInicio = agendamentos
       .filter(a =>
