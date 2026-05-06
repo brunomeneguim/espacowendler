@@ -63,12 +63,21 @@ export function DashboardContent({ encaixes: initialEncaixes, calProps }: Props)
     setEncaixes(prev => prev.map(e => e.id === enc.id ? enc : e));
   }
 
+  // Enriquece reagendarInfo com pacienteId ao reagendar da lista de encaixe
+  function handleReagendarFromEncaixe(info: ReagendarInfo) {
+    const pacientes = calProps.pacientes as Array<{ id: string; nome_completo: string }>;
+    const found = pacientes?.find(
+      p => p.nome_completo.toLowerCase() === info.pacienteNome.toLowerCase()
+    );
+    setReagendarInfo({ ...info, pacienteId: found?.id ?? info.pacienteId });
+  }
+
   return (
     <>
       <ListaEncaixe
         encaixes={encaixes}
         profissionais={calProps.profissionais as any}
-        onReagendar={setReagendarInfo}
+        onReagendar={handleReagendarFromEncaixe}
         onAddEncaixe={handleAddEncaixe}
         onRemoveEncaixe={handleRemoveEncaixe}
         onUpdateEncaixe={handleUpdateEncaixe}

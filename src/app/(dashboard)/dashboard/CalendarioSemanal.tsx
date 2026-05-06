@@ -570,7 +570,7 @@ function FaltaJustificadaModal({
               onClick={onListaEncaixe}
               className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-rust text-white text-sm font-medium hover:bg-rust/90 transition-colors"
             >
-              <List className="w-4 h-4" /> Ver Lista de Encaixe
+              <List className="w-4 h-4" /> Lista de Encaixe
             </button>
             <button
               type="button"
@@ -954,12 +954,6 @@ function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, prof
     ags.filter(a=>!["cancelado","faltou"].includes(a.status))
        .map(a => new Date(a.data_hora_inicio).getHours())
   );
-  // Horas ocupadas por outros profissionais (para exibir "Horário Indisponível")
-  const horasConflito = new Set(
-    (agsOutros ?? [])
-      .filter(a => !["cancelado","faltou","ausencia"].includes(a.status))
-      .map(a => new Date(a.data_hora_inicio).getHours())
-  );
 
   return (
     <div className="relative flex-1 min-w-0" style={{ height: TOTAL_HORAS * PX_POR_HORA }}>
@@ -979,18 +973,6 @@ function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, prof
       {horas.map(h => {
         if (slotsOcupados.has(h)) return null;
         const isMetade = slotsMetade.has(h);
-        // Slot ocupado por outro profissional
-        if (horasConflito.has(h) && !isMetade) {
-          return (
-            <div
-              key={h}
-              className="absolute left-0 right-0 flex items-center justify-center bg-gray-50 border-t border-gray-100"
-              style={{ top: (h - HORA_INICIO) * PX_POR_HORA, height: PX_POR_HORA - 1, zIndex: 1 }}
-            >
-              <span className="text-[10px] text-gray-400 italic select-none">Horário Indisponível</span>
-            </div>
-          );
-        }
         return (
           <SlotVazio key={h} dia={dia} hora={h} salaId={salaId}
             reagendarInfo={reagendarInfo} onReagendarSlotClick={onReagendarSlotClick}
@@ -1060,6 +1042,36 @@ function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, prof
           />
         );
       })}
+
+      {/* Cards mascarados para agendamentos de OUTROS profissionais (privacidade) */}
+      {(agsOutros ?? []).map(ag => {
+        const ini = new Date(ag.data_hora_inicio), fim = new Date(ag.data_hora_fim);
+        const inicioMin = (ini.getHours()-HORA_INICIO)*60 + ini.getMinutes();
+        const duracaoMin = (fim.getTime()-ini.getTime())/60000;
+        const top = (inicioMin/60)*PX_POR_HORA;
+        const height = Math.max(22, (duracaoMin/60)*PX_POR_HORA - 2);
+        return (
+          <div
+            key={`outro-${ag.id}`}
+            className="absolute left-0.5 right-0.5 rounded border-l-4 border overflow-hidden cursor-default select-none"
+            style={{ top: Math.max(0, top), height, zIndex: 10,
+              backgroundColor: "#fff1f2", borderLeftColor: "#f87171", borderColor: "#fecaca" }}
+          >
+            <div className="px-1.5 pt-0.5 pb-4 leading-tight flex flex-col gap-px">
+              <p className="text-xs font-semibold truncate pr-3 text-red-700">
+                {format(ini, "HH:mm")} Horário Indisponível
+              </p>
+              <p className="text-[10px] truncate text-red-400">
+                {ag.profissional?.profile?.nome_completo}
+              </p>
+            </div>
+            <div
+              className="absolute bottom-1 left-1.5 w-2 h-2 rounded-full bg-red-400"
+              style={{ boxShadow: "0 0 0 1.5px rgba(0,0,0,0.40)" }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1086,10 +1098,8 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
   onClose: () => void;
 }) {
   const isProfissional = userRole === "profissional";
-  // Para profissional: pré-seleciona o próprio registro; para outros: primeiro da lista
-  const profissionalPropio = isProfissional
-    ? profissionais.find(p => p.profile_id === currentUserId)
-    : null;
+  // Sempre tenta encontrar o próprio registro de profissional (funciona para qualquer papel, incluindo admin)
+  const profissionalPropio = profissionais.find(p => p.profile_id === currentUserId) ?? null;
   const defaultProfId = profissionalPropio?.id ?? profissionais[0]?.id ?? "";
 
   const [profId, setProfId] = useState<string>(defaultProfId);
@@ -1106,6 +1116,16 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
         return isSameDay(new Date(ag.data_hora_inicio), dia);
       })
       .sort((a, b) => new Date(a.data_hora_inicio).getTime() - new Date(b.data_hora_inicio).getTime());
+  }
+
+  // Agendamentos de OUTROS profissionais na mesma sala (para detectar "Sala Ocupada")
+  function agsDeOutrosParaDia(dia: Date) {
+    return agendamentos.filter(ag => {
+      if (ag.profissional?.id === profId) return false;
+      if (salaFiltro && ag.sala?.id !== salaFiltro) return false;
+      if (!["agendado","confirmado","realizado","finalizado"].includes(ag.status)) return false;
+      return isSameDay(new Date(ag.data_hora_inicio), dia);
+    });
   }
 
   function horariosParaDia(dia: Date) {
@@ -1196,86 +1216,101 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
                   </div>
 
                   {/* Grid de horários */}
-                  <div className="relative" style={{ height: TOTAL_HORAS * PX }}>
+                  {(() => {
+                    const agsOutros = agsDeOutrosParaDia(dia);
+                    return (
+                    <div className="relative" style={{ height: TOTAL_HORAS * PX }}>
 
-                    {/* Linhas de hora — z-index acima das faixas verdes */}
-                    {horasEspelho.map(h => (
-                      <div
-                        key={h}
-                        className="absolute left-0 right-0 border-t border-gray-200"
-                        style={{ top: (h - HORA_INICIO) * PX, zIndex: 1 }}
-                      />
-                    ))}
-
-                    {/* Horário Indisponível — horas não cobertas pelos horários do profissional */}
-                    {horasEspelho.map(h => {
-                      const horaCoberta = horarios.some(hr => {
-                        const s = parseTimeToMinutes(hr.hora_inicio);
-                        const e = parseTimeToMinutes(hr.hora_fim);
-                        return s <= h * 60 && e > h * 60;
-                      });
-                      const temAg = ags.some(ag => new Date(ag.data_hora_inicio).getHours() === h);
-                      if (horaCoberta || temAg) return null;
-                      return (
+                      {/* Linhas de hora — z-index acima das faixas de fundo */}
+                      {horasEspelho.map(h => (
                         <div
                           key={h}
-                          className="absolute left-0 right-0 flex items-center justify-center bg-gray-50/70"
-                          style={{ top: (h - HORA_INICIO) * PX, height: PX - 1, zIndex: 0 }}
-                        >
-                          <span className="text-[9px] text-gray-400 italic select-none">Horário Indisponível</span>
-                        </div>
-                      );
-                    })}
-
-                    {/* Faixas de horário disponível */}
-                    {horarios.map((h, i) => {
-                      const startMin = parseTimeToMinutes(h.hora_inicio) - HORA_INICIO * 60;
-                      const endMin   = parseTimeToMinutes(h.hora_fim)   - HORA_INICIO * 60;
-                      if (startMin >= TOTAL_HORAS * 60 || endMin <= 0) return null;
-                      const top    = (Math.max(0, startMin) / 60) * PX;
-                      const height = ((Math.min(TOTAL_HORAS * 60, endMin) - Math.max(0, startMin)) / 60) * PX;
-                      return (
-                        <div
-                          key={i}
-                          className="absolute left-0 right-0 bg-green-50 border-l-2 border-green-300"
-                          style={{ top, height, zIndex: 0 }}
+                          className="absolute left-0 right-0 border-t border-gray-200"
+                          style={{ top: (h - HORA_INICIO) * PX, zIndex: 1 }}
                         />
-                      );
-                    })}
+                      ))}
 
-                    {/* Cards de agendamento */}
-                    {ags.map(ag => {
-                      const startDate  = new Date(ag.data_hora_inicio);
-                      const endDate    = new Date(ag.data_hora_fim);
-                      const startMin   = startDate.getHours() * 60 + startDate.getMinutes() - HORA_INICIO * 60;
-                      const endMin     = endDate.getHours() * 60 + endDate.getMinutes()   - HORA_INICIO * 60;
-                      const top        = Math.max(0, (startMin / 60) * PX);
-                      const height     = Math.max(18, ((endMin - startMin) / 60) * PX - 2);
-                      const cfg        = STATUS[ag.status] ?? STATUS.agendado;
-                      const isAusencia = ag.status === "ausencia";
-                      const isFalta    = ag.status === "faltou" || ag.status === "cancelado";
+                      {/* Fundo por hora: cinza=indisponível, vermelho=sala ocupada, verde=disponível */}
+                      {horasEspelho.map(h => {
+                        const horaCoberta = horarios.some(hr => {
+                          const s = parseTimeToMinutes(hr.hora_inicio);
+                          const e = parseTimeToMinutes(hr.hora_fim);
+                          return s <= h * 60 && e > h * 60;
+                        });
+                        const temAgProprio = ags.some(ag => new Date(ag.data_hora_inicio).getHours() === h);
+                        // Sala Ocupada: outro prof tem agendamento nesta hora na mesma sala
+                        const salaOcupada = horaCoberta && !temAgProprio && agsOutros.some(ag => new Date(ag.data_hora_inicio).getHours() === h);
 
-                      return (
-                        <div
-                          key={ag.id}
-                          className={`absolute left-0.5 right-0.5 rounded px-1 py-0.5 overflow-hidden border text-[10px] leading-tight ${
-                            isAusencia ? "bg-gray-100 border-gray-300 text-gray-500" :
-                            isFalta    ? "bg-red-50 border-red-300 text-red-700" :
-                                         cfg.card
-                          }`}
-                          style={{ top, height, zIndex: 2 }}
-                        >
-                          <p className="font-semibold truncate">{format(startDate, "HH:mm")}–{format(endDate, "HH:mm")}</p>
-                          {height > 28 && (
-                            <p className="truncate opacity-80">{ag.paciente?.nome_completo ?? (isAusencia ? "Ausência" : "—")}</p>
-                          )}
-                          {height > 44 && ag.sala && (
-                            <p className="truncate opacity-60 text-[9px]">{ag.sala.nome}</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                        if (temAgProprio) return null; // o card do agendamento já ocupa o espaço
+
+                        if (!horaCoberta) {
+                          return (
+                            <div
+                              key={h}
+                              className="absolute left-0 right-0 flex items-center justify-center bg-gray-50 border-l-2 border-gray-200"
+                              style={{ top: (h - HORA_INICIO) * PX, height: PX - 1, zIndex: 0 }}
+                            >
+                              <span className="text-[9px] text-gray-400 italic select-none">Horário Indisponível</span>
+                            </div>
+                          );
+                        }
+                        if (salaOcupada) {
+                          const outroProfNome = agsOutros.find(ag => new Date(ag.data_hora_inicio).getHours() === h)?.profissional?.profile?.nome_completo ?? "";
+                          return (
+                            <div
+                              key={h}
+                              className="absolute left-0 right-0 flex flex-col items-center justify-center bg-red-50 border-l-2 border-red-400"
+                              style={{ top: (h - HORA_INICIO) * PX, height: PX - 1, zIndex: 0 }}
+                            >
+                              <span className="text-[9px] text-red-600 font-medium select-none">Sala Ocupada</span>
+                              {outroProfNome && <span className="text-[8px] text-red-400 select-none truncate px-1">{outroProfNome}</span>}
+                            </div>
+                          );
+                        }
+                        // Verde: disponível e livre
+                        return (
+                          <div
+                            key={h}
+                            className="absolute left-0 right-0 bg-green-50 border-l-2 border-green-300"
+                            style={{ top: (h - HORA_INICIO) * PX, height: PX - 1, zIndex: 0 }}
+                          />
+                        );
+                      })}
+
+                      {/* Cards de agendamento do profissional selecionado (cor azul) */}
+                      {ags.map(ag => {
+                        const startDate  = new Date(ag.data_hora_inicio);
+                        const endDate    = new Date(ag.data_hora_fim);
+                        const startMin   = startDate.getHours() * 60 + startDate.getMinutes() - HORA_INICIO * 60;
+                        const endMin     = endDate.getHours() * 60 + endDate.getMinutes()   - HORA_INICIO * 60;
+                        const top        = Math.max(0, (startMin / 60) * PX);
+                        const height     = Math.max(18, ((endMin - startMin) / 60) * PX - 2);
+                        const isAusencia = ag.status === "ausencia";
+                        const isFalta    = ag.status === "faltou" || ag.status === "cancelado";
+
+                        return (
+                          <div
+                            key={ag.id}
+                            className={`absolute left-0.5 right-0.5 rounded px-1 py-0.5 overflow-hidden border-l-2 border text-[10px] leading-tight ${
+                              isAusencia ? "bg-gray-100 border-gray-300 border-l-gray-400 text-gray-500" :
+                              isFalta    ? "bg-orange-50 border-orange-200 border-l-orange-400 text-orange-700" :
+                                           "bg-blue-50 border-blue-200 border-l-blue-500 text-blue-900"
+                            }`}
+                            style={{ top, height, zIndex: 2 }}
+                          >
+                            <p className="font-semibold truncate">{format(startDate, "HH:mm")}–{format(endDate, "HH:mm")}</p>
+                            {height > 28 && (
+                              <p className="truncate opacity-80">{ag.paciente?.nome_completo ?? (isAusencia ? "Ausência" : "—")}</p>
+                            )}
+                            {height > 44 && ag.sala && (
+                              <p className="truncate opacity-60 text-[9px]">{ag.sala.nome}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -1283,11 +1318,23 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-sand/20 text-xs text-forest-400 shrink-0 flex items-center gap-4">
+        <div className="px-6 py-3 border-t border-sand/20 text-xs text-forest-400 shrink-0 flex flex-wrap items-center gap-4">
           <span>{totalAgs} agendamento{totalAgs !== 1 ? "s" : ""} na semana</span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm bg-green-50 border-l-2 border-green-300 inline-block" />
             Horário disponível
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-gray-50 border-l-2 border-gray-300 inline-block" />
+            Horário Indisponível
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-red-50 border-l-2 border-red-400 inline-block" />
+            Sala Ocupada
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-blue-50 border-l-2 border-blue-500 inline-block" />
+            Agendamento
           </span>
         </div>
       </div>
@@ -1345,6 +1392,8 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   }
 
   const canEdit = ["admin","supervisor","secretaria"].includes(userRole);
+  // ID do profissional correspondente ao usuário logado (nulo se não for profissional ou não encontrado)
+  const currentProfId = profissionais.find(p => p.profile_id === currentUserId)?.id ?? null;
 
   // ── Callback de clique no slot de reagendamento ──────────────────
   const handleReagendarSlotClick = useCallback((dataStr: string, horaStr: string) => {
@@ -1420,6 +1469,10 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const suppressExpandRef = useRef<Set<string>>(new Set());
 
   const [moveError, setMoveError] = useState<string | null>(null);
+  // Confirmação de arrastar para horário indisponível
+  const [moveConfirmPending, setMoveConfirmPending] = useState<{
+    agId: string; ag: Agendamento; newData: string; newHora: string; durationMin: number;
+  } | null>(null);
 
   const handleResizeStart = useCallback((agId: string, startY: number, durationMin: number, el: HTMLDivElement) => {
     const ag = agendamentos.find(a => a.id === agId);
@@ -1569,6 +1622,25 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
       const oldHora = format(new Date(ag.data_hora_inicio), "HH:mm");
       if (newData === oldData && newHora === oldHora) return;
 
+      // Verificar se o horário destino está nos horários disponíveis do profissional
+      const profId = ag.profissional?.id;
+      const diaSemana = currentTargetDay.getDay();
+      const horaDestino = newHours;
+      const horariosProfParaDia = horariosDisponiveis.filter(
+        h => h.profissional_id === profId && h.dia_semana === diaSemana
+      );
+      const estaDisponivel = horariosProfParaDia.some(h => {
+        const s = parseTimeToMinutes(h.hora_inicio) / 60;
+        const e = parseTimeToMinutes(h.hora_fim) / 60;
+        return s <= horaDestino && e > horaDestino;
+      });
+
+      if (!estaDisponivel && horariosProfParaDia.length > 0) {
+        // Horário fora do cadastro → pede confirmação antes de salvar
+        setMoveConfirmPending({ agId, ag, newData, newHora, durationMin });
+        return;
+      }
+
       el.style.opacity = "0.5";
 
       startTransition(async () => {
@@ -1671,17 +1743,25 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   });
   const agsFiltrados = agsDaSemana.filter(a => {
     const matchSala = filtroSalaId === null || a.sala === null || a.sala?.id === filtroSalaId;
-    const matchProf = filtroProf === "todos" || a.profissional?.id === filtroProf;
+    let matchProf: boolean;
+    if (currentProfId) {
+      // Usuário é profissional: vê apenas os próprios agendamentos (privacidade)
+      matchProf = a.profissional?.id === currentProfId;
+    } else {
+      matchProf = filtroProf === "todos" || a.profissional?.id === filtroProf;
+    }
     return matchSala && matchProf;
   });
 
   const agsParaDia  = (dia:Date) => agsFiltrados.filter(a=>isSameDay(new Date(a.data_hora_inicio),dia));
-  // Agendamentos de OUTROS profissionais (para mostrar "Horário Indisponível" quando userRole=profissional)
+  // Agendamentos de OUTROS profissionais na mesma sala (mostrado como "Horário Indisponível")
+  // Exibido sempre que o usuário logado tem um registro de profissional
   const agsOutrosParaDia = (dia: Date) => {
-    if (userRole !== "profissional" || filtroProf === "todos") return [];
+    if (!currentProfId) return [];
     return agsDaSemana.filter(a =>
       isSameDay(new Date(a.data_hora_inicio), dia) &&
-      a.profissional?.id !== filtroProf &&
+      a.profissional?.id !== currentProfId &&
+      !["cancelado","faltou","ausencia"].includes(a.status) &&
       (filtroSalaId === null || a.sala?.id === filtroSalaId)
     );
   };
@@ -2244,7 +2324,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                     </div>
                   </div>
                   <div className="relative px-0.5" data-dia-date={format(dia, "yyyy-MM-dd")}>
-                    <DiaColuna dia={dia} ags={agsDay} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} profValorConsultaMap={profValorConsultaMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} onMoveStart={handleMoveStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={handleExpand} privacyMode={privacyMode} reagendarInfo={reagendarInfo} onReagendarSlotClick={handleReagendarSlotClick} />
+                    <DiaColuna dia={dia} ags={agsDay} agsOutros={agsOutrosParaDia(dia)} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} profValorConsultaMap={profValorConsultaMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} onMoveStart={handleMoveStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={handleExpand} privacyMode={privacyMode} reagendarInfo={reagendarInfo} onReagendarSlotClick={handleReagendarSlotClick} />
                   </div>
                 </div>
               );
@@ -2371,6 +2451,11 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
               <span className="w-2 h-2 rounded-full bg-green-400" /> Horário disponível
             </span>
           )}
+          {currentProfId&&(
+            <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-red-50 border-red-200 text-red-700">
+              <span className="w-2 h-2 rounded-full bg-red-400" /> Horário Indisponível
+            </span>
+          )}
         </div>
       )}
 
@@ -2441,6 +2526,70 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
           }}
           onClose={() => { setFaltaModal(null); router.refresh(); }}
         />
+      )}
+
+      {/* Modal de confirmação: arrastar para horário indisponível */}
+      {moveConfirmPending && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm" />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="font-display text-base text-forest">Horário Indisponível</h3>
+                  <p className="text-sm text-forest-600 mt-1">
+                    O profissional não cadastrou esse horário para atendimento. Deseja agendar mesmo assim?
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => {
+                    const { agId, ag, newData, newHora, durationMin } = moveConfirmPending;
+                    setMoveConfirmPending(null);
+                    const tzOffset = new Date().getTimezoneOffset();
+                    startTransition(async () => {
+                      const res = await atualizarAgendamento(
+                        agId,
+                        ag.profissional?.id ?? "",
+                        ag.paciente?.id ?? "",
+                        ag.sala?.id ? String(ag.sala.id) : null,
+                        newData,
+                        newHora,
+                        durationMin,
+                        ag.status,
+                        ag.observacoes ?? null,
+                        tzOffset,
+                      );
+                      if (res?.error) {
+                        setMoveError(res.error);
+                        setTimeout(() => setMoveError(null), 4000);
+                      } else {
+                        router.refresh();
+                      }
+                    });
+                  }}
+                  className="btn-primary flex-1 flex items-center justify-center gap-2"
+                >
+                  {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Sim
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMoveConfirmPending(null)}
+                  className="btn-secondary flex-1"
+                >
+                  Não
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Toast de erro ao mover card */}
