@@ -33,6 +33,46 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
 
   const respFinMesmoPaciente = formData.get("resp_fin_mesmo_paciente") === "true";
 
+  // ── Verificação de duplicidade ────────────────────────────────────
+  const nomeCompleto = (formData.get("nome_completo") as string)?.trim();
+  const cpfCnpj = get("cpf_cnpj");
+
+  // 1. CPF/CNPJ já cadastrado
+  if (cpfCnpj) {
+    const { data: dup } = await supabase
+      .from("pacientes")
+      .select("id, nome_completo")
+      .eq("cpf", cpfCnpj)
+      .maybeSingle();
+    if (dup) return { error: `Já existe um paciente cadastrado com este CPF/CNPJ: "${dup.nome_completo}". Verifique se o paciente já está no sistema.`, id: null };
+  }
+
+  // 2. Mesmo nome + mesma data de nascimento
+  if (nomeCompleto && data_nascimento) {
+    const { data: dup } = await supabase
+      .from("pacientes")
+      .select("id, nome_completo, data_nascimento")
+      .ilike("nome_completo", nomeCompleto)
+      .eq("data_nascimento", data_nascimento)
+      .maybeSingle();
+    if (dup) return { error: `Já existe um paciente com o mesmo nome e data de nascimento: "${dup.nome_completo}". Verifique se o paciente já está no sistema.`, id: null };
+  }
+
+  // 3. Mesmo nome (sem data de nascimento para confirmar)
+  if (nomeCompleto) {
+    const { data: dup } = await supabase
+      .from("pacientes")
+      .select("id, nome_completo, data_nascimento")
+      .ilike("nome_completo", nomeCompleto)
+      .maybeSingle();
+    if (dup) {
+      const dataNascFmt = dup.data_nascimento
+        ? ` (nascido em ${new Date(dup.data_nascimento + "T12:00:00").toLocaleDateString("pt-BR")})`
+        : "";
+      return { error: `Já existe um paciente cadastrado com o nome "${dup.nome_completo}"${dataNascFmt}. Caso seja uma pessoa diferente, verifique os dados antes de continuar.`, id: null };
+    }
+  }
+
   const { data: novo, error } = await supabase.from("pacientes").insert({
     nome_completo:                  formData.get("nome_completo") as string,
     data_cadastro:                  new Date().toISOString().split("T")[0],

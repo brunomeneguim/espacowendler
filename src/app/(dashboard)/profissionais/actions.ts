@@ -308,6 +308,43 @@ export async function cadastrarProfissionalCompleto(
   const profile_id = formData.get("profile_id") as string;
   if (!profile_id) return { error: "Selecione um usuário." };
 
+  // ── Verificação de duplicidade ────────────────────────────────────
+
+  // 1. Perfil já tem um profissional cadastrado
+  const { data: profExistente } = await supabase
+    .from("profissionais")
+    .select("id")
+    .eq("profile_id", profile_id)
+    .maybeSingle();
+  if (profExistente) return { error: "Este usuário já possui um cadastro como profissional no sistema." };
+
+  // 2. CPF já cadastrado em outro profissional
+  const cpf = get("cpf");
+  if (cpf) {
+    const { data: dupCpf } = await supabase
+      .from("profissionais")
+      .select("id, profile:profiles(nome_completo)")
+      .eq("cpf", cpf)
+      .maybeSingle();
+    if (dupCpf) {
+      const nome = (dupCpf as any).profile?.nome_completo ?? "outro profissional";
+      return { error: `Já existe um profissional cadastrado com este CPF: "${nome}". Verifique os dados antes de continuar.` };
+    }
+  }
+
+  // 3. Nome já cadastrado como profissional
+  const nome_completo_form = get("nome_completo");
+  if (nome_completo_form) {
+    const { data: dupNome } = await supabase
+      .from("profissionais")
+      .select("id, profile:profiles(nome_completo)")
+      .ilike("profiles.nome_completo", nome_completo_form.trim())
+      .maybeSingle();
+    if (dupNome && (dupNome as any).profile?.nome_completo) {
+      return { error: `Já existe um profissional cadastrado com o nome "${(dupNome as any).profile.nome_completo}". Verifique se é a mesma pessoa.` };
+    }
+  }
+
   // Atualiza nome no profile se preenchido
   const nome_completo = get("nome_completo");
   if (nome_completo) {
