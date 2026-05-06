@@ -1346,35 +1346,41 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
-  // ── Realtime: escuta mudanças no banco diretamente via postgres_changes ──
+  // ── Realtime: broadcast entre clientes ──────────────────────────────────
   const [rtStatus, setRtStatus] = useState<string>("conectando...");
   const [rtCount, setRtCount] = useState(0);
   const routerRef = useRef(router);
+  const broadcastRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>["channel"]> | null>(null);
   useEffect(() => { routerRef.current = router; }, [router]);
 
   useEffect(() => {
     const supabase = createBrowserClient();
     const channel = supabase
-      .channel("agendamentos-db-changes")
-      .on(
-        "postgres_changes" as any,
-        { event: "*", schema: "public", table: "agendamentos" },
-        (payload: any) => {
-          console.log("[CalendarioSemanal] DB change recebido:", payload);
-          setRtCount(c => c + 1);
-          routerRef.current.refresh();
-        }
-      )
+      .channel("agenda-updates", { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "agenda_changed" }, () => {
+        console.log("[RT] broadcast recebido — atualizando calendário");
+        setRtCount(c => c + 1);
+        routerRef.current.refresh();
+      })
       .subscribe((status: string, err?: Error) => {
-        console.log("[CalendarioSemanal] Realtime status:", status, err ?? "");
+        console.log("[RT] status:", status, err ?? "");
         setRtStatus(status);
+        broadcastRef.current = status === "SUBSCRIBED" ? channel : null;
       });
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+      broadcastRef.current = null;
+    };
   }, []);
 
-  /** Atualiza dados locais após ação do próprio usuário */
+  /** Atualiza a própria view E notifica todos os outros clientes */
   const refreshCalendar = useCallback(() => {
     router.refresh();
+    broadcastRef.current?.send({
+      type: "broadcast",
+      event: "agenda_changed",
+      payload: {},
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
