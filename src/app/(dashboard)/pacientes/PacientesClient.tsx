@@ -424,8 +424,8 @@ export function PacientesClient({ pacientes, canEdit, profissionais = [], pacien
                     )}
                   </div>
                 </div>
-                {/* Ações: profissional NÃO pode editar/ativar seus próprios pacientes (vinculados a ele) */}
-                {!myPatientIds.includes(p.id) && (
+                {/* Ações: profissional SÓ pode editar/ativar seus próprios pacientes (vinculados a ele) */}
+                {(myPatientIds.length === 0 || myPatientIds.includes(p.id)) && (
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => handleToggleAtivo(p)}
