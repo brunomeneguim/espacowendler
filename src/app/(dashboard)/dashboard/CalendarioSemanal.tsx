@@ -1748,8 +1748,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
         ag.observacoes ?? null,
         tzOffset,
       );
+      refreshCalendar();
     });
-  }, [startTransition, agendamentos, profissionais]);
+  }, [startTransition, agendamentos, profissionais, refreshCalendar]);
 
   // Usa a cor cadastrada do profissional; sem cor → branco (#ffffff)
   const profColorMap = new Map(profissionais.map(p => [
