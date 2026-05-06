@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
+import { broadcastAgendaChange } from "@/lib/broadcastAgenda";
 
 // ── Verificar horário indisponível (exportado para uso nos forms) ──
 export async function verificarHorarioIndisponivel(
@@ -225,6 +226,7 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
 
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
+  void broadcastAgendaChange();
   return { error: null, ignoradas, datasIgnoradas };
 }
 
@@ -271,6 +273,7 @@ export async function reagendarAgendamentoRapido(params: {
 
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
+  void broadcastAgendaChange();
   return { error: null };
 }
 
@@ -337,6 +340,7 @@ export async function atualizarStatusAgendamento(
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   revalidatePath("/financeiro");
+  void broadcastAgendaChange();
 }
 
 export async function marcarPagamentoAgendamento(
@@ -402,6 +406,7 @@ export async function marcarPagamentoAgendamento(
   revalidatePath("/agenda");
   revalidatePath("/financeiro");
   revalidatePath("/dashboard");
+  void broadcastAgendaChange();
   return { error: null };
 }
 
@@ -504,6 +509,7 @@ export async function atualizarAgendamento(
   if (error) return { error: error.message };
   revalidatePath("/dashboard");
   revalidatePath("/agenda");
+  void broadcastAgendaChange();
   return { error: null };
 }
 
@@ -541,6 +547,7 @@ export async function deletarAgendamentoClient(id: string): Promise<{ error: str
   if (error) return { error: error.message };
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
+  void broadcastAgendaChange();
   return { error: null };
 }
 
