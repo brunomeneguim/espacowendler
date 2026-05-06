@@ -559,9 +559,7 @@ function FaltaJustificadaModal({
             </div>
             <div>
               <h3 className="font-display text-base text-forest">Falta justificada registrada</h3>
-              <p className="text-sm text-forest-500 mt-0.5">
-                <span className="font-semibold">{pacienteNome}</span> foi adicionado(a) à lista de encaixe automaticamente.
-              </p>
+              <p className="text-sm text-forest-500 mt-0.5">O que deseja fazer com o horário de <span className="font-semibold">{pacienteNome}</span>?</p>
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -1795,32 +1793,6 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
         return;
       }
       const ag = agendamentos.find(a => a.id === id);
-      // Falta justificada → adicionar automaticamente à lista de encaixe
-      if (novoStatus === "cancelado" && ag?.paciente) {
-        // Só adiciona se este agendamento ainda não gerou um encaixe nesta sessão
-        if (!encaixePorAg[id]) {
-          const res = await adicionarEncaixeDireto(
-            ag.paciente.nome_completo,
-            ag.profissional?.id ?? null,
-            ag.paciente.telefone ?? null,
-          );
-          if (res.id) {
-            setEncaixePorAg(prev => ({ ...prev, [id]: res.id! }));
-            // Só notifica o pai se o registro é realmente novo (sem duplicata)
-            if (!res.jaExistia) {
-              onAddEncaixe?.({
-                id: res.id!,
-                paciente_nome: ag.paciente.nome_completo,
-                telefone: ag.paciente.telefone ?? null,
-                observacoes: null,
-                profissional_id: ag.profissional?.id ?? null,
-                created_at: new Date().toISOString(),
-                profissional: ag.profissional ? { profile: ag.profissional.profile } : null,
-              });
-            }
-          }
-        }
-      }
       // Desfazer (qualquer status → agendado) → remover o encaixe gerado por este ag
       if (novoStatus === "agendado") {
         // Tenta pelo mapa de sessão, depois pela lista atual (inclui dados pós-refresh)
@@ -2497,23 +2469,69 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
       {faltaModal?.tipo === "justificada" && (
         <FaltaJustificadaModal
           pacienteNome={faltaModal.paciente?.nome_completo ?? "Paciente"}
-          onListaEncaixe={() => {
-            // Paciente já foi adicionado automaticamente à lista de encaixe
+          onListaEncaixe={async () => {
+            // Adiciona à lista de encaixe somente quando o usuário clica no botão
+            const { ag: agFalta, agId: agIdFalta, paciente: pacFalta, profissional: profFalta } = faltaModal;
+            if (pacFalta && profFalta && !encaixePorAg[agIdFalta]) {
+              const res = await adicionarEncaixeDireto(
+                pacFalta.nome_completo,
+                profFalta.id ?? null,
+                pacFalta.telefone ?? null,
+              );
+              if (res.id) {
+                setEncaixePorAg(prev => ({ ...prev, [agIdFalta]: res.id! }));
+                if (!res.jaExistia) {
+                  onAddEncaixe?.({
+                    id: res.id!,
+                    paciente_nome: pacFalta.nome_completo,
+                    telefone: pacFalta.telefone ?? null,
+                    observacoes: null,
+                    profissional_id: profFalta.id ?? null,
+                    created_at: new Date().toISOString(),
+                    profissional: profFalta ? { profile: profFalta.profile } : null,
+                  });
+                }
+              }
+            }
             setFaltaModal(null);
             router.refresh();
           }}
-          onReagendar={() => {
+          onReagendar={async () => {
             if (faltaModal.paciente && faltaModal.profissional) {
               const agOrig = faltaModal.ag;
               const duracaoMin = agOrig
                 ? Math.round((new Date(agOrig.data_hora_fim).getTime() - new Date(agOrig.data_hora_inicio).getTime()) / 60000)
                 : undefined;
+              // Adiciona à lista de encaixe ao reagendar (para poder desfazer depois)
+              let encId = encaixePorAg[faltaModal.agId];
+              if (!encId && faltaModal.paciente) {
+                const res = await adicionarEncaixeDireto(
+                  faltaModal.paciente.nome_completo,
+                  faltaModal.profissional.id ?? null,
+                  faltaModal.paciente.telefone ?? null,
+                );
+                if (res.id) {
+                  encId = res.id;
+                  setEncaixePorAg(prev => ({ ...prev, [faltaModal.agId]: res.id! }));
+                  if (!res.jaExistia) {
+                    onAddEncaixe?.({
+                      id: res.id!,
+                      paciente_nome: faltaModal.paciente!.nome_completo,
+                      telefone: faltaModal.paciente!.telefone ?? null,
+                      observacoes: null,
+                      profissional_id: faltaModal.profissional!.id ?? null,
+                      created_at: new Date().toISOString(),
+                      profissional: faltaModal.profissional ? { profile: faltaModal.profissional.profile } : null,
+                    });
+                  }
+                }
+              }
               setReagendarInfo({
                 pacienteId: faltaModal.paciente.id,
                 pacienteNome: faltaModal.paciente.nome_completo,
                 profissionalId: faltaModal.profissional.id,
                 profissionalNome: faltaModal.profissional.profile?.nome_completo ?? "Profissional",
-                encaixeId: encaixePorAg[faltaModal.agId],
+                encaixeId: encId,
                 // Dados para reagendamento automático
                 salaId: agOrig?.sala?.id ?? null,
                 duracaoMin,
