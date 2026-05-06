@@ -88,10 +88,8 @@ function ModalTarefa({
   const [erro, setErro] = useState<string | null>(null);
   const hoje = new Date().toISOString().split("T")[0];
 
-  // Filtrar destinatários conforme a role de quem cria/edita
-  const profilesAtribuir = currentRole === "secretaria"
-    ? profiles.filter(p => p.role !== "secretaria")
-    : profiles.filter(p => p.role === "secretaria");
+  // Todos os usuários cadastrados podem ser destinatários
+  const profilesAtribuir = profiles;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

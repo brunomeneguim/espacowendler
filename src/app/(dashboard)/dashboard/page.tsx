@@ -97,6 +97,15 @@ export default async function DashboardPage({
       .limit(2000),
   ]);
 
+  // Para profissional: filtrar encaixe pelo próprio profissional_id
+  const ownProfId = profile.role === "profissional"
+    ? ((profissionais ?? []) as any[]).find((p: any) => p.profile_id === profile.id)?.id ?? null
+    : null;
+
+  const encaixesFiltrados = ownProfId
+    ? (encaixes ?? []).filter((e: any) => e.profissional_id === ownProfId)
+    : (encaixes ?? []);
+
   // Build map: paciente_id -> nome do profissional responsável (mais recente)
   const profMap = new Map<string, string>();
   for (const ag of (profPorPaciente ?? []) as any[]) {
@@ -128,7 +137,7 @@ export default async function DashboardPage({
   return (
     <div className="p-4 md:p-6 max-w-full">
       <DashboardContent
-        encaixes={(encaixes as any) ?? []}
+        encaixes={(encaixesFiltrados as any) ?? []}
         calProps={{
           agendamentos: (agendamentos as any) ?? [],
           profissionais: (profissionais as any) ?? [],
