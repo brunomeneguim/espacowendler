@@ -1851,8 +1851,8 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
           onRemoveEncaixe?.(encId);
           setEncaixePorAg(prev => { const next = { ...prev }; delete next[id]; return next; });
         }
-      }
-      if (novoStatus === "faltou" || novoStatus === "cancelado") {
+        refreshCalendar();
+      } else if (novoStatus === "faltou" || novoStatus === "cancelado") {
         if (ag) {
           setFaltaModal({
             tipo: novoStatus === "faltou" ? "cobrada" : "justificada",
@@ -1862,6 +1862,10 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
             ag,
           });
         }
+        // o modal chama refreshCalendar() ao fechar
+      } else {
+        // confirmado, ausencia, etc.
+        refreshCalendar();
       }
     });
   }
@@ -1875,7 +1879,10 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
 
   function handleDelete(id: string) {
     if (!confirm("Excluir este agendamento? Esta ação não pode ser desfeita.")) return;
-    startTransition(async () => { await deletarAgendamentoClient(id); });
+    startTransition(async () => {
+      await deletarAgendamentoClient(id);
+      refreshCalendar();
+    });
   }
 
   const isCurrentWeek = weekDays.some(d=>format(d,"yyyy-MM-dd")===hoje);
