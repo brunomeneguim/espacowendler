@@ -1347,16 +1347,20 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const datePickerRef = useRef<HTMLInputElement>(null);
 
   // ── Realtime: atualiza o calendário para todos quando agendamentos mudam ──
+  const routerRef = useRef(router);
+  routerRef.current = router;
+  const [, startRealtimeTransition] = useTransition();
   useEffect(() => {
     const supabase = createBrowserClient();
     const channel = supabase
       .channel("agendamentos-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "agendamentos" }, () => {
-        router.refresh();
+        startRealtimeTransition(() => { routerRef.current.refresh(); });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Parse weekStart from string in local time (avoids UTC timezone offset bug)
   const [y, m, d] = weekStartStr.split("-").map(Number);
