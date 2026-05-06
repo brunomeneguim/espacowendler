@@ -291,7 +291,7 @@ export function PacientesClient({ pacientes, canEdit, profissionais = [], pacien
   const [inativando, setInativando] = useState<Paciente | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [mostrarInativos, setMostrarInativos] = useState(true);
-  const [filtroProfId, setFiltroProfId] = useState("");
+  const [filtroProfId, setFiltroProfId] = useState(myProfId ?? "");
   const [, startTransition] = useTransition();
 
   function executarToggle(id: string) {
