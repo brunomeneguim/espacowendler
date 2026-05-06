@@ -6,6 +6,21 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 import { broadcastAgendaChange } from "@/lib/broadcastAgenda";
 
+// ── Vincular paciente ↔ profissional automaticamente ─────────────
+async function vincularPacienteProfissional(
+  supabase: ReturnType<typeof createClient>,
+  paciente_id: string | null,
+  profissional_id: string | null,
+) {
+  if (!paciente_id || !profissional_id) return;
+  await supabase
+    .from("paciente_profissional")
+    .upsert(
+      { paciente_id, profissional_id },
+      { onConflict: "paciente_id,profissional_id", ignoreDuplicates: true }
+    );
+}
+
 // ── Verificar horário indisponível (exportado para uso nos forms) ──
 export async function verificarHorarioIndisponivel(
   profissionalId: string,
@@ -207,6 +222,9 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
   });
   if (error) return { error: error.message, ignoradas: 0, datasIgnoradas: [] };
 
+  // Vincular paciente ao profissional automaticamente
+  await vincularPacienteProfissional(supabase, paciente_id, profissional_id);
+
   // Inserir recorrências (ausência não tem recorrência)
   let ignoradas = 0;
   const datasIgnoradas: string[] = [];
@@ -270,6 +288,9 @@ export async function reagendarAgendamentoRapido(params: {
   });
 
   if (error) return { error: error.message };
+
+  // Vincular paciente ao profissional automaticamente
+  await vincularPacienteProfissional(supabase, pacienteId, profissionalId);
 
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
@@ -465,6 +486,10 @@ export async function editarAgendamento(id: string, formData: FormData) {
   const { error } = await supabase.from("agendamentos").update(updateData).eq("id", id);
 
   if (error) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(error.message)}`);
+
+  // Vincular paciente ao profissional automaticamente
+  await vincularPacienteProfissional(supabase, paciente_id, profissional_id);
+
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   redirect("/agenda");
@@ -507,6 +532,10 @@ export async function atualizarAgendamento(
   }).eq("id", id);
 
   if (error) return { error: error.message };
+
+  // Vincular paciente ao profissional automaticamente
+  await vincularPacienteProfissional(supabase, paciente_id, profissional_id);
+
   revalidatePath("/dashboard");
   revalidatePath("/agenda");
   void broadcastAgendaChange();
