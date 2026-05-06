@@ -30,6 +30,7 @@ interface Props {
   profissionais: Profissional[];
   canManage: boolean;
   canDelete?: boolean;
+  ownProfId?: string | null;
 }
 
 function ColorPickerPopover({ profId, currentCor, coresUsadas, onClose }: {
@@ -340,7 +341,7 @@ function formatMoney(val?: number | null) {
   return val.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function ProfissionaisClient({ profissionais, canManage, canDelete }: Props) {
+export function ProfissionaisClient({ profissionais, canManage, canDelete, ownProfId }: Props) {
   const [busca, setBusca] = useState("");
   const [excluindo, setExcluindo] = useState<Profissional | null>(null);
   const [inativando, setInativando] = useState<Profissional | null>(null);
@@ -456,48 +457,57 @@ export function ProfissionaisClient({ profissionais, canManage, canDelete }: Pro
                     {!p.ativo && (
                       <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">Inativo</span>
                     )}
-                    {/* Color picker */}
-                    <div className="relative">
-                      <button
-                        onClick={() => setColorPickerId(colorPickerId === p.id ? null : p.id)}
-                        className="p-1.5 rounded-lg hover:bg-forest/10 text-forest-400 hover:text-forest transition-colors"
-                        title="Alterar cor"
-                      >
-                        <Palette className="w-4 h-4" style={{ color: corInfo?.hex }} />
-                      </button>
-                      {colorPickerId === p.id && (
-                        <ColorPickerPopover
-                          profId={p.id}
-                          currentCor={p.cor}
-                          coresUsadas={coresUsadas}
-                          onClose={() => setColorPickerId(null)}
-                        />
-                      )}
-                    </div>
-                    {/* Toggle ativo */}
-                    <button
-                      onClick={() => handleToggleAtivo(p)}
-                      disabled={togglingId === p.id}
-                      className={`p-1.5 rounded-lg transition-colors ${p.ativo ? "hover:bg-amber-50 text-amber-500 hover:text-amber-600" : "hover:bg-green-50 text-gray-400 hover:text-green-600"}`}
-                      title={p.ativo ? "Desativar" : "Reativar"}
-                    >
-                      {togglingId === p.id
-                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : p.ativo ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                    </button>
-                    {canManage && (
-                      <Link href={`/profissionais/${p.id}/editar`} className="p-1.5 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors" title="Editar profissional">
-                        <Pencil className="w-4 h-4" />
-                      </Link>
-                    )}
-                    {(canDelete ?? canManage) && (
-                      <button
-                        onClick={() => setExcluindo(p)}
-                        className="p-1.5 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors"
-                        title="Excluir profissional"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    {/* Ações restritas: admin/supervisor podem tudo; profissional só no próprio card */}
+                    {(canManage || p.id === ownProfId) && (
+                      <>
+                        {/* Color picker */}
+                        <div className="relative">
+                          <button
+                            onClick={() => setColorPickerId(colorPickerId === p.id ? null : p.id)}
+                            className="p-1.5 rounded-lg hover:bg-forest/10 text-forest-400 hover:text-forest transition-colors"
+                            title="Alterar cor"
+                          >
+                            <Palette className="w-4 h-4" style={{ color: corInfo?.hex }} />
+                          </button>
+                          {colorPickerId === p.id && (
+                            <ColorPickerPopover
+                              profId={p.id}
+                              currentCor={p.cor}
+                              coresUsadas={coresUsadas}
+                              onClose={() => setColorPickerId(null)}
+                            />
+                          )}
+                        </div>
+                        {/* Toggle ativo */}
+                        <button
+                          onClick={() => handleToggleAtivo(p)}
+                          disabled={togglingId === p.id}
+                          className={`p-1.5 rounded-lg transition-colors ${p.ativo ? "hover:bg-amber-50 text-amber-500 hover:text-amber-600" : "hover:bg-green-50 text-gray-400 hover:text-green-600"}`}
+                          title={p.ativo ? "Desativar" : "Reativar"}
+                        >
+                          {togglingId === p.id
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : p.ativo ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                        </button>
+                        {/* Editar */}
+                        <Link
+                          href={p.id === ownProfId ? "/profissionais/completar" : `/profissionais/${p.id}/editar`}
+                          className="p-1.5 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors"
+                          title="Editar profissional"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Link>
+                        {/* Excluir: só admin/supervisor */}
+                        {(canDelete ?? canManage) && (
+                          <button
+                            onClick={() => setExcluindo(p)}
+                            className="p-1.5 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors"
+                            title="Excluir profissional"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

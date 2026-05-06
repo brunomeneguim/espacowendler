@@ -18,12 +18,17 @@ export default async function ProfissionaisPage() {
       supabase
         .from("profissionais")
         .select(
-          "id, registro_profissional, valor_plano, telefone_1, ativo, foto_url, cor, data_nascimento, profile:profiles(nome_completo, email), especialidades:profissional_especialidades(especialidade:especialidades(nome))"
+          "id, profile_id, registro_profissional, valor_plano, telefone_1, ativo, foto_url, cor, data_nascimento, profile:profiles(nome_completo, email), especialidades:profissional_especialidades(especialidade:especialidades(nome))"
         )
         .order("created_at", { ascending: false }),
       supabase.from("especialidades").select("id, nome").order("nome"),
       supabase.from("configuracoes_campos_profissional").select("campo, obrigatorio"),
     ]);
+
+  // Profissional só pode gerenciar seu próprio registro
+  const ownProfId = profile.role === "profissional"
+    ? ((profissionais ?? []) as any[]).find((p: any) => p.profile_id === profile.id)?.id ?? null
+    : null;
 
   const camposConfig = (configsRaw ?? []) as { campo: string; obrigatorio: boolean }[];
 
@@ -50,6 +55,7 @@ export default async function ProfissionaisPage() {
         profissionais={(profissionais as any) ?? []}
         canManage={canManage}
         canDelete={canDelete}
+        ownProfId={ownProfId}
       />
     </div>
   );

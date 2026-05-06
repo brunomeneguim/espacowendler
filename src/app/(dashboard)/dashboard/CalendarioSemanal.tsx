@@ -26,6 +26,7 @@ import { adicionarEncaixeDireto } from "./listaEncaixeActions";
 import type { Encaixe } from "./DashboardContent";
 import { PROF_CORES, getCorById } from "@/lib/profCores";
 import { usePrivacyMode } from "@/app/(dashboard)/PrivacyContext";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
 
 // ── Constantes ───────────────────────────────────────────────────
 const HORA_INICIO = 7;
@@ -1344,6 +1345,18 @@ function EspelhoModal({ profissionais, agendamentos, horariosDisponiveis, salas,
 export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniversariantes, horariosDisponiveis, salas, weekStartStr, userRole, currentUserId, encaixes: encaixesProp = [], reagendarInfo: externalReagendarInfo, onSetReagendarInfo, onAddEncaixe, onRemoveEncaixe }: Props) {
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
+
+  // ── Realtime: atualiza o calendário para todos quando agendamentos mudam ──
+  useEffect(() => {
+    const supabase = createBrowserClient();
+    const channel = supabase
+      .channel("agendamentos-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "agendamentos" }, () => {
+        router.refresh();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [router]);
 
   // Parse weekStart from string in local time (avoids UTC timezone offset bug)
   const [y, m, d] = weekStartStr.split("-").map(Number);

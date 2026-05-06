@@ -9,7 +9,8 @@ import { ConfigCamposButton } from "./ConfigCamposButton";
 export default async function PacientesPage() {
   const supabase = createClient();
   const profile = await getCurrentProfile();
-  const canEdit = ["admin", "supervisor", "secretaria"].includes(profile.role);
+  const isProfissional = profile.role === "profissional";
+  const canEdit = ["admin", "supervisor", "secretaria", "profissional"].includes(profile.role);
   const canConfig = ["admin", "supervisor"].includes(profile.role);
 
   const [{ data: pacientes }, { data: configsRaw }, { data: profissionaisRaw }, { data: vinculos }] = await Promise.all([
@@ -22,25 +23,40 @@ export default async function PacientesPage() {
       .select("campo, obrigatorio"),
     supabase
       .from("profissionais")
-      .select("id, profile:profiles(nome_completo)")
+      .select("id, profile_id, profile:profiles(nome_completo)")
       .eq("ativo", true)
       .order("id"),
     // Vínculos paciente → profissional(ais)
     supabase
       .from("paciente_profissional")
-      .select("paciente_id, profissional:profissionais(profile:profiles(nome_completo))"),
+      .select("paciente_id, profissional_id"),
   ]);
 
   const camposConfig = (configsRaw ?? []) as { campo: string; obrigatorio: boolean }[];
 
-  // Mapa paciente_id → nome(s) do(s) profissional(ais) vinculados
+  // Mapa paciente_id → nome(s) do(s) profissional(ais) vinculados (para exibição)
+  const profNomeMap: Record<string, string> = {};
+  for (const p of (profissionaisRaw ?? []) as any[]) {
+    profNomeMap[p.id] = p.profile?.nome_completo ?? "—";
+  }
   const pacienteProfMap: Record<string, string> = {};
   for (const v of (vinculos ?? []) as any[]) {
-    const nome = v.profissional?.profile?.nome_completo;
+    const nome = profNomeMap[v.profissional_id];
     if (v.paciente_id && nome) {
       pacienteProfMap[v.paciente_id] = pacienteProfMap[v.paciente_id]
         ? `${pacienteProfMap[v.paciente_id]}, ${nome}`
         : nome;
+    }
+  }
+
+  // Para profissionais: set de pacientes vinculados a eles (não podem editar/ativar)
+  let myPatientIds: string[] = [];
+  if (isProfissional) {
+    const myProfId = ((profissionaisRaw ?? []) as any[]).find((p: any) => p.profile_id === profile.id)?.id;
+    if (myProfId) {
+      myPatientIds = ((vinculos ?? []) as any[])
+        .filter((v: any) => v.profissional_id === myProfId)
+        .map((v: any) => v.paciente_id as string);
     }
   }
 
@@ -72,6 +88,7 @@ export default async function PacientesPage() {
         canEdit={canEdit}
         profissionais={profissionais}
         pacienteProfMap={pacienteProfMap}
+        myPatientIds={myPatientIds}
       />
     </div>
   );

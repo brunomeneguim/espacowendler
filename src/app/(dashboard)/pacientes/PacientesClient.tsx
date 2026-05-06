@@ -29,6 +29,7 @@ interface Props {
   canEdit: boolean;
   profissionais?: Profissional[];
   pacienteProfMap?: Record<string, string>;
+  myPatientIds?: string[]; // pacientes vinculados ao profissional logado (não pode editar/ativar)
 }
 
 function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () => void }) {
@@ -282,7 +283,7 @@ function ModalConfirmarInativar({ pacienteId, nome, onConfirm, onClose }: { paci
   );
 }
 
-export function PacientesClient({ pacientes, canEdit, profissionais = [], pacienteProfMap = {} }: Props) {
+export function PacientesClient({ pacientes, canEdit, profissionais = [], pacienteProfMap = {}, myPatientIds = [] }: Props) {
   const [busca, setBusca] = useState("");
   const [excluindo, setExcluindo] = useState<Paciente | null>(null);
   const [inativando, setInativando] = useState<Paciente | null>(null);
@@ -423,32 +424,35 @@ export function PacientesClient({ pacientes, canEdit, profissionais = [], pacien
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => handleToggleAtivo(p)}
-                    disabled={togglingId === p.id}
-                    className={`p-2 rounded-lg transition-colors ${p.ativo ? "hover:bg-amber-50 text-amber-500 hover:text-amber-600" : "hover:bg-green-50 text-gray-400 hover:text-green-600"}`}
-                    title={p.ativo ? "Desativar paciente" : "Reativar paciente"}
-                  >
-                    {togglingId === p.id
-                      ? <Loader2 className="w-4 h-4 animate-spin" />
-                      : p.ativo ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                  </button>
-                  {canEdit && (
-                    <>
-                      <Link href={`/pacientes/${p.id}/editar`} className="p-2 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors" title="Editar paciente">
-                        <Pencil className="w-4 h-4" />
-                      </Link>
-                      <button
-                        onClick={() => setExcluindo(p)}
-                        className="p-2 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors"
-                        title="Excluir paciente"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
+                {/* Ações: profissional NÃO pode editar/ativar seus próprios pacientes (vinculados a ele) */}
+                {!myPatientIds.includes(p.id) && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleToggleAtivo(p)}
+                      disabled={togglingId === p.id}
+                      className={`p-2 rounded-lg transition-colors ${p.ativo ? "hover:bg-amber-50 text-amber-500 hover:text-amber-600" : "hover:bg-green-50 text-gray-400 hover:text-green-600"}`}
+                      title={p.ativo ? "Desativar paciente" : "Reativar paciente"}
+                    >
+                      {togglingId === p.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : p.ativo ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                    </button>
+                    {canEdit && (
+                      <>
+                        <Link href={`/pacientes/${p.id}/editar`} className="p-2 rounded-lg hover:bg-forest/10 text-forest-500 hover:text-forest transition-colors" title="Editar paciente">
+                          <Pencil className="w-4 h-4" />
+                        </Link>
+                        <button
+                          onClick={() => setExcluindo(p)}
+                          className="p-2 rounded-lg hover:bg-rust/10 text-forest-400 hover:text-rust transition-colors"
+                          title="Excluir paciente"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

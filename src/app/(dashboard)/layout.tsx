@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/Sidebar";
 import { PrivacyProvider } from "./PrivacyContext";
 import { PermissoesProvider } from "./PermissoesContext";
+import { PerfilCompletoProvider } from "./PerfilCompletoContext";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -15,18 +16,17 @@ export default async function DashboardLayout({
   const supabase = createClient();
 
   // Profissional sem perfil completo → forçar completar cadastro
+  let perfilCompleto = true;
   if (profile.role === "profissional") {
     const pathname = headers().get("x-pathname") ?? "";
-    const deveVerificar = pathname !== "" && !pathname.startsWith("/profissionais/completar");
-    if (deveVerificar) {
-      const { data: profReg } = await supabase
-        .from("profissionais")
-        .select("perfil_completo")
-        .eq("profile_id", profile.id)
-        .maybeSingle();
-      if (!profReg || !profReg.perfil_completo) {
-        redirect("/profissionais/completar");
-      }
+    const { data: profReg } = await supabase
+      .from("profissionais")
+      .select("perfil_completo")
+      .eq("profile_id", profile.id)
+      .maybeSingle();
+    perfilCompleto = !!(profReg?.perfil_completo);
+    if (!perfilCompleto && !pathname.startsWith("/profissionais/completar")) {
+      redirect("/profissionais/completar");
     }
   }
 
@@ -49,12 +49,14 @@ export default async function DashboardLayout({
     <div className="flex min-h-screen bg-cream">
       <PrivacyProvider>
         <PermissoesProvider permissoes={permissoes}>
-          <Sidebar
-            role={profile.role}
-            nome={profile.nome_completo}
-            menuConfig={(menuConfig as any) ?? []}
-          />
-          <main className="flex-1 min-w-0">{children}</main>
+          <PerfilCompletoProvider value={perfilCompleto}>
+            <Sidebar
+              role={profile.role}
+              nome={profile.nome_completo}
+              menuConfig={(menuConfig as any) ?? []}
+            />
+            <main className="flex-1 min-w-0">{children}</main>
+          </PerfilCompletoProvider>
         </PermissoesProvider>
       </PrivacyProvider>
     </div>

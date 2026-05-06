@@ -7,7 +7,7 @@ import {
   Calendar, Users, UserCircle, LogOut, Leaf,
   Stethoscope, CheckSquare, Settings2, Check,
   ChevronUp, ChevronDown, X, Pencil, Building2, GripVertical,
-  DollarSign, BarChart2, Eye, EyeOff, ShieldCheck, CreditCard,
+  DollarSign, BarChart2, Eye, EyeOff, ShieldCheck, CreditCard, AlertTriangle,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
 import { signOut } from "@/app/(auth)/actions";
@@ -15,6 +15,7 @@ import { salvarMenuConfig } from "@/app/(dashboard)/menuConfigActions";
 import type { MenuItem } from "@/app/(dashboard)/menuConfigActions";
 import { usePrivacyMode } from "@/app/(dashboard)/PrivacyContext";
 import { usePermissoes } from "@/app/(dashboard)/PermissoesContext";
+import { usePerfilCompleto } from "@/app/(dashboard)/PerfilCompletoContext";
 
 // ── Mapeamento de ícones (string → componente) ────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -59,6 +60,15 @@ export function Sidebar({
 
   const { privacyMode, setPrivacyMode } = usePrivacyMode();
   const { permissoes, hasCustomPermissions } = usePermissoes();
+  const perfilCompleto = usePerfilCompleto();
+  const [showCadastroModal, setShowCadastroModal] = useState(false);
+
+  function handleNavClick(e: React.MouseEvent) {
+    if (!perfilCompleto) {
+      e.preventDefault();
+      setShowCadastroModal(true);
+    }
+  }
 
   const isAdmin = role === "admin";
   const access = ROLE_ACCESS[role] ?? ROLE_ACCESS.profissional;
@@ -143,6 +153,24 @@ export function Sidebar({
   };
 
   return (
+    <>
+    {showCadastroModal && (
+      <>
+        <div className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm" onClick={() => setShowCadastroModal(false)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-display text-lg text-forest">Cadastro incompleto</p>
+              <p className="text-sm text-forest-600 mt-1">O cadastro deve ser finalizado antes de continuar.</p>
+            </div>
+            <button onClick={() => setShowCadastroModal(false)} className="btn-primary w-full">Ok, continuar preenchendo</button>
+          </div>
+        </div>
+      </>
+    )}
     <aside className="hidden md:flex md:flex-col w-64 bg-forest text-cream h-screen sticky top-0 overflow-y-auto">
       {/* Logo */}
       <div className="p-6 border-b border-forest-400/20">
@@ -170,6 +198,7 @@ export function Sidebar({
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={handleNavClick}
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-colors ${
                   active
                     ? "bg-cream/10 text-peach font-medium"
@@ -274,6 +303,7 @@ export function Sidebar({
               {podeSalas && (
                 <Link
                   href="/salas"
+                  onClick={handleNavClick}
                   className={`flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm transition-colors ${
                     pathname.startsWith("/salas")
                       ? "bg-cream/10 text-peach font-medium"
@@ -288,6 +318,7 @@ export function Sidebar({
               {podeVerConta && (
                 <Link
                   href="/configuracoes/conta"
+                  onClick={handleNavClick}
                   className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors"
                 >
                   <UserCircle className="w-4 h-4" strokeWidth={1.5} />
@@ -343,5 +374,6 @@ export function Sidebar({
         </form>
       </div>
     </aside>
+    </>
   );
 }
