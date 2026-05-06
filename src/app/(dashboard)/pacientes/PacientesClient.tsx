@@ -29,7 +29,9 @@ interface Props {
   canEdit: boolean;
   profissionais?: Profissional[];
   pacienteProfMap?: Record<string, string>;
-  myPatientIds?: string[]; // pacientes vinculados ao profissional logado (não pode editar/ativar)
+  pacienteProfIdMap?: Record<string, string[]>; // paciente_id → [profissional_id, ...]
+  myPatientIds?: string[]; // pacientes vinculados ao profissional logado
+  myProfId?: string | null; // ID do profissional logado (para filtro padrão)
 }
 
 function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () => void }) {
@@ -283,13 +285,13 @@ function ModalConfirmarInativar({ pacienteId, nome, onConfirm, onClose }: { paci
   );
 }
 
-export function PacientesClient({ pacientes, canEdit, profissionais = [], pacienteProfMap = {}, myPatientIds = [] }: Props) {
+export function PacientesClient({ pacientes, canEdit, profissionais = [], pacienteProfMap = {}, pacienteProfIdMap = {}, myPatientIds = [], myProfId }: Props) {
   const [busca, setBusca] = useState("");
   const [excluindo, setExcluindo] = useState<Paciente | null>(null);
   const [inativando, setInativando] = useState<Paciente | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [mostrarInativos, setMostrarInativos] = useState(false);
-  const [filtroProfId, setFiltroProfId] = useState("");
+  const [mostrarInativos, setMostrarInativos] = useState(true);
+  const [filtroProfId, setFiltroProfId] = useState(myProfId ?? "");
   const [, startTransition] = useTransition();
 
   function executarToggle(id: string) {
@@ -311,13 +313,14 @@ export function PacientesClient({ pacientes, canEdit, profissionais = [], pacien
   const filtrados = useMemo(() =>
     pacientes.filter(p => {
       if (!mostrarInativos && !p.ativo) return false;
-      if (filtroProfId && pacienteProfMap[p.id] !== filtroProfId) return false;
+      if (filtroProfId && !(pacienteProfIdMap[p.id] ?? []).includes(filtroProfId)) return false;
       return !busca || p.nome_completo?.toLowerCase().includes(busca.toLowerCase()) ||
         p.email?.toLowerCase().includes(busca.toLowerCase()) ||
         p.telefone?.includes(busca);
-    }), [pacientes, busca, mostrarInativos, filtroProfId, pacienteProfMap]);
+    }), [pacientes, busca, mostrarInativos, filtroProfId, pacienteProfIdMap]);
 
   const inativos = pacientes.filter(p => !p.ativo).length;
+  const ativos = pacientes.filter(p => p.ativo).length;
 
   return (
     <div>
@@ -364,7 +367,7 @@ export function PacientesClient({ pacientes, canEdit, profissionais = [], pacien
             title={mostrarInativos ? "Ocultar inativos" : "Mostrar inativos"}
           >
             {mostrarInativos ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-            Inativos ({inativos})
+            {mostrarInativos ? `Inativos (${inativos})` : `Mostrar inativos (${inativos})`}
           </button>
         )}
       </div>

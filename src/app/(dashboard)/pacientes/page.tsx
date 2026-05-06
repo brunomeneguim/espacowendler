@@ -49,21 +49,30 @@ export default async function PacientesPage() {
     }
   }
 
-  // Para profissionais: set de pacientes vinculados a eles (não podem editar/ativar)
-  let myPatientIds: string[] = [];
-  if (isProfissional) {
-    const myProfId = ((profissionaisRaw ?? []) as any[]).find((p: any) => p.profile_id === profile.id)?.id;
-    if (myProfId) {
-      myPatientIds = ((vinculos ?? []) as any[])
-        .filter((v: any) => v.profissional_id === myProfId)
-        .map((v: any) => v.paciente_id as string);
+  // Mapa paciente_id → [profissional_id, ...] (para filtro por ID)
+  const pacienteProfIdMap: Record<string, string[]> = {};
+  for (const v of (vinculos ?? []) as any[]) {
+    if (v.paciente_id && v.profissional_id) {
+      if (!pacienteProfIdMap[v.paciente_id]) pacienteProfIdMap[v.paciente_id] = [];
+      pacienteProfIdMap[v.paciente_id].push(v.profissional_id);
     }
   }
 
-  const profissionais = (profissionaisRaw ?? []).map((p: any) => ({
-    id: p.id,
-    nome_completo: p.profile?.nome_completo ?? "—",
-  }));
+  // Para profissionais: ID próprio e lista de pacientes vinculados
+  const myProfId = isProfissional
+    ? (((profissionaisRaw ?? []) as any[]).find((p: any) => p.profile_id === profile.id)?.id ?? null)
+    : null;
+
+  const myPatientIds: string[] = myProfId
+    ? ((vinculos ?? []) as any[])
+        .filter((v: any) => v.profissional_id === myProfId)
+        .map((v: any) => v.paciente_id as string)
+    : [];
+
+  // Profissionais para o filtro, em ordem alfabética
+  const profissionais = [...((profissionaisRaw ?? []) as any[])]
+    .sort((a, b) => (a.profile?.nome_completo ?? "").localeCompare(b.profile?.nome_completo ?? "", "pt-BR"))
+    .map((p: any) => ({ id: p.id, nome_completo: p.profile?.nome_completo ?? "—" }));
 
   return (
     <div className="p-6 md:p-10 max-w-6xl">
@@ -88,7 +97,9 @@ export default async function PacientesPage() {
         canEdit={canEdit}
         profissionais={profissionais}
         pacienteProfMap={pacienteProfMap}
+        pacienteProfIdMap={pacienteProfIdMap}
         myPatientIds={myPatientIds}
+        myProfId={myProfId}
       />
     </div>
   );
