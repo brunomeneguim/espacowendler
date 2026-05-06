@@ -1347,8 +1347,6 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const datePickerRef = useRef<HTMLInputElement>(null);
 
   // ── Realtime: broadcast entre clientes ──────────────────────────────────
-  const [rtStatus, setRtStatus] = useState<string>("conectando...");
-  const [rtCount, setRtCount] = useState(0);
   const routerRef = useRef(router);
   const broadcastRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>["channel"]> | null>(null);
   useEffect(() => { routerRef.current = router; }, [router]);
@@ -1358,13 +1356,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     const channel = supabase
       .channel("agenda-updates", { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "agenda_changed" }, () => {
-        console.log("[RT] broadcast recebido — atualizando calendário");
-        setRtCount(c => c + 1);
         routerRef.current.refresh();
       })
-      .subscribe((status: string, err?: Error) => {
-        console.log("[RT] status:", status, err ?? "");
-        setRtStatus(status);
+      .subscribe((status: string) => {
         broadcastRef.current = status === "SUBSCRIBED" ? channel : null;
       });
     return () => {
@@ -1916,11 +1910,6 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ── DEBUG Realtime ── remover após confirmar funcionamento */}
-      <div className="text-[11px] font-mono px-3 py-1 rounded bg-black/80 text-white w-fit">
-        RT: <span className={rtStatus === "SUBSCRIBED" ? "text-green-400" : "text-yellow-400"}>{rtStatus}</span>
-        {" · eventos: "}<span className="text-cyan-400">{rtCount}</span>
-      </div>
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
