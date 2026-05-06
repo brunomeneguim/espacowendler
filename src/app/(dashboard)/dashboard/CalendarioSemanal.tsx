@@ -1346,38 +1346,35 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
-  // ── Realtime: broadcast para todos os clientes quando há mudança ──
-  const clientIdRef = useRef(`c-${Math.random().toString(36).slice(2)}`);
-  const broadcastRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>["channel"]> | null>(null);
-  const [, startRealtimeTransition] = useTransition();
+  // ── Realtime: escuta mudanças no banco diretamente via postgres_changes ──
+  const [rtStatus, setRtStatus] = useState<string>("conectando...");
+  const [rtCount, setRtCount] = useState(0);
+  const routerRef = useRef(router);
+  useEffect(() => { routerRef.current = router; }, [router]);
 
   useEffect(() => {
     const supabase = createBrowserClient();
     const channel = supabase
-      .channel("agenda-updates")
-      .on("broadcast", { event: "agenda_changed" }, (msg) => {
-        // Ignora o próprio broadcast; atualiza ao receber de outro cliente
-        if (msg.payload?.clientId !== clientIdRef.current) {
-          startRealtimeTransition(() => { router.refresh(); });
+      .channel("agendamentos-db-changes")
+      .on(
+        "postgres_changes" as any,
+        { event: "*", schema: "public", table: "agendamentos" },
+        (payload: any) => {
+          console.log("[CalendarioSemanal] DB change recebido:", payload);
+          setRtCount(c => c + 1);
+          routerRef.current.refresh();
         }
-      })
-      .subscribe();
-    broadcastRef.current = channel;
-    return () => {
-      supabase.removeChannel(channel);
-      broadcastRef.current = null;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      )
+      .subscribe((status: string, err?: Error) => {
+        console.log("[CalendarioSemanal] Realtime status:", status, err ?? "");
+        setRtStatus(status);
+      });
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  /** Atualiza dados locais E notifica todos os outros clientes abertos */
+  /** Atualiza dados locais após ação do próprio usuário */
   const refreshCalendar = useCallback(() => {
-    refreshCalendar();
-    broadcastRef.current?.send({
-      type: "broadcast",
-      event: "agenda_changed",
-      payload: { clientId: clientIdRef.current },
-    });
+    router.refresh();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -1905,6 +1902,11 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
 
   return (
     <div className="flex flex-col gap-4">
+      {/* ── DEBUG Realtime ── remover após confirmar funcionamento */}
+      <div className="text-[11px] font-mono px-3 py-1 rounded bg-black/80 text-white w-fit">
+        RT: <span className={rtStatus === "SUBSCRIBED" ? "text-green-400" : "text-yellow-400"}>{rtStatus}</span>
+        {" · eventos: "}<span className="text-cyan-400">{rtCount}</span>
+      </div>
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
