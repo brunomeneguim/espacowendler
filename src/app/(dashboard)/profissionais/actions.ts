@@ -176,22 +176,22 @@ export async function completarPerfilProfissional(
     .single();
 
   const profData = {
-    foto_url:           get("foto_url"),
-    data_nascimento:    get("data_nascimento"),
-    sexo:               get("sexo"),
-    cpf:                get("cpf"),
-    cnpj:               get("cnpj"),
-    horario_inicio:     get("horario_inicio"),
-    horario_fim:        get("horario_fim"),
-    tempo_atendimento:  get("tempo_atendimento") ? parseInt(get("tempo_atendimento")!) : null,
-    cor:                get("cor"),
-    observacoes:        get("observacoes"),
-    telefone_1:         get("telefone_1"),
-    telefone_2:         get("telefone_2"),
+    foto_url:              get("foto_url"),
+    data_nascimento:       get("data_nascimento"),
+    sexo:                  get("sexo"),
+    cpf:                   get("cpf"),
+    cnpj:                  get("cnpj"),
+    tempo_atendimento:     get("tempo_atendimento") ? parseInt(get("tempo_atendimento")!) : null,
+    cor:                   get("cor"),
+    observacoes:           get("observacoes"),
+    telefone_1:            get("telefone_1"),
+    telefone_2:            get("telefone_2"),
     registro_profissional: get("registro_profissional"),
-    data_cadastro:      new Date().toISOString().split("T")[0],
-    perfil_completo:    true,
-    ativo:              true,
+    valor_consulta:        get("valor_consulta") ? parseFloat(get("valor_consulta")!) : null,
+    valor_plano:           get("valor_plano") ? parseFloat(get("valor_plano")!) : null,
+    data_cadastro:         new Date().toISOString().split("T")[0],
+    perfil_completo:       true,
+    ativo:                 true,
   };
 
   let profId: string | undefined;
@@ -211,16 +211,43 @@ export async function completarPerfilProfissional(
 
   if (error) return { error: error.message };
 
-  // Atualizar especialidades na junction table
-  const especialidadeId = get("especialidade_id");
+  // Atualizar especialidades na junction table (multi-select)
+  const especialidadeIds = formData.getAll("especialidade_ids") as string[];
   if (profId) {
     await supabase.from("profissional_especialidades").delete().eq("profissional_id", profId);
-    if (especialidadeId) {
-      await supabase.from("profissional_especialidades").insert({
-        profissional_id: profId,
-        especialidade_id: parseInt(especialidadeId),
-      });
+    if (especialidadeIds.length > 0) {
+      await supabase.from("profissional_especialidades").insert(
+        especialidadeIds.map(eid => ({ profissional_id: profId!, especialidade_id: parseInt(eid) }))
+      );
     }
+  }
+
+  // Atualizar horários disponíveis
+  const horariosJson = get("horarios_json");
+  if (horariosJson && profId) {
+    try {
+      const horarios = JSON.parse(horariosJson) as { dia_semana: number; hora_inicio: string; hora_fim: string }[];
+      await supabase.from("horarios_disponiveis").delete().eq("profissional_id", profId);
+      if (horarios.length > 0) {
+        await supabase.from("horarios_disponiveis").insert(
+          horarios.map(h => ({ profissional_id: profId!, ...h }))
+        );
+      }
+    } catch { /* ignora JSON inválido */ }
+  }
+
+  // Atualizar horários indisponíveis
+  const horariosIndispJson = get("horarios_indisponiveis_json");
+  if (horariosIndispJson && profId) {
+    try {
+      const horariosIndisp = JSON.parse(horariosIndispJson) as { dia_semana: number; hora_inicio: string; hora_fim: string }[];
+      await supabase.from("horarios_indisponiveis").delete().eq("profissional_id", profId);
+      if (horariosIndisp.length > 0) {
+        await supabase.from("horarios_indisponiveis").insert(
+          horariosIndisp.map(h => ({ profissional_id: profId!, ...h }))
+        );
+      }
+    } catch { /* ignora JSON inválido */ }
   }
 
   // Alterar senha se preenchida

@@ -11,7 +11,7 @@ export default async function CompletarPerfilPage() {
     await Promise.all([
       supabase
         .from("profissionais")
-        .select("id, foto_url, data_nascimento, sexo, cpf, cnpj, horario_inicio, horario_fim, tempo_atendimento, observacoes, registro_profissional, perfil_completo, cor, valor_consulta")
+        .select("id, foto_url, data_nascimento, sexo, cpf, cnpj, telefone_1, telefone_2, horario_inicio, horario_fim, tempo_atendimento, observacoes, registro_profissional, perfil_completo, cor, valor_consulta, valor_plano")
         .eq("profile_id", profile.id)
         .maybeSingle(),
       supabase.from("especialidades").select("id, nome").order("nome"),
@@ -19,16 +19,19 @@ export default async function CompletarPerfilPage() {
       supabase.from("profissionais").select("cor").not("cor", "is", null).neq("profile_id", profile.id),
     ]);
 
-  // Buscar especialidade atual da junction table
-  let especialidadeAtualId: number | null = null;
+  // Buscar especialidades atuais da junction table (multi)
+  let especialidadeIds: number[] = [];
+  let horariosDisponiveis: { dia_semana: number; hora_inicio: string; hora_fim: string }[] = [];
+  let horariosIndisponiveis: { dia_semana: number; hora_inicio: string; hora_fim: string }[] = [];
   if ((profReg as any)?.id) {
-    const { data: espRow } = await supabase
-      .from("profissional_especialidades")
-      .select("especialidade_id")
-      .eq("profissional_id", (profReg as any).id)
-      .limit(1)
-      .maybeSingle();
-    especialidadeAtualId = espRow?.especialidade_id ?? null;
+    const [{ data: espRows }, { data: hdRows }, { data: hiRows }] = await Promise.all([
+      supabase.from("profissional_especialidades").select("especialidade_id").eq("profissional_id", (profReg as any).id),
+      supabase.from("horarios_disponiveis").select("dia_semana, hora_inicio, hora_fim").eq("profissional_id", (profReg as any).id),
+      supabase.from("horarios_indisponiveis").select("dia_semana, hora_inicio, hora_fim").eq("profissional_id", (profReg as any).id),
+    ]);
+    especialidadeIds = (espRows ?? []).map((r: any) => r.especialidade_id as number);
+    horariosDisponiveis = (hdRows ?? []) as typeof horariosDisponiveis;
+    horariosIndisponiveis = (hiRows ?? []) as typeof horariosIndisponiveis;
   }
 
   const camposConfig = (configsRaw ?? []) as { campo: string; obrigatorio: boolean }[];
@@ -43,8 +46,11 @@ export default async function CompletarPerfilPage() {
       />
       <CompletarPerfilForm
         profile={profile}
-        profReg={{ ...(profReg as any), especialidade_id: especialidadeAtualId }}
+        profReg={profReg as any}
         especialidades={especialidades ?? []}
+        especialidadeIds={especialidadeIds}
+        horariosDisponiveis={horariosDisponiveis}
+        horariosIndisponiveis={horariosIndisponiveis}
         camposConfig={camposConfig}
         coresUsadas={coresUsadas}
       />
