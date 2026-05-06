@@ -1346,21 +1346,40 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const router = useRouter();
   const datePickerRef = useRef<HTMLInputElement>(null);
 
-  // ── Realtime: atualiza o calendário para todos quando agendamentos mudam ──
-  const routerRef = useRef(router);
-  routerRef.current = router;
+  // ── Realtime: broadcast para todos os clientes quando há mudança ──
+  const clientIdRef = useRef(`c-${Math.random().toString(36).slice(2)}`);
+  const broadcastRef = useRef<ReturnType<ReturnType<typeof createBrowserClient>["channel"]> | null>(null);
   const [, startRealtimeTransition] = useTransition();
+
   useEffect(() => {
     const supabase = createBrowserClient();
     const channel = supabase
-      .channel("agendamentos-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "agendamentos" }, () => {
-        startRealtimeTransition(() => { routerRef.current.refresh(); });
+      .channel("agenda-updates")
+      .on("broadcast", { event: "agenda_changed" }, (msg) => {
+        // Ignora o próprio broadcast; atualiza ao receber de outro cliente
+        if (msg.payload?.clientId !== clientIdRef.current) {
+          startRealtimeTransition(() => { router.refresh(); });
+        }
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    broadcastRef.current = channel;
+    return () => {
+      supabase.removeChannel(channel);
+      broadcastRef.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Atualiza dados locais E notifica todos os outros clientes abertos */
+  const refreshCalendar = useCallback(() => {
+    refreshCalendar();
+    broadcastRef.current?.send({
+      type: "broadcast",
+      event: "agenda_changed",
+      payload: { clientId: clientIdRef.current },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
 
   // Parse weekStart from string in local time (avoids UTC timezone offset bug)
   const [y, m, d] = weekStartStr.split("-").map(Number);
@@ -1436,7 +1455,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
             onRemoveEncaixe?.(reagendarInfo.encaixeId);
           }
           setReagendarInfo(null);
-          router.refresh();
+          refreshCalendar();
         } else {
           setMoveError(res.error);
           setTimeout(() => setMoveError(null), 4000);
@@ -1448,7 +1467,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
         startTransition(async () => {
           const { removerEncaixe } = await import("./listaEncaixeActions");
           await removerEncaixe(reagendarInfo.encaixeId!);
-          router.refresh();
+          refreshCalendar();
         });
       }
       setReagendarInfo(null);
@@ -1678,7 +1697,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
           setMoveError(res.error);
           setTimeout(() => setMoveError(null), 4000);
         } else {
-          router.refresh(); // re-render para mover o card para a coluna correta
+          refreshCalendar(); // re-render para mover o card para a coluna correta
         }
       });
       return;
@@ -1847,7 +1866,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   function handlePayment(id: string, forma: string, valor: number | null, outrosDesc?: string) {
     startTransition(async () => {
       await marcarPagamentoAgendamento(id, true, forma, valor, outrosDesc);
-      router.refresh();
+      refreshCalendar();
     });
   }
 
@@ -2470,7 +2489,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
           pacientes={pacientes}
           salas={salas}
           onClose={()=>setEditingAg(null)}
-          onSaved={()=>router.refresh()}
+          onSaved={()=>refreshCalendar()}
         />
       )}
 
@@ -2478,7 +2497,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
       {faltaModal?.tipo === "cobrada" && (
         <FaltaCobradaModal
           pacienteNome={faltaModal.paciente?.nome_completo ?? "Paciente"}
-          onClose={() => { setFaltaModal(null); router.refresh(); }}
+          onClose={() => { setFaltaModal(null); refreshCalendar(); }}
         />
       )}
 
@@ -2511,7 +2530,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
               }
             }
             setFaltaModal(null);
-            router.refresh();
+            refreshCalendar();
           }}
           onReagendar={async () => {
             if (faltaModal.paciente && faltaModal.profissional) {
@@ -2557,9 +2576,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
               });
             }
             setFaltaModal(null);
-            router.refresh();
+            refreshCalendar();
           }}
-          onClose={() => { setFaltaModal(null); router.refresh(); }}
+          onClose={() => { setFaltaModal(null); refreshCalendar(); }}
         />
       )}
 
@@ -2605,7 +2624,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                         setMoveError(res.error);
                         setTimeout(() => setMoveError(null), 4000);
                       } else {
-                        router.refresh();
+                        refreshCalendar();
                       }
                     });
                   }}
