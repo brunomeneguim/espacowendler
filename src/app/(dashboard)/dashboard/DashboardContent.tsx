@@ -68,11 +68,17 @@ export function DashboardContent({ encaixes: initialEncaixes, calProps }: Props)
     setReagendarInfo({ ...info, pacienteId: found?.id ?? info.pacienteId });
   }
 
+  // ID do profissional logado (null para admin/secretaria)
+  const currentProfId = (calProps.userRole as string) === "profissional"
+    ? ((calProps.profissionais as any[]).find((p: any) => p.profile_id === calProps.currentUserId)?.id ?? null)
+    : null;
+
   return (
     <>
       <ListaEncaixe
         encaixes={encaixes}
         profissionais={calProps.profissionais as any}
+        currentProfId={currentProfId}
         onReagendar={handleReagendarFromEncaixe}
         onAddEncaixe={handleAddEncaixe}
         onRemoveEncaixe={handleRemoveEncaixe}

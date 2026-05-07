@@ -24,6 +24,7 @@ interface ReagendarInfo {
 interface Props {
   encaixes: Encaixe[];           // controlado pelo pai (DashboardContent)
   profissionais: Profissional[];
+  currentProfId?: string | null; // id do profissional logado (null = admin/secretaria)
   onReagendar?: (info: ReagendarInfo) => void;
   onAddEncaixe: (enc: Encaixe) => void;
   onRemoveEncaixe: (id: string) => void;
@@ -40,12 +41,13 @@ function maskPhone(v: string) {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-export function ListaEncaixe({ encaixes, profissionais, onReagendar, onAddEncaixe, onRemoveEncaixe, onUpdateEncaixe }: Props) {
+export function ListaEncaixe({ encaixes, profissionais, currentProfId, onReagendar, onAddEncaixe, onRemoveEncaixe, onUpdateEncaixe }: Props) {
+  const isProfissional = !!currentProfId;
   const [isPending, startTransition] = useTransition();
   const [aberto, setAberto] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [busca, setBusca] = useState("");
-  const [filtroProf, setFiltroProf] = useState("todos");
+  const [filtroProf, setFiltroProf] = useState(currentProfId ?? "todos");
   const [telefone, setTelefone] = useState("");
   const [erro, setErro] = useState<string | null>(null);
 
@@ -173,10 +175,11 @@ export function ListaEncaixe({ encaixes, profissionais, onReagendar, onAddEncaix
             </div>
             <select
               value={filtroProf}
-              onChange={e => setFiltroProf(e.target.value)}
-              className="h-[34px] text-sm border border-sand/40 rounded-lg px-2 bg-white text-forest focus:outline-none focus:ring-2 focus:ring-forest/20 shrink-0"
+              onChange={e => !isProfissional && setFiltroProf(e.target.value)}
+              disabled={isProfissional}
+              className={`h-[34px] text-sm border border-sand/40 rounded-lg px-2 bg-white text-forest focus:outline-none focus:ring-2 focus:ring-forest/20 shrink-0 ${isProfissional ? "opacity-75 cursor-not-allowed" : ""}`}
             >
-              <option value="todos">Todos os profissionais</option>
+              {!isProfissional && <option value="todos">Todos os profissionais</option>}
               {profissionais.map(p => (
                 <option key={p.id} value={p.id}>{p.profile?.nome_completo}</option>
               ))}
@@ -210,8 +213,13 @@ export function ListaEncaixe({ encaixes, profissionais, onReagendar, onAddEncaix
               </div>
               <div>
                 <label className="text-xs font-medium text-forest-600 mb-1 block">Profissional</label>
-                <select name="profissional_id" className="input-field py-1.5 text-sm" defaultValue="">
-                  <option value="">— Qualquer profissional —</option>
+                <select
+                  name="profissional_id"
+                  className={`input-field py-1.5 text-sm ${isProfissional ? "opacity-75 cursor-not-allowed" : ""}`}
+                  defaultValue={currentProfId ?? ""}
+                  disabled={isProfissional}
+                >
+                  {!isProfissional && <option value="">— Qualquer profissional —</option>}
                   {profissionais.map(p => (
                     <option key={p.id} value={p.id}>{p.profile?.nome_completo}</option>
                   ))}
@@ -262,8 +270,13 @@ export function ListaEncaixe({ encaixes, profissionais, onReagendar, onAddEncaix
                       </div>
                       <div>
                         <label className="text-xs font-medium text-forest-600 mb-0.5 block">Profissional</label>
-                        <select value={editProfId} onChange={e2 => setEditProfId(e2.target.value)} className="input-field py-1 text-sm">
-                          <option value="">— Qualquer profissional —</option>
+                        <select
+                          value={editProfId}
+                          onChange={e2 => !isProfissional && setEditProfId(e2.target.value)}
+                          disabled={isProfissional}
+                          className={`input-field py-1 text-sm ${isProfissional ? "opacity-75 cursor-not-allowed" : ""}`}
+                        >
+                          {!isProfissional && <option value="">— Qualquer profissional —</option>}
                           {profissionais.map(p => (
                             <option key={p.id} value={p.id}>{p.profile?.nome_completo}</option>
                           ))}
