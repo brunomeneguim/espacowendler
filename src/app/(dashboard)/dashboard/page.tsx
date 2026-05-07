@@ -108,19 +108,27 @@ export default async function DashboardPage({
 
   // Build map: paciente_id -> nome do profissional responsável (mais recente)
   const profMap = new Map<string, string>();
+  // Set de paciente_ids vinculados ao profissional logado (para filtro)
+  const pacientesDoProfissional = new Set<string>();
   for (const ag of (profPorPaciente ?? []) as any[]) {
-    if (ag.paciente_id && !profMap.has(ag.paciente_id)) {
-      const nome = (ag.profissional as any)?.profile?.nome_completo;
-      if (nome) profMap.set(ag.paciente_id, nome);
+    if (!ag.paciente_id) continue;
+    const nomeProf = (ag.profissional as any)?.profile?.nome_completo;
+    if (nomeProf && !profMap.has(ag.paciente_id)) profMap.set(ag.paciente_id, nomeProf);
+    // Registrar todos os pacientes que tiveram algum agendamento com este profissional
+    if (ownProfId && (ag.profissional as any)?.id === ownProfId) {
+      pacientesDoProfissional.add(ag.paciente_id);
     }
   }
 
   // Pacientes aniversariantes enriquecidos com nome do profissional
-  const aniversariantesEnriquecidos = (aniversariantesPacientes ?? []).map((a: any) => ({
-    ...a,
-    tipo: "paciente" as const,
-    profissional_nome: profMap.get(a.id) ?? null,
-  }));
+  // Para profissional: mostrar apenas pacientes vinculados ao próprio profissional
+  const aniversariantesEnriquecidos = (aniversariantesPacientes ?? [])
+    .filter((a: any) => !ownProfId || pacientesDoProfissional.has(a.id))
+    .map((a: any) => ({
+      ...a,
+      tipo: "paciente" as const,
+      profissional_nome: profMap.get(a.id) ?? null,
+    }));
 
   // Profissionais aniversariantes
   const aniversariantesProfissionaisArr = (profissionaisComAniversario ?? []).map((p: any) => ({

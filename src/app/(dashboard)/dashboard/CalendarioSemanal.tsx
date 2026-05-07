@@ -2066,7 +2066,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                               </a>
                             )}
                           </div>
-                          {a.profissional_nome && (
+                          {a.profissional_nome && userRole !== "profissional" && (
                             <span className="flex items-center gap-1 text-xs text-forest-400 shrink-0 max-w-[110px] truncate" title={`Profissional: ${a.profissional_nome}`}>
                               <Stethoscope className="w-3 h-3 shrink-0" />
                               <span className="truncate">{a.profissional_nome}</span>
