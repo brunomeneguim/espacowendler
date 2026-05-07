@@ -142,10 +142,16 @@ export default async function DashboardPage({
 
   const todosAniversariantes = [...aniversariantesEnriquecidos, ...aniversariantesProfissionaisArr];
 
+  // Pacientes vinculados ao profissional logado (para autocomplete no encaixe)
+  const pacientesSugestaoEncaixe = ownProfId
+    ? (pacientes ?? []).filter((p: any) => pacientesDoProfissional.has(p.id))
+    : [];
+
   return (
     <div className="p-4 md:p-6 max-w-full">
       <DashboardContent
         encaixes={(encaixesFiltrados as any) ?? []}
+        pacientesSugestaoEncaixe={(pacientesSugestaoEncaixe as any) ?? []}
         calProps={{
           agendamentos: (agendamentos as any) ?? [],
           profissionais: (profissionais as any) ?? [],

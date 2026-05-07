@@ -27,12 +27,15 @@ export interface Encaixe {
   profissional?: { profile: { nome_completo: string } | null } | null;
 }
 
+interface PacienteSugestao { id: string; nome_completo: string; telefone?: string | null }
+
 interface Props {
   encaixes: Encaixe[];
+  pacientesSugestaoEncaixe?: PacienteSugestao[];
   calProps: Omit<React.ComponentProps<typeof CalendarioSemanal>, "reagendarInfo" | "onSetReagendarInfo" | "onAddEncaixe" | "onRemoveEncaixe" | "encaixes">;
 }
 
-export function DashboardContent({ encaixes: initialEncaixes, calProps }: Props) {
+export function DashboardContent({ encaixes: initialEncaixes, pacientesSugestaoEncaixe = [], calProps }: Props) {
   const [reagendarInfo, setReagendarInfo] = useState<ReagendarInfo | null>(null);
   // ── Único dono do estado de encaixe — tanto ListaEncaixe quanto CalendarioSemanal usam estes callbacks ──
   const [encaixes, setEncaixes] = useState<Encaixe[]>(initialEncaixes);
@@ -79,6 +82,7 @@ export function DashboardContent({ encaixes: initialEncaixes, calProps }: Props)
         encaixes={encaixes}
         profissionais={calProps.profissionais as any}
         currentProfId={currentProfId}
+        pacientesSugestao={pacientesSugestaoEncaixe}
         onReagendar={handleReagendarFromEncaixe}
         onAddEncaixe={handleAddEncaixe}
         onRemoveEncaixe={handleRemoveEncaixe}

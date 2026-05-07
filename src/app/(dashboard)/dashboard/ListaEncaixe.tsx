@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { UserPlus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Phone, FileText, User, Pencil, Check, X, CalendarPlus } from "lucide-react";
 import { adicionarEncaixe, removerEncaixe, editarEncaixe } from "./listaEncaixeActions";
 import type { Encaixe } from "./DashboardContent";
@@ -8,6 +8,12 @@ import type { Encaixe } from "./DashboardContent";
 interface Profissional {
   id: string;
   profile: { nome_completo: string } | null;
+}
+
+interface PacienteSugestao {
+  id: string;
+  nome_completo: string;
+  telefone?: string | null;
 }
 
 interface ReagendarInfo {
@@ -25,6 +31,7 @@ interface Props {
   encaixes: Encaixe[];           // controlado pelo pai (DashboardContent)
   profissionais: Profissional[];
   currentProfId?: string | null; // id do profissional logado (null = admin/secretaria)
+  pacientesSugestao?: PacienteSugestao[]; // pacientes vinculados ao profissional (para autocomplete)
   onReagendar?: (info: ReagendarInfo) => void;
   onAddEncaixe: (enc: Encaixe) => void;
   onRemoveEncaixe: (id: string) => void;
@@ -41,7 +48,7 @@ function maskPhone(v: string) {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-export function ListaEncaixe({ encaixes, profissionais, currentProfId, onReagendar, onAddEncaixe, onRemoveEncaixe, onUpdateEncaixe }: Props) {
+export function ListaEncaixe({ encaixes, profissionais, currentProfId, pacientesSugestao = [], onReagendar, onAddEncaixe, onRemoveEncaixe, onUpdateEncaixe }: Props) {
   const isProfissional = !!currentProfId;
   const [isPending, startTransition] = useTransition();
   const [aberto, setAberto] = useState(false);
@@ -50,6 +57,44 @@ export function ListaEncaixe({ encaixes, profissionais, currentProfId, onReagend
   const [filtroProf, setFiltroProf] = useState(currentProfId ?? "todos");
   const [telefone, setTelefone] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+
+  // ── Combobox autocomplete para nome do paciente ──
+  const [nomeInput, setNomeInput] = useState("");
+  const [nomeFocused, setNomeFocused] = useState(false);
+  const [nomeHiddenValue, setNomeHiddenValue] = useState("");
+  const comboboxRef = useRef<HTMLDivElement>(null);
+
+  const sugestoesFiltradas = isProfissional && nomeInput.length > 0
+    ? pacientesSugestao.filter(p =>
+        p.nome_completo.toLowerCase().includes(nomeInput.toLowerCase()) ||
+        (p.telefone ?? "").includes(nomeInput)
+      ).slice(0, 8)
+    : [];
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(ev: MouseEvent) {
+      if (comboboxRef.current && !comboboxRef.current.contains(ev.target as Node)) {
+        setNomeFocused(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function selecionarPaciente(p: PacienteSugestao) {
+    setNomeInput(p.nome_completo);
+    setNomeHiddenValue(p.nome_completo);
+    if (p.telefone) setTelefone(maskPhone(p.telefone));
+    setNomeFocused(false);
+  }
+
+  function resetForm() {
+    setNomeInput("");
+    setNomeHiddenValue("");
+    setTelefone("");
+    setNomeFocused(false);
+  }
 
   // ── Estado de edição inline ──
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -128,7 +173,7 @@ export function ListaEncaixe({ encaixes, profissionais, currentProfId, onReagend
         profissional: prof ? { profile: prof.profile } : null,
       });
       setShowForm(false);
-      setTelefone("");
+      resetForm();
       (e.target as HTMLFormElement).reset();
     });
   }
@@ -203,7 +248,44 @@ export function ListaEncaixe({ encaixes, profissionais, currentProfId, onReagend
                   <label className="text-xs font-medium text-forest-600 mb-1 block">
                     Nome do paciente <span className="text-rust">*</span>
                   </label>
-                  <input name="paciente_nome" type="text" required placeholder="Nome completo" className="input-field py-1.5 text-sm" />
+                  {isProfissional ? (
+                    /* Combobox com autocomplete para profissional */
+                    <div ref={comboboxRef} className="relative">
+                      {/* campo hidden que vai no FormData */}
+                      <input type="hidden" name="paciente_nome" value={nomeInput} required />
+                      <input
+                        type="text"
+                        placeholder="Digite para buscar ou inserir nome…"
+                        value={nomeInput}
+                        onChange={e => { setNomeInput(e.target.value); setNomeFocused(true); }}
+                        onFocus={() => setNomeFocused(true)}
+                        autoComplete="off"
+                        className="input-field py-1.5 text-sm w-full"
+                      />
+                      {nomeFocused && sugestoesFiltradas.length > 0 && (
+                        <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-sand/40 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                          {sugestoesFiltradas.map(p => (
+                            <li
+                              key={p.id}
+                              onMouseDown={e => { e.preventDefault(); selecionarPaciente(p); }}
+                              className="flex items-center gap-2 px-3 py-2 hover:bg-forest/5 cursor-pointer transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-forest truncate">{p.nome_completo}</p>
+                                {p.telefone && (
+                                  <p className="text-xs text-forest-400 flex items-center gap-1">
+                                    <Phone className="w-3 h-3" />{p.telefone}
+                                  </p>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ) : (
+                    <input name="paciente_nome" type="text" required placeholder="Nome completo" className="input-field py-1.5 text-sm" />
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-medium text-forest-600 mb-1 block">Telefone</label>
@@ -235,7 +317,7 @@ export function ListaEncaixe({ encaixes, profissionais, currentProfId, onReagend
                   {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
                   Adicionar à lista
                 </button>
-                <button type="button" onClick={() => { setShowForm(false); setErro(null); }}
+                <button type="button" onClick={() => { setShowForm(false); setErro(null); resetForm(); }}
                   className="inline-flex items-center justify-center px-4 py-1.5 bg-peach text-rust text-sm font-medium rounded-full hover:bg-peach-600 transition-all">
                   Cancelar
                 </button>
