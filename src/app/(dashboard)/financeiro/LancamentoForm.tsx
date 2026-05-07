@@ -28,6 +28,8 @@ interface Props {
   pacientes: Paciente[];
   profissionais: Profissional[];
   lancamento?: Lancamento;
+  /** Quando definido, o campo profissional fica fixo (visão do próprio profissional) */
+  profissionalFixed?: { id: string; nome: string };
 }
 
 function MoneyInput({ defaultValue }: { defaultValue?: number | null }) {
@@ -58,7 +60,7 @@ function MoneyInput({ defaultValue }: { defaultValue?: number | null }) {
   );
 }
 
-export function LancamentoForm({ pacientes, profissionais, lancamento = {} }: Props) {
+export function LancamentoForm({ pacientes, profissionais, lancamento = {}, profissionalFixed }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -168,26 +170,36 @@ export function LancamentoForm({ pacientes, profissionais, lancamento = {} }: Pr
       </div>
 
       {/* Paciente + Profissional */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div>
-          <label className="label">Paciente <span className="text-forest-400 text-xs font-normal">(opcional)</span></label>
-          <select name="paciente_id" className="input-field" defaultValue={lancamento.paciente_id ?? ""}>
-            <option value="">Sem paciente</option>
-            {pacientes.map(p => (
-              <option key={p.id} value={p.id}>{p.nome_completo}</option>
-            ))}
-          </select>
+      {profissionalFixed ? (
+        /* Visão do profissional: profissional fixo, sem seletor de paciente */
+        <>
+          <input type="hidden" name="profissional_id" value={profissionalFixed.id} />
+          <div className="px-3 py-2 bg-forest/5 border border-forest/10 rounded-xl text-sm text-forest-600">
+            Lançamento vinculado a: <span className="font-medium text-forest">{profissionalFixed.nome}</span>
+          </div>
+        </>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="label">Paciente <span className="text-forest-400 text-xs font-normal">(opcional)</span></label>
+            <select name="paciente_id" className="input-field" defaultValue={lancamento.paciente_id ?? ""}>
+              <option value="">Sem paciente</option>
+              {pacientes.map(p => (
+                <option key={p.id} value={p.id}>{p.nome_completo}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Profissional <span className="text-forest-400 text-xs font-normal">(opcional)</span></label>
+            <select name="profissional_id" className="input-field" defaultValue={lancamento.profissional_id ?? ""}>
+              <option value="">Sem profissional</option>
+              {profissionais.map(p => (
+                <option key={p.id} value={p.id}>{p.nome}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div>
-          <label className="label">Profissional <span className="text-forest-400 text-xs font-normal">(opcional)</span></label>
-          <select name="profissional_id" className="input-field" defaultValue={lancamento.profissional_id ?? ""}>
-            <option value="">Sem profissional</option>
-            {profissionais.map(p => (
-              <option key={p.id} value={p.id}>{p.nome}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      )}
 
       {/* Observações */}
       <div>

@@ -236,21 +236,34 @@ async function FinanceiroProfissionalPage({
     fim:    searchParams.periodo_fim    || defaultFim,
   };
 
-  const { data: agendamentos } = await supabase
-    .from("agendamentos")
-    .select("id, data_hora_inicio, status, pago, forma_pagamento, valor_sessao, aluguel_cobrado, aluguel_valor, paciente:pacientes(nome_completo)")
-    .eq("profissional_id", profissional.id)
-    .in("status", ["realizado", "finalizado", "faltou"])
-    .gte("data_hora_inicio", `${periodo.inicio}T00:00:00.000Z`)
-    .lte("data_hora_inicio", `${periodo.fim}T23:59:59.999Z`)
-    .order("data_hora_inicio", { ascending: false });
+  const [{ data: agendamentos }, { data: lancamentosRaw }] = await Promise.all([
+    supabase
+      .from("agendamentos")
+      .select("id, data_hora_inicio, status, pago, forma_pagamento, valor_sessao, aluguel_cobrado, aluguel_valor, paciente:pacientes(nome_completo)")
+      .eq("profissional_id", profissional.id)
+      .in("status", ["realizado", "finalizado", "faltou"])
+      .gte("data_hora_inicio", `${periodo.inicio}T00:00:00.000Z`)
+      .lte("data_hora_inicio", `${periodo.fim}T23:59:59.999Z`)
+      .order("data_hora_inicio", { ascending: false }),
+    supabase
+      .from("lancamentos")
+      .select("id, tipo, valor, data_lancamento, status, descricao, categoria, forma_pagamento, observacoes")
+      .eq("profissional_id", profissional.id)
+      .gte("data_lancamento", periodo.inicio)
+      .lte("data_lancamento", periodo.fim)
+      .order("data_lancamento", { ascending: false }),
+  ]);
 
   const ags = (agendamentos ?? []) as any[];
+  const lancamentos = (lancamentosRaw ?? []) as any[];
 
-  const totalSessoes   = ags.length;
-  const totalReceita   = ags.reduce((s, a) => s + Number(a.valor_sessao ?? profissional.valor_consulta ?? 0), 0);
-  const totalAluguel   = ags.filter(a => a.aluguel_cobrado).reduce((s, a) => s + Number(a.aluguel_valor ?? profissional.valor_aluguel_sala ?? 50), 0);
-  const totalLiquido   = totalReceita - totalAluguel;
+  const totalSessoes       = ags.length;
+  const totalReceitaAgs    = ags.reduce((s, a) => s + Number(a.valor_sessao ?? profissional.valor_consulta ?? 0), 0);
+  const totalAluguel       = ags.filter(a => a.aluguel_cobrado).reduce((s, a) => s + Number(a.aluguel_valor ?? profissional.valor_aluguel_sala ?? 50), 0);
+  const totalReceitaManual = lancamentos.filter(l => l.tipo === "receita").reduce((s, l) => s + Number(l.valor ?? 0), 0);
+  const totalDespesas      = lancamentos.filter(l => l.tipo === "despesa").reduce((s, l) => s + Number(l.valor ?? 0), 0);
+  const totalReceita       = totalReceitaAgs + totalReceitaManual;
+  const totalLiquido       = totalReceita - totalAluguel - totalDespesas;
 
   return (
     <div className="p-6 md:p-10 max-w-4xl">
@@ -258,12 +271,17 @@ async function FinanceiroProfissionalPage({
         eyebrow="Módulo"
         title="Financeiro"
         description="Seus atendimentos e repasses do período"
-      />
+      >
+        <Link href="/financeiro/novo" className="btn-primary text-sm flex items-center gap-1.5">
+          <Plus className="w-4 h-4" /> Novo lançamento
+        </Link>
+      </PageHeader>
       <FinanceiroProfissionalClient
         agendamentos={ags}
+        lancamentos={lancamentos}
         periodo={periodo}
         profissional={{ valor_consulta: profissional.valor_consulta, valor_aluguel_sala: profissional.valor_aluguel_sala }}
-        totais={{ totalSessoes, totalReceita, totalAluguel, totalLiquido }}
+        totais={{ totalSessoes, totalReceita, totalAluguel, totalDespesas, totalLiquido }}
       />
     </div>
   );

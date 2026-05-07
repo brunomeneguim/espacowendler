@@ -14,7 +14,13 @@ async function requireAccess() {
 function str(fd: FormData, k: string) { return (fd.get(k) as string | null) ?? ""; }
 
 export async function criarLancamento(fd: FormData): Promise<{ error: string | null }> {
-  const profile = await requireAccess();
+  const profile = await getCurrentProfile();
+  const isProfissional = profile.role === "profissional";
+
+  if (!["admin", "supervisor", "secretaria", "profissional"].includes(profile.role)) {
+    return { error: "Acesso negado." };
+  }
+
   const supabase = createClient();
 
   const valor = parseFloat(str(fd, "valor"));
@@ -22,6 +28,17 @@ export async function criarLancamento(fd: FormData): Promise<{ error: string | n
 
   const descricao = str(fd, "descricao");
   if (!descricao) return { error: "Informe a descrição." };
+
+  // Para profissional: força o próprio profissional_id
+  let profissional_id: string | null = str(fd, "profissional_id") || null;
+  if (isProfissional) {
+    const { data: prof } = await supabase
+      .from("profissionais")
+      .select("id")
+      .eq("profile_id", profile.id)
+      .single();
+    profissional_id = prof?.id ?? null;
+  }
 
   const { error } = await supabase.from("lancamentos").insert({
     tipo:            str(fd, "tipo")            || "receita",
@@ -32,12 +49,41 @@ export async function criarLancamento(fd: FormData): Promise<{ error: string | n
     descricao,
     forma_pagamento: str(fd, "forma_pagamento") || null,
     categoria:       str(fd, "categoria")       || "outros",
-    paciente_id:     str(fd, "paciente_id")     || null,
-    profissional_id: str(fd, "profissional_id") || null,
+    paciente_id:     isProfissional ? null : (str(fd, "paciente_id") || null),
+    profissional_id,
     observacoes:     str(fd, "observacoes")     || null,
     created_by:      profile.id,
   });
 
+  if (error) return { error: error.message };
+  revalidatePath("/financeiro");
+  return { error: null };
+}
+
+export async function excluirLancamentoProfissional(id: string): Promise<{ error: string | null }> {
+  const profile = await getCurrentProfile();
+  const supabase = createClient();
+
+  // Profissional só pode excluir seus próprios lançamentos
+  if (profile.role === "profissional") {
+    const { data: prof } = await supabase
+      .from("profissionais")
+      .select("id")
+      .eq("profile_id", profile.id)
+      .single();
+    if (!prof) return { error: "Profissional não encontrado." };
+
+    const { data: lanc } = await supabase
+      .from("lancamentos")
+      .select("profissional_id")
+      .eq("id", id)
+      .single();
+    if (!lanc || lanc.profissional_id !== prof.id) return { error: "Sem permissão para excluir este lançamento." };
+  } else if (!["admin", "supervisor", "secretaria"].includes(profile.role)) {
+    return { error: "Acesso negado." };
+  }
+
+  const { error } = await supabase.from("lancamentos").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/financeiro");
   return { error: null };
