@@ -38,13 +38,9 @@ export function DashboardContent({ encaixes: initialEncaixes, calProps }: Props)
   const [encaixes, setEncaixes] = useState<Encaixe[]>(initialEncaixes);
 
   // ── Sincroniza com dados frescos do servidor após router.refresh() ──
-  // Adiciona itens novos que chegaram do servidor mas não estão no estado atual
+  // Substitui o estado inteiro para refletir adições E remoções vindas do servidor
   useEffect(() => {
-    setEncaixes(prev => {
-      const ids = new Set(prev.map(e => e.id));
-      const novos = initialEncaixes.filter(e => !ids.has(e.id));
-      return novos.length > 0 ? [...prev, ...novos] : prev;
-    });
+    setEncaixes(initialEncaixes);
   }, [initialEncaixes]);
 
   function handleAddEncaixe(enc: Encaixe) {
