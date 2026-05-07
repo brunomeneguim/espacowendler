@@ -417,6 +417,16 @@ export async function marcarPagamentoAgendamento(
     update.valor_sessao    = null;
     update.aluguel_cobrado = false;
     update.aluguel_valor   = null;
+
+    // Se estava finalizado, reverter para confirmado (pagamento era pré-requisito)
+    const { data: agAtual } = await supabase
+      .from("agendamentos")
+      .select("status")
+      .eq("id", id)
+      .single();
+    if (agAtual?.status === "finalizado") {
+      update.status = "confirmado";
+    }
   }
 
   const { error } = await supabase

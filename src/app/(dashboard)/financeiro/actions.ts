@@ -117,7 +117,7 @@ export async function desfazerPagamentoSessaoFinanceiro(agendamentoId: string): 
 
     const { data: ag } = await supabase
       .from("agendamentos")
-      .select("profissional_id")
+      .select("profissional_id, status")
       .eq("id", agendamentoId)
       .single();
     if (!ag || ag.profissional_id !== prof.id) return { error: "Sem permissão." };
@@ -125,15 +125,27 @@ export async function desfazerPagamentoSessaoFinanceiro(agendamentoId: string): 
     return { error: "Acesso negado." };
   }
 
+  // Buscar status atual para reverter finalizado → confirmado
+  const { data: agAtual } = await supabase
+    .from("agendamentos")
+    .select("status")
+    .eq("id", agendamentoId)
+    .single();
+
+  const updateData: Record<string, unknown> = {
+    pago: false,
+    forma_pagamento: null,
+    valor_sessao: null,
+    aluguel_cobrado: false,
+    aluguel_valor: null,
+  };
+  if (agAtual?.status === "finalizado") {
+    updateData.status = "confirmado";
+  }
+
   const { error } = await supabase
     .from("agendamentos")
-    .update({
-      pago: false,
-      forma_pagamento: null,
-      valor_sessao: null,
-      aluguel_cobrado: false,
-      aluguel_valor: null,
-    })
+    .update(updateData)
     .eq("id", agendamentoId);
 
   if (error) return { error: error.message };
