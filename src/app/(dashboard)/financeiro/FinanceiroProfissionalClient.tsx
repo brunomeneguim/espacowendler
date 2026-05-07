@@ -300,7 +300,7 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
                           <button
                             onClick={() => handleDesfazerPagamento(ag.id)}
                             disabled={desfazendoId === ag.id || isPending}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors disabled:opacity-40"
+                            className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-400 hover:text-amber-600 transition-colors disabled:opacity-40"
                             title="Desfazer pagamento"
                           >
                             {desfazendoId === ag.id
