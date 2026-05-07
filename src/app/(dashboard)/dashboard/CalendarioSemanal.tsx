@@ -2290,12 +2290,21 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                                           <DollarSign className="w-3.5 h-3.5 text-gray-400" /> Cobrança não necessária
                                         </p>
                                       ) : a.pago ? (
-                                        <p className="text-xs font-semibold text-green-700 flex items-center gap-1.5">
-                                          <DollarSign className="w-3.5 h-3.5" />
-                                          Sessão paga
-                                          {a.valor_sessao != null && <span className="font-bold">{Number(a.valor_sessao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>}
-                                          {a.forma_pagamento && <span className="font-normal text-gray-400">· {FORMA_LABELS[a.forma_pagamento] ?? a.forma_pagamento}</span>}
-                                        </p>
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-xs font-semibold text-green-700 flex items-center gap-1.5 flex-1">
+                                            <DollarSign className="w-3.5 h-3.5" />
+                                            Sessão paga
+                                            {a.valor_sessao != null && <span className="font-bold">{Number(a.valor_sessao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>}
+                                            {a.forma_pagamento && <span className="font-normal text-gray-400">· {FORMA_LABELS[a.forma_pagamento] ?? a.forma_pagamento}</span>}
+                                          </p>
+                                          <button
+                                            title="Desfazer pagamento"
+                                            onClick={() => { handleUndoPayment(a.id); setExpandedListId(null); }}
+                                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors shrink-0"
+                                          >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
                                       ) : (
                                         <PaymentForm
                                           agId={a.id}
@@ -2351,7 +2360,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                     </div>
                   </div>
                   <div className="relative px-0.5" data-dia-date={format(dia, "yyyy-MM-dd")}>
-                    <DiaColuna dia={dia} ags={agsDay} agsOutros={agsOutrosParaDia(dia)} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} profValorConsultaMap={profValorConsultaMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onResizeStart={handleResizeStart} onMoveStart={handleMoveStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={handleExpand} privacyMode={privacyMode} reagendarInfo={reagendarInfo} onReagendarSlotClick={handleReagendarSlotClick} />
+                    <DiaColuna dia={dia} ags={agsDay} agsOutros={agsOutrosParaDia(dia)} horariosParaDia={horariosParaDia(dia)} mostrarHorarios={filtroProf!=="todos"} profColorMap={profColorMap} profHexMap={profHexMap} profValorConsultaMap={profValorConsultaMap} onEdit={setEditingAg} onDelete={handleDelete} onStatus={handleStatus} onPayment={handlePayment} onUndoPayment={handleUndoPayment} onResizeStart={handleResizeStart} onMoveStart={handleMoveStart} pending={isPending} canEdit={canEdit} salaId={filtroSalaId} expandedId={expandedId} onExpand={handleExpand} privacyMode={privacyMode} reagendarInfo={reagendarInfo} onReagendarSlotClick={handleReagendarSlotClick} />
                   </div>
                 </div>
               );

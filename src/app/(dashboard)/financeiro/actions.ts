@@ -60,6 +60,88 @@ export async function criarLancamento(fd: FormData): Promise<{ error: string | n
   return { error: null };
 }
 
+export async function editarLancamentoProfissional(id: string, fd: FormData): Promise<{ error: string | null }> {
+  const profile = await getCurrentProfile();
+  const supabase = createClient();
+
+  // Profissional só pode editar seus próprios lançamentos
+  if (profile.role === "profissional") {
+    const { data: prof } = await supabase
+      .from("profissionais")
+      .select("id")
+      .eq("profile_id", profile.id)
+      .single();
+    if (!prof) return { error: "Profissional não encontrado." };
+
+    const { data: lanc } = await supabase
+      .from("lancamentos")
+      .select("profissional_id")
+      .eq("id", id)
+      .single();
+    if (!lanc || lanc.profissional_id !== prof.id) return { error: "Sem permissão para editar este lançamento." };
+  } else if (!["admin", "supervisor", "secretaria"].includes(profile.role)) {
+    return { error: "Acesso negado." };
+  }
+
+  const valor = parseFloat(str(fd, "valor"));
+  if (!valor || valor <= 0) return { error: "Informe um valor válido." };
+
+  const descricao = str(fd, "descricao");
+  if (!descricao) return { error: "Informe a descrição." };
+
+  const { error } = await supabase.from("lancamentos").update({
+    tipo:            str(fd, "tipo") || "receita",
+    valor,
+    data_lancamento: str(fd, "data_lancamento") || new Date().toISOString().split("T")[0],
+    descricao,
+    categoria:       str(fd, "categoria") || "outros",
+  }).eq("id", id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/financeiro");
+  return { error: null };
+}
+
+export async function desfazerPagamentoSessaoFinanceiro(agendamentoId: string): Promise<{ error: string | null }> {
+  const profile = await getCurrentProfile();
+  const supabase = createClient();
+
+  // Profissional só pode desfazer pagamento de suas próprias sessões
+  if (profile.role === "profissional") {
+    const { data: prof } = await supabase
+      .from("profissionais")
+      .select("id")
+      .eq("profile_id", profile.id)
+      .single();
+    if (!prof) return { error: "Profissional não encontrado." };
+
+    const { data: ag } = await supabase
+      .from("agendamentos")
+      .select("profissional_id")
+      .eq("id", agendamentoId)
+      .single();
+    if (!ag || ag.profissional_id !== prof.id) return { error: "Sem permissão." };
+  } else if (!["admin", "supervisor", "secretaria"].includes(profile.role)) {
+    return { error: "Acesso negado." };
+  }
+
+  const { error } = await supabase
+    .from("agendamentos")
+    .update({
+      pago: false,
+      forma_pagamento: null,
+      valor_sessao: null,
+      aluguel_cobrado: false,
+      aluguel_valor: null,
+    })
+    .eq("id", agendamentoId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/financeiro");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function excluirLancamentoProfissional(id: string): Promise<{ error: string | null }> {
   const profile = await getCurrentProfile();
   const supabase = createClient();
