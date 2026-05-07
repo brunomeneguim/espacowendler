@@ -391,6 +391,7 @@ interface CardProps {
   onDelete: () => void;
   onStatus: (s: Status) => void;
   onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string) => void;
+  onUndoPayment?: (id: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   onMoveStart?: (agId: string, startMouseY: number, originalTopPx: number, durationMin: number, el: HTMLDivElement) => void;
   pending: boolean;
@@ -592,7 +593,7 @@ function FaltaJustificadaModal({
   );
 }
 
-function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onEdit, onDelete, onStatus, onPayment, onResizeStart, onMoveStart, pending, canEdit, canMove, expanded, onExpand, privacyMode }: CardProps) {
+function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onEdit, onDelete, onStatus, onPayment, onUndoPayment, onResizeStart, onMoveStart, pending, canEdit, canMove, expanded, onExpand, privacyMode }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
   const cardRef = useRef<HTMLDivElement>(null);
@@ -787,6 +788,15 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
                         <p className="text-[10px] text-gray-400 leading-tight">{FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}</p>
                       )}
                     </div>
+                    {onUndoPayment && (
+                      <button
+                        title="Desfazer pagamento"
+                        onClick={e => { e.stopPropagation(); onUndoPayment(ag.id); }}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors shrink-0"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <PaymentForm
@@ -922,6 +932,7 @@ interface ColunaProps {
   onDelete: (id: string) => void;
   onStatus: (id: string, s: Status) => void;
   onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string) => void;
+  onUndoPayment?: (id: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   onMoveStart?: (agId: string, startMouseY: number, originalTopPx: number, durationMin: number, el: HTMLDivElement, dia: Date) => void;
   pending: boolean;
@@ -934,7 +945,7 @@ interface ColunaProps {
   onReagendarSlotClick?: (dataStr: string, horaStr: string) => void;
 }
 
-function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, profValorConsultaMap, onEdit, onDelete, onStatus, onPayment, onResizeStart, onMoveStart, pending, canEdit, salaId, expandedId, onExpand, privacyMode, reagendarInfo, onReagendarSlotClick }: ColunaProps) {
+function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, profColorMap, profHexMap, profValorConsultaMap, onEdit, onDelete, onStatus, onPayment, onUndoPayment, onResizeStart, onMoveStart, pending, canEdit, salaId, expandedId, onExpand, privacyMode, reagendarInfo, onReagendarSlotClick }: ColunaProps) {
   const colMap = calcularColunas(ags);
   // Injeta dia no onMoveStart para que o handler pai saiba em qual coluna o drag começou
   const onMoveStartWithDia = onMoveStart
@@ -1028,6 +1039,7 @@ function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, prof
             onDelete={() => onDelete(ag.id)}
             onStatus={s => onStatus(ag.id, s)}
             onPayment={onPayment}
+            onUndoPayment={onUndoPayment}
             onResizeStart={onResizeStart}
             onMoveStart={onMoveStartWithDia}
             pending={pending}
@@ -1870,6 +1882,13 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     });
   }
 
+  function handleUndoPayment(id: string) {
+    startTransition(async () => {
+      await marcarPagamentoAgendamento(id, false, null);
+      refreshCalendar();
+    });
+  }
+
   function handleDelete(id: string) {
     if (!confirm("Excluir este agendamento? Esta ação não pode ser desfeita.")) return;
     startTransition(async () => {
@@ -2380,6 +2399,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                   onDelete={handleDelete}
                   onStatus={handleStatus}
                   onPayment={handlePayment}
+                  onUndoPayment={handleUndoPayment}
                   onResizeStart={handleResizeStart}
                   onMoveStart={handleMoveStart}
                   pending={isPending}

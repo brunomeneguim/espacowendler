@@ -241,7 +241,8 @@ async function FinanceiroProfissionalPage({
       .from("agendamentos")
       .select("id, data_hora_inicio, status, pago, forma_pagamento, valor_sessao, aluguel_cobrado, aluguel_valor, paciente:pacientes(nome_completo)")
       .eq("profissional_id", profissional.id)
-      .in("status", ["realizado", "finalizado", "faltou"])
+      .eq("pago", true)
+      .not("status", "in", "(ausencia,cancelado)")
       .gte("data_hora_inicio", `${periodo.inicio}T00:00:00.000Z`)
       .lte("data_hora_inicio", `${periodo.fim}T23:59:59.999Z`)
       .order("data_hora_inicio", { ascending: false }),
@@ -257,7 +258,7 @@ async function FinanceiroProfissionalPage({
   const ags = (agendamentos ?? []) as any[];
   const lancamentos = (lancamentosRaw ?? []) as any[];
 
-  const totalSessoes       = ags.length;
+  const totalSessoes       = ags.filter((a: any) => ["realizado", "finalizado", "faltou"].includes(a.status)).length;
   const totalReceitaAgs    = ags.reduce((s, a) => s + Number(a.valor_sessao ?? profissional.valor_consulta ?? 0), 0);
   const totalAluguel       = ags.filter(a => a.aluguel_cobrado).reduce((s, a) => s + Number(a.aluguel_valor ?? profissional.valor_aluguel_sala ?? 50), 0);
   const totalReceitaManual = lancamentos.filter(l => l.tipo === "receita").reduce((s, l) => s + Number(l.valor ?? 0), 0);
