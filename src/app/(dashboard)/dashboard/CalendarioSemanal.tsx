@@ -643,8 +643,8 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
   return (
     <div
       ref={cardRef}
-      style={{ ...style, backgroundColor: bgColor, borderLeftColor: borderAccent, borderColor: borderGeneral }}
-      className={`absolute rounded border-l-4 border transition-shadow hover:shadow-md select-none overflow-hidden ${canBeMoved ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${expanded ? "z-30 shadow-lg" : "z-10"} ${pending ? "pointer-events-none" : ""}`}
+      style={{ ...style, backgroundColor: bgColor, borderLeftColor: borderAccent, borderColor: borderGeneral, borderLeftWidth: '8px', boxShadow: ag.status === "finalizado" ? "inset 0 0 0 1000px rgba(0,0,0,0.22)" : undefined }}
+      className={`absolute rounded border transition-shadow hover:shadow-md select-none overflow-hidden ${canBeMoved ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${expanded ? "z-30 shadow-lg" : "z-10"} ${pending ? "pointer-events-none" : ""}`}
       onClick={onExpand}
       onMouseDown={e => {
         if (e.button !== 0) return;
@@ -656,18 +656,16 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
         onMoveStart(ag.id, e.clientY, topPx, durationMin, cardRef.current);
       }}
     >
-      {/* ✓ Check de presença confirmada — canto superior direito */}
-      {ag.status === "confirmado" && (
+      {/* ✓ Check — confirmado e finalizado */}
+      {(ag.status === "confirmado" || ag.status === "finalizado") && (
         <div className="absolute top-0.5 right-1 z-10 pointer-events-none">
-          <Check className="w-3 h-3" style={{ color: isColorDark(bgColor) ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.75)" }} strokeWidth={3} />
+          <Check
+            className="w-3 h-3"
+            style={{ color: (ag.status === "finalizado" || isColorDark(bgColor)) ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.75)" }}
+            strokeWidth={3}
+          />
         </div>
       )}
-      {/* Dot de status — canto inferior esquerdo */}
-      <div
-        title={cfg.label}
-        className={`absolute bottom-1 left-1.5 w-2 h-2 rounded-full z-10 pointer-events-none ${cfg.dot}`}
-        style={{ boxShadow: "0 0 0 1.5px rgba(0,0,0,0.40)" }}
-      />
       {/* $ Pagamento — canto inferior direito */}
       {ag.status !== "ausencia" && ag.status !== "cancelado" && (
         <div className="absolute bottom-1 right-1 z-10 pointer-events-none">
