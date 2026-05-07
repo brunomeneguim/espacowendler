@@ -253,6 +253,7 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
                   <th className="px-5 py-3 text-right">Aluguel</th>
                   <th className="px-5 py-3 text-right">Líquido</th>
                   <th className="px-5 py-3">Pagamento</th>
+                  <th className="px-5 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-sand/20">
@@ -292,6 +293,20 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
                           </span>
                         ) : (
                           <span className="text-xs text-amber-600">Pendente</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3">
+                        {ag.pago && (
+                          <button
+                            onClick={() => handleDesfazerPagamento(ag.id)}
+                            disabled={desfazendoId === ag.id || isPending}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors disabled:opacity-40"
+                            title="Desfazer pagamento"
+                          >
+                            {desfazendoId === ag.id
+                              ? <Loader2 className="w-4 h-4 animate-spin" />
+                              : <RotateCcw className="w-4 h-4" />}
+                          </button>
                         )}
                       </td>
                     </tr>
