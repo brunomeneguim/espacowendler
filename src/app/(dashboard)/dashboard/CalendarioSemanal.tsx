@@ -1074,10 +1074,6 @@ function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, prof
                 {ag.profissional?.profile?.nome_completo}
               </p>
             </div>
-            <div
-              className="absolute bottom-1 left-1.5 w-2 h-2 rounded-full bg-red-400"
-              style={{ boxShadow: "0 0 0 1.5px rgba(0,0,0,0.40)" }}
-            />
           </div>
         );
       })}
@@ -2071,8 +2067,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                             )}
                           </div>
                           {a.profissional_nome && (
-                            <span className="text-xs text-forest-400 shrink-0 text-right max-w-[90px] truncate" title={a.profissional_nome}>
-                              {a.profissional_nome}
+                            <span className="flex items-center gap-1 text-xs text-forest-400 shrink-0 max-w-[110px] truncate" title={`Profissional: ${a.profissional_nome}`}>
+                              <Stethoscope className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{a.profissional_nome}</span>
                             </span>
                           )}
                         </div>

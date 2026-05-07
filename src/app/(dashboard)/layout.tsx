@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/Sidebar";
+import { ToastProvider } from "@/components/Toaster";
 import { PrivacyProvider } from "./PrivacyContext";
 import { PermissoesProvider } from "./PermissoesContext";
 import { PerfilCompletoProvider } from "./PerfilCompletoContext";
@@ -47,18 +48,20 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-cream">
-      <PrivacyProvider>
-        <PermissoesProvider permissoes={permissoes}>
-          <PerfilCompletoProvider value={perfilCompleto}>
-            <Sidebar
-              role={profile.role}
-              nome={profile.nome_completo}
-              menuConfig={(menuConfig as any) ?? []}
-            />
-            <main className="flex-1 min-w-0">{children}</main>
-          </PerfilCompletoProvider>
-        </PermissoesProvider>
-      </PrivacyProvider>
+      <ToastProvider>
+        <PrivacyProvider>
+          <PermissoesProvider permissoes={permissoes}>
+            <PerfilCompletoProvider value={perfilCompleto}>
+              <Sidebar
+                role={profile.role}
+                nome={profile.nome_completo}
+                menuConfig={(menuConfig as any) ?? []}
+              />
+              <main className="flex-1 min-w-0">{children}</main>
+            </PerfilCompletoProvider>
+          </PermissoesProvider>
+        </PrivacyProvider>
+      </ToastProvider>
     </div>
   );
 }

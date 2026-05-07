@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { cadastrarProfissionalCompleto, buscarDadosProfissionalPorProfile } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
+import { useToast } from "@/components/Toaster";
 import { EspecialidadesMultiSelect } from "../EspecialidadesMultiSelect";
 import { DDISelector } from "../../pacientes/novo/DDISelector";
 
@@ -167,7 +168,12 @@ interface Props {
 export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsadas }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const { showToast } = useToast();
   const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (erro) { showToast(erro, "error"); setErro(null); }
+  }, [erro]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [foto, setFoto] = useState<string | null>(null);
@@ -309,12 +315,6 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
 
   return (
     <div className="space-y-5">
-      {erro && (
-        <div className="flex items-start gap-2 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {erro}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* ── Selecionar usuário ── */}
         <Section icon={User} title="Usuário">

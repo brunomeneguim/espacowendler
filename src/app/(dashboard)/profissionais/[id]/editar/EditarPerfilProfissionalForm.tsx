@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { editarProfissionalCompleto } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
+import { useToast } from "@/components/Toaster";
 import { EspecialidadesMultiSelect } from "../../EspecialidadesMultiSelect";
 import { DDISelector } from "../../../pacientes/novo/DDISelector";
 
@@ -207,7 +208,12 @@ interface Props {
 
 export function EditarPerfilProfissionalForm({ profissionalId, profileId, profile, prof, especialidades, especialidadesSelecionadas: initialSelecionadas, coresUsadas, searchError, canChangePassword }: Props) {
   const [isPending, startTransition] = useTransition();
+  const { showToast } = useToast();
   const [erro, setErro] = useState<string | null>(searchError ?? null);
+
+  useEffect(() => {
+    if (erro) { showToast(erro, "error"); setErro(null); }
+  }, [erro]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [foto, setFoto] = useState<string | null>(prof.foto_url ?? null);
@@ -275,10 +281,6 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
 
   return (
     <div className="space-y-5">
-      {erro && (
-        <div className="p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">{erro}</div>
-      )}
-
       <form id="prof-edit-form" onSubmit={handleSubmit} className="space-y-5">
         {/* ── Usuário ── */}
         <Section icon={User} title="Usuário">

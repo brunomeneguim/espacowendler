@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useTransition } from "react";
+import { useState, useRef, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { atualizarPacienteCompleto } from "./actions";
 import { DDISelector } from "../../novo/DDISelector";
+import { useToast } from "@/components/Toaster";
 
 interface CampoConfig { campo: string; obrigatorio: boolean }
 interface ContatoEmergencia { nome: string; relacao: string; telefone: string; ddi: string }
@@ -118,7 +119,12 @@ interface Props {
 export function EditarPacienteForm({ paciente, camposConfig, profissionais, profissionaisVinculados }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const { showToast } = useToast();
   const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (erro) { showToast(erro, "error"); setErro(null); }
+  }, [erro]);
 
   // Foto
   const [foto, setFoto] = useState<string | null>(paciente.foto_url ?? null);
@@ -321,13 +327,6 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
 
   return (
     <div className="space-y-5">
-      {erro && (
-        <div className="flex items-start gap-2 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          {erro}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* ── Toggle Individual / Casal ── */}
         <input type="hidden" name="tipo_cadastro" value={tipoCadastro} />
