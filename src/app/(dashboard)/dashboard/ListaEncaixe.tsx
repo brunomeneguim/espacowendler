@@ -64,7 +64,7 @@ export function ListaEncaixe({ encaixes, profissionais, currentProfId, pacientes
   const [nomeHiddenValue, setNomeHiddenValue] = useState("");
   const comboboxRef = useRef<HTMLDivElement>(null);
 
-  const sugestoesFiltradas = isProfissional && nomeInput.length > 0
+  const sugestoesFiltradas = pacientesSugestao.length > 0 && nomeInput.length > 0
     ? pacientesSugestao.filter(p =>
         p.nome_completo.toLowerCase().includes(nomeInput.toLowerCase()) ||
         (p.telefone ?? "").includes(nomeInput)
