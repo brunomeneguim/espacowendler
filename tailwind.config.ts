@@ -57,6 +57,7 @@ const config: Config = {
       fontFamily: {
         display: ["var(--font-fraunces)", "Georgia", "serif"],
         sans: ["var(--font-inter-tight)", "system-ui", "sans-serif"],
+        halimun: ["var(--font-halimun)", "cursive"],
       },
       borderRadius: {
         "2xl": "1.25rem",

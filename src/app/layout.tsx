@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -12,6 +13,12 @@ const fraunces = Fraunces({
 const interTight = Inter_Tight({
   subsets: ["latin"],
   variable: "--font-inter-tight",
+  display: "swap",
+});
+
+const halimun = localFont({
+  src: "./fonts/Halimun.ttf",
+  variable: "--font-halimun",
   display: "swap",
 });
 
@@ -30,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className={`${fraunces.variable} ${interTight.variable}`}>
+    <html lang="pt-BR" className={`${fraunces.variable} ${interTight.variable} ${halimun.variable}`}>
       <body>{children}</body>
     </html>
   );

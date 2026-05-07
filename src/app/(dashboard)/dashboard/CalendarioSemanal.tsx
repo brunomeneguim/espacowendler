@@ -9,7 +9,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
   DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope, Users, AlertTriangle,
-  FileText, DollarSign, CheckCircle2, PhoneCall, CalendarPlus,
+  FileText, DollarSign, CheckCircle2, PhoneCall, CalendarPlus, User,
 } from "lucide-react";
 
 const Users2Icon = Users;
@@ -680,15 +680,21 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
         </div>
       )}
       <div className="px-1.5 pt-0.5 pb-4 leading-tight flex flex-col gap-px">
-        {/* Linha 1: horário + nome */}
-        <p className="text-xs font-semibold truncate pr-3" style={{ color: textColor }}>
-          {format(new Date(ag.data_hora_inicio), "HH:mm")} {privacyMode ? "● ● ●" : (ag.paciente?.nome_completo ?? "—")}
-        </p>
+        {/* Linha 1: horário + paciente */}
+        <div className="flex items-center gap-0.5 pr-3 min-w-0">
+          <User className="w-2.5 h-2.5 shrink-0 opacity-60" style={{ color: textColor }} strokeWidth={2} />
+          <p className="text-xs font-semibold truncate" style={{ color: textColor }}>
+            {format(new Date(ag.data_hora_inicio), "HH:mm")} {privacyMode ? "● ● ●" : (ag.paciente?.nome_completo ?? "—")}
+          </p>
+        </div>
         {/* Linha 2: profissional (oculto no modo privacidade) */}
         {!privacyMode && (
-          <p className="text-[10px] truncate" style={{ color: textMuted }}>
-            {ag.profissional?.profile?.nome_completo}
-          </p>
+          <div className="flex items-center gap-0.5 min-w-0">
+            <Stethoscope className="w-2.5 h-2.5 shrink-0 opacity-60" style={{ color: textMuted }} strokeWidth={2} />
+            <p className="text-[10px] truncate" style={{ color: textMuted }}>
+              {ag.profissional?.profile?.nome_completo}
+            </p>
+          </div>
         )}
       </div>
 
@@ -1070,9 +1076,12 @@ function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, prof
               <p className="text-xs font-semibold truncate pr-3 text-red-700">
                 {format(ini, "HH:mm")} Horário Indisponível
               </p>
-              <p className="text-[10px] truncate text-red-400">
-                {ag.profissional?.profile?.nome_completo}
-              </p>
+              <div className="flex items-center gap-0.5 min-w-0">
+                <Stethoscope className="w-2.5 h-2.5 shrink-0 opacity-60 text-red-400" strokeWidth={2} />
+                <p className="text-[10px] truncate text-red-400">
+                  {ag.profissional?.profile?.nome_completo}
+                </p>
+              </div>
             </div>
           </div>
         );
