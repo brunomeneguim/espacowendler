@@ -242,18 +242,18 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
             <p className="text-sm text-forest-500">Nenhum atendimento no período.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-sand/20 text-left text-xs text-forest-500 uppercase tracking-wider">
-                  <th className="px-5 py-3">Data</th>
-                  <th className="px-5 py-3">Paciente</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3 text-right">Sessão</th>
-                  <th className="px-5 py-3 text-right">Aluguel</th>
-                  <th className="px-5 py-3 text-right">Líquido</th>
-                  <th className="px-5 py-3">Pagamento</th>
-                  <th className="px-5 py-3"></th>
+                  <th className="px-3 py-3">Data</th>
+                  <th className="px-3 py-3">Paciente</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3 text-right">Sessão</th>
+                  <th className="px-3 py-3 text-right">Aluguel</th>
+                  <th className="px-3 py-3 text-right">Líquido</th>
+                  <th className="px-3 py-3">Pagamento</th>
+                  <th className="px-2 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-sand/20">
@@ -264,11 +264,11 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
                   const isFalta = ag.status === "faltou";
                   return (
                     <tr key={ag.id} className={`hover:bg-cream/40 transition-colors ${isFalta ? "opacity-60" : ""}`}>
-                      <td className="px-5 py-3 text-forest whitespace-nowrap">
-                        {format(new Date(ag.data_hora_inicio), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      <td className="px-3 py-3 text-forest whitespace-nowrap text-xs">
+                        {format(new Date(ag.data_hora_inicio), "dd/MM/yy HH:mm", { locale: ptBR })}
                       </td>
-                      <td className="px-5 py-3 text-forest">{ag.paciente?.nome_completo ?? "—"}</td>
-                      <td className="px-5 py-3">
+                      <td className="px-3 py-3 text-forest">{ag.paciente?.nome_completo ?? "—"}</td>
+                      <td className="px-3 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           ag.status === "faltou" ? "bg-orange-100 text-orange-700" :
                           ag.status === "finalizado" ? "bg-gray-100 text-gray-600" :
@@ -277,16 +277,16 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
                           {STATUS_LABEL[ag.status] ?? ag.status}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right text-forest font-medium">
+                      <td className="px-3 py-3 text-right text-forest font-medium text-xs">
                         {isFalta ? "—" : fmt(valorSessao)}
                       </td>
-                      <td className="px-5 py-3 text-right text-amber-600">
+                      <td className="px-3 py-3 text-right text-amber-600 text-xs">
                         {ag.aluguel_cobrado ? `− ${fmt(valorAluguel)}` : "—"}
                       </td>
-                      <td className="px-5 py-3 text-right font-semibold text-teal-700">
+                      <td className="px-3 py-3 text-right font-semibold text-teal-700 text-xs">
                         {isFalta ? `− ${fmt(valorAluguel)}` : fmt(liquido)}
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-3 py-3">
                         {ag.pago ? (
                           <span className="text-xs text-green-700 font-medium">
                             {FORMA_LABELS[ag.forma_pagamento ?? ""] ?? ag.forma_pagamento ?? "Pago"}
@@ -295,7 +295,7 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
                           <span className="text-xs text-amber-600">Pendente</span>
                         )}
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-2 py-3">
                         {ag.pago && (
                           <button
                             onClick={() => handleDesfazerPagamento(ag.id)}
