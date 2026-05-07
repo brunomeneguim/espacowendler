@@ -2055,10 +2055,12 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                             {dia}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium truncate ${isHoje ? "text-rust" : "text-forest"}`}>
-                              {a.nome_completo}
-                              {isHoje && <span className="ml-1 text-[10px] bg-rust/10 text-rust px-1 py-0.5 rounded-full">hoje 🎂</span>}
-                            </p>
+                            <div className="flex items-center gap-1 min-w-0">
+                              <p className={`text-sm font-medium truncate ${isHoje ? "text-rust" : "text-forest"}`}>
+                                {a.nome_completo}
+                              </p>
+                              {isHoje && <span className="shrink-0 text-[10px] bg-rust/10 text-rust px-1 py-0.5 rounded-full whitespace-nowrap">hoje 🎂</span>}
+                            </div>
                             {waLink && (
                               <a href={waLink} target="_blank" rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors">
