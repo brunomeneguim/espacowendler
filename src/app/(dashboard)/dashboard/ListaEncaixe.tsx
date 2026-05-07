@@ -248,8 +248,8 @@ export function ListaEncaixe({ encaixes, profissionais, currentProfId, pacientes
                   <label className="text-xs font-medium text-forest-600 mb-1 block">
                     Nome do paciente <span className="text-rust">*</span>
                   </label>
-                  {isProfissional ? (
-                    /* Combobox com autocomplete para profissional */
+                  {pacientesSugestao.length > 0 ? (
+                    /* Combobox com autocomplete */
                     <div ref={comboboxRef} className="relative">
                       {/* campo hidden que vai no FormData */}
                       <input type="hidden" name="paciente_nome" value={nomeInput} required />

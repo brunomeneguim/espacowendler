@@ -72,7 +72,7 @@ export function DashboardContent({ encaixes: initialEncaixes, pacientesSugestaoE
   }
 
   // ID do profissional logado (null para admin/secretaria)
-  const currentProfId = (calProps.userRole as string) === "profissional"
+  const currentProfId = (["profissional", "supervisor"] as string[]).includes(calProps.userRole as string)
     ? ((calProps.profissionais as any[]).find((p: any) => p.profile_id === calProps.currentUserId)?.id ?? null)
     : null;
 

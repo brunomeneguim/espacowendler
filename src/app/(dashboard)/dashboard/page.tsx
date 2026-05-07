@@ -97,8 +97,8 @@ export default async function DashboardPage({
       .limit(2000),
   ]);
 
-  // Para profissional: filtrar encaixe pelo próprio profissional_id
-  const ownProfId = profile.role === "profissional"
+  // Para profissional e supervisor: filtrar encaixe pelo próprio profissional_id
+  const ownProfId = ["profissional", "supervisor"].includes(profile.role)
     ? ((profissionais ?? []) as any[]).find((p: any) => p.profile_id === profile.id)?.id ?? null
     : null;
 
@@ -142,10 +142,12 @@ export default async function DashboardPage({
 
   const todosAniversariantes = [...aniversariantesEnriquecidos, ...aniversariantesProfissionaisArr];
 
-  // Pacientes vinculados ao profissional logado (para autocomplete no encaixe)
+  // Pacientes para autocomplete no encaixe:
+  // - profissional/supervisor com registro: apenas seus próprios pacientes
+  // - admin/secretaria (ou supervisor sem registro): todos os pacientes
   const pacientesSugestaoEncaixe = ownProfId
     ? (pacientes ?? []).filter((p: any) => pacientesDoProfissional.has(p.id))
-    : [];
+    : (pacientes ?? []);
 
   return (
     <div className="p-4 md:p-6 max-w-full">
