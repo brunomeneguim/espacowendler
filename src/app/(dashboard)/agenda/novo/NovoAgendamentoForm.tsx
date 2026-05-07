@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { RepeatIcon, Loader2, UserPlus, AlertTriangle, Search, X } from "lucide-react";
 import { criarAgendamento, verificarHorarioIndisponivel } from "../actions";
 import { removerEncaixe } from "../../dashboard/listaEncaixeActions";
+import { broadcastAgendaChanged } from "@/lib/broadcastAgendaClient";
 
 interface Prof  { id: string; nome: string; especialidade?: string }
 interface Pac   { id: string; nome_completo: string; telefone?: string }
@@ -222,6 +223,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       if (res.error) { setSubmitError(res.error); return; }
       if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
       if (encaixeId) await removerEncaixe(encaixeId);
+      await broadcastAgendaChanged();
       router.push("/dashboard");
     });
   }
@@ -236,6 +238,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       if (res.error) { setSubmitError(res.error); return; }
       if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
       if (encaixeId) await removerEncaixe(encaixeId);
+      await broadcastAgendaChanged();
       router.push("/dashboard");
     });
   }

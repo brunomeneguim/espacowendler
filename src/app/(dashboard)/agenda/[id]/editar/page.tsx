@@ -5,9 +5,8 @@ import { getCurrentProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
-import { editarAgendamento, excluirAgendamento } from "../../actions";
-import { TzOffsetInput } from "./TzOffsetInput";
-import { SubmitButton } from "./SubmitButton";
+import { excluirAgendamento } from "../../actions";
+import { EditarAgendamentoFormClient } from "./EditarAgendamentoFormClient";
 
 export default async function EditarAgendamentoPage({
   params,
@@ -52,7 +51,13 @@ export default async function EditarAgendamentoPage({
   const dataStr = format(inicioDate, "yyyy-MM-dd");
   const horaStr = format(inicioDate, "HH:mm");
 
-  const editAction = editarAgendamento.bind(null, params.id);
+  const profsFormatted = (profs ?? [])
+    .filter((p: any) => p.profile?.role !== "secretaria")
+    .map((p: any) => ({ id: p.id, nome: p.profile?.nome_completo ?? "—" }));
+
+  const salasFormatted = (salas ?? []).map((s: any) => ({ id: s.id, nome: s.nome }));
+
+  const pacienteNome = (pacs ?? []).find((p: any) => p.id === ag.paciente_id)?.nome_completo ?? "—";
 
   return (
     <div className="p-6 md:p-10 max-w-3xl">
@@ -70,90 +75,22 @@ export default async function EditarAgendamentoPage({
         description="Altere os dados do atendimento"
       />
 
-      {searchParams.error && (
-        <div className="mb-5 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          {decodeURIComponent(searchParams.error)}
-        </div>
-      )}
-
-      <form action={editAction} className="card space-y-5">
-        <TzOffsetInput />
-        <input type="hidden" name="tipo_agendamento" value={ag.tipo_agendamento ?? "consulta_avulsa"} />
-
-        {ag.tipo_agendamento === "ausencia" && (
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
-            Este agendamento é uma <strong>ausência</strong> — o profissional não estará disponível neste horário.
-          </div>
-        )}
-        <div>
-          <label htmlFor="profissional_id" className="label">Profissional</label>
-          <select id="profissional_id" name="profissional_id" required className="input-field" defaultValue={ag.profissional_id}>
-            {(profs ?? []).filter((p: any) => p.profile?.role !== "secretaria").map((p: any) => (
-              <option key={p.id} value={p.id}>{p.profile?.nome_completo}</option>
-            ))}
-          </select>
-        </div>
-
-        {ag.tipo_agendamento !== "ausencia" && (
-          <div>
-            <label className="label">Paciente</label>
-            <div className="input-field bg-sand/10 text-forest-700 cursor-default select-none">
-              {(pacs ?? []).find((p: any) => p.id === ag.paciente_id)?.nome_completo ?? "—"}
-            </div>
-            <input type="hidden" name="paciente_id" value={ag.paciente_id ?? ""} />
-          </div>
-        )}
-
-        <div>
-          <label htmlFor="sala_id" className="label">Sala de atendimento</label>
-          <select id="sala_id" name="sala_id" className="input-field" defaultValue={ag.sala_id ?? ""}>
-            <option value="">Sem sala definida</option>
-            {(salas ?? []).map((s: any) => (
-              <option key={s.id} value={s.id}>{s.nome}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid sm:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="data" className="label">Data</label>
-            <input id="data" name="data" type="date" required className="input-field" defaultValue={dataStr} />
-          </div>
-          <div>
-            <label htmlFor="hora" className="label">Horário</label>
-            <input id="hora" name="hora" type="time" required className="input-field" defaultValue={horaStr} />
-          </div>
-          <div>
-            <label htmlFor="duracao" className="label">Duração (min)</label>
-            <input id="duracao" name="duracao" type="number" min="15" step="5" className="input-field" defaultValue={duracaoMin} />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="status" className="label">Status</label>
-          <select id="status" name="status" required className="input-field" defaultValue={ag.status}>
-            <option value="agendado">Agendado</option>
-            <option value="confirmado">Confirmado</option>
-            <option value="realizado">Realizado</option>
-            <option value="finalizado">Finalizado</option>
-            <option value="cancelado">Falta Justificada</option>
-            <option value="faltou">Falta Cobrada</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="observacoes" className="label">
-            Observações
-          </label>
-          <textarea id="observacoes" name="observacoes" rows={3} className="input-field resize-none" defaultValue={ag.observacoes ?? ""} />
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <SubmitButton />
-          <Link href="/dashboard" className="btn-secondary flex-1">Cancelar</Link>
-        </div>
-      </form>
+      <EditarAgendamentoFormClient
+        id={params.id}
+        tipoAgendamento={ag.tipo_agendamento ?? "consulta_avulsa"}
+        defaultProfissionalId={ag.profissional_id}
+        defaultPacienteId={ag.paciente_id}
+        defaultPacienteNome={pacienteNome}
+        defaultSalaId={ag.sala_id ? String(ag.sala_id) : null}
+        defaultData={dataStr}
+        defaultHora={horaStr}
+        defaultDuracao={duracaoMin}
+        defaultStatus={ag.status}
+        defaultObservacoes={ag.observacoes ?? ""}
+        profs={profsFormatted}
+        salas={salasFormatted}
+        canDelete={profile.role === "admin"}
+      />
 
       {profile.role === "admin" && (
         <div className="mt-6 p-4 border border-rust/20 rounded-xl bg-rust/5">

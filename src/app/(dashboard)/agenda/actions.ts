@@ -495,6 +495,70 @@ export async function editarAgendamento(id: string, formData: FormData) {
   redirect("/agenda");
 }
 
+// ── Versão sem redirect (para uso client-side com broadcast) ──────
+export async function editarAgendamentoAction(
+  id: string,
+  formData: FormData
+): Promise<{ error: string | null }> {
+  const supabase = createClient();
+
+  const profissional_id  = formData.get("profissional_id") as string;
+  const tipo_agendamento = (formData.get("tipo_agendamento") as string) || "consulta_avulsa";
+  const isAusencia       = tipo_agendamento === "ausencia";
+  const paciente_id      = isAusencia ? null : (formData.get("paciente_id") as string);
+  const sala_id          = formData.get("sala_id") as string;
+  const data             = formData.get("data") as string;
+  const hora             = formData.get("hora") as string;
+  const duracao          = parseInt((formData.get("duracao") as string) || "60", 10);
+  const status           = isAusencia ? "ausencia" : (formData.get("status") as string);
+  const observacoes      = (formData.get("observacoes") as string) || null;
+  const editarGrupo      = formData.get("editar_grupo") === "true";
+  const tzOffset         = parseInt((formData.get("tz_offset") as string) || "0");
+
+  const inicio = new Date(`${data}T${hora}:00`);
+  inicio.setMinutes(inicio.getMinutes() + tzOffset);
+  const fim    = new Date(inicio.getTime() + duracao * 60_000);
+  const salaIdNum = sala_id ? parseInt(sala_id) : null;
+
+  if (!isAusencia) {
+    const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, hora, duracao);
+    if (erroHorario) return { error: erroHorario };
+  }
+
+  const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim, id);
+  if (conflito) return { error: conflito };
+
+  const updateData = {
+    profissional_id,
+    paciente_id,
+    sala_id: salaIdNum,
+    data_hora_inicio: inicio.toISOString(),
+    data_hora_fim:    fim.toISOString(),
+    status,
+    tipo_agendamento,
+    observacoes,
+  };
+
+  if (editarGrupo) {
+    const { data: ag } = await supabase.from("agendamentos").select("recorrencia_grupo_id, data_hora_inicio").eq("id", id).single();
+    if (ag?.recorrencia_grupo_id) {
+      await supabase.from("agendamentos")
+        .update({ profissional_id, paciente_id, sala_id: salaIdNum, status, observacoes })
+        .eq("recorrencia_grupo_id", ag.recorrencia_grupo_id)
+        .gte("data_hora_inicio", ag.data_hora_inicio);
+    }
+  }
+
+  const { error } = await supabase.from("agendamentos").update(updateData).eq("id", id);
+  if (error) return { error: error.message };
+
+  await vincularPacienteProfissional(supabase, paciente_id, profissional_id);
+
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function atualizarAgendamento(
   id: string,
   profissional_id: string,
