@@ -3,18 +3,20 @@
 import { useState, useTransition, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  startOfWeek, addWeeks, subWeeks, addDays, format, isToday,
+  startOfWeek, addWeeks, subWeeks, addDays, addMonths, addYears,
+  format, isToday, getDay,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, Check, Trash2, Pencil, X,
-  CalendarRange, MoreHorizontal, Share2, Users,
+  CalendarRange, MoreHorizontal, Share2, Users, Repeat2,
 } from "lucide-react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import {
   criarPlanner, renomearPlanner, excluirPlanner,
   criarTarefaPlanner, editarTarefaPlanner, alternarTarefaPlanner, excluirTarefaPlanner,
   buscarCompartilhamentos, salvarCompartilhamentos, removerCompartilhamento,
+  criarTarefasRepetidas,
 } from "./actions";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -54,6 +56,276 @@ interface Props {
 }
 
 const DIAS_ABREV = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+
+// ── Helper: texto com links clicáveis ─────────────────────────────────────────
+function renderWithLinks(text: string): React.ReactNode[] {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+        onClick={e => e.stopPropagation()}
+        className="underline text-blue-500 hover:text-blue-700 break-all">
+        {part}
+      </a>
+    ) : part
+  );
+}
+
+// ── Tipos de repetição ────────────────────────────────────────────────────────
+type RepeatMode = "daily" | "weekly" | "monthly" | "yearly" | "weekdays" | "custom";
+type EndType = "never" | "count" | "date";
+type CustomUnit = "days" | "weeks" | "months" | "years";
+
+const DIAS_SEMANA_FULL = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+const MESES_PT = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const UNIT_LABELS: Record<CustomUnit, string> = { days:"Dia(s)", weeks:"Semana(s)", months:"Mês/Meses", years:"Ano(s)" };
+// JS days em ordem Seg→Dom: [1,2,3,4,5,6,0]
+const WEEK_ORDER = [1,2,3,4,5,6,0];
+const WEEK_LABELS = ["Se","Te","Qa","Qi","Sx","Sb","Do"];
+
+function generateRepeatDates(
+  base: Date,
+  mode: RepeatMode,
+  interval: number,
+  unit: CustomUnit,
+  weekDays: number[],
+  endType: EndType,
+  endDateStr: string,
+  endCount: number,
+): string[] {
+  const MAX = 52;
+  const baseStr = format(base, "yyyy-MM-dd");
+  const endDateObj = endDateStr ? new Date(endDateStr + "T23:59:59") : null;
+  const results: string[] = [];
+
+  const canAdd = (d: Date): boolean => {
+    if (format(d, "yyyy-MM-dd") <= baseStr) return false;
+    if (endType === "date" && endDateObj && d > endDateObj) return false;
+    if (endType === "count" && results.length >= endCount) return false;
+    if (results.length >= MAX) return false;
+    return true;
+  };
+  const isDone = (d: Date): boolean => {
+    if (results.length >= MAX) return true;
+    if (endType === "count" && results.length >= endCount) return true;
+    if (endType === "date" && endDateObj && d > endDateObj) return true;
+    if (endType === "never" && results.length >= MAX) return true;
+    return false;
+  };
+
+  let d: Date;
+  if (mode === "daily") {
+    d = addDays(base, 1);
+    while (!isDone(d)) { if (canAdd(d)) results.push(format(d, "yyyy-MM-dd")); d = addDays(d, 1); }
+  } else if (mode === "weekly") {
+    d = addDays(base, 7);
+    while (!isDone(d)) { if (canAdd(d)) results.push(format(d, "yyyy-MM-dd")); d = addDays(d, 7); }
+  } else if (mode === "monthly") {
+    d = addMonths(base, 1);
+    while (!isDone(d)) { if (canAdd(d)) results.push(format(d, "yyyy-MM-dd")); d = addMonths(d, 1); }
+  } else if (mode === "yearly") {
+    d = addYears(base, 1);
+    while (!isDone(d)) { if (canAdd(d)) results.push(format(d, "yyyy-MM-dd")); d = addYears(d, 1); }
+  } else if (mode === "weekdays") {
+    d = addDays(base, 1);
+    while (!isDone(d)) {
+      const day = getDay(d);
+      if (day >= 1 && day <= 5 && canAdd(d)) results.push(format(d, "yyyy-MM-dd"));
+      d = addDays(d, 1);
+    }
+  } else if (mode === "custom") {
+    if (unit === "days") {
+      d = addDays(base, interval);
+      while (!isDone(d)) { if (canAdd(d)) results.push(format(d, "yyyy-MM-dd")); d = addDays(d, interval); }
+    } else if (unit === "weeks" && weekDays.length > 0) {
+      const baseMonday = startOfWeek(base, { weekStartsOn: 1 });
+      d = addDays(base, 1);
+      while (!isDone(d)) {
+        const jsDay = getDay(d);
+        if (weekDays.includes(jsDay)) {
+          const wDiff = Math.round((startOfWeek(d, { weekStartsOn: 1 }).getTime() - baseMonday.getTime()) / 604800000);
+          if (wDiff % interval === 0 && canAdd(d)) results.push(format(d, "yyyy-MM-dd"));
+        }
+        d = addDays(d, 1);
+      }
+    } else if (unit === "months") {
+      d = addMonths(base, interval);
+      while (!isDone(d)) { if (canAdd(d)) results.push(format(d, "yyyy-MM-dd")); d = addMonths(d, interval); }
+    } else if (unit === "years") {
+      d = addYears(base, interval);
+      while (!isDone(d)) { if (canAdd(d)) results.push(format(d, "yyyy-MM-dd")); d = addYears(d, interval); }
+    }
+  }
+  return results;
+}
+
+// ── Modal Repetir Tarefa ──────────────────────────────────────────────────────
+function ModalRepetirTarefa({ tarefa, onClose, onConfirm }: {
+  tarefa: PlannerTarefa;
+  onClose: () => void;
+  onConfirm: (dates: string[]) => void;
+}) {
+  const base = new Date(tarefa.data_tarefa + "T12:00:00");
+  const jsDay = getDay(base);
+
+  const [mode, setMode] = useState<RepeatMode>("weekly");
+  const [customInterval, setCustomInterval] = useState(1);
+  const [unit, setUnit] = useState<CustomUnit>("weeks");
+  const [weekDays, setWeekDays] = useState<number[]>([jsDay]);
+  const [endType, setEndType] = useState<EndType>("count");
+  const [endDate, setEndDate] = useState(format(addMonths(base, 1), "yyyy-MM-dd"));
+  const [endCount, setEndCount] = useState(4);
+
+  const dates = useMemo(() =>
+    generateRepeatDates(base, mode, customInterval, unit, weekDays, endType, endDate, endCount),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [mode, customInterval, unit, weekDays, endType, endDate, endCount]);
+
+  function toggleWeekDay(day: number) {
+    setWeekDays(prev => prev.includes(day)
+      ? prev.length > 1 ? prev.filter(d => d !== day) : prev
+      : [...prev, day]
+    );
+  }
+
+  const modeOptions: [RepeatMode, string][] = [
+    ["daily", "Todo dia"],
+    ["weekly", `Toda semana na ${DIAS_SEMANA_FULL[jsDay]}`],
+    ["monthly", `Todo mês no dia ${format(base, "d")}`],
+    ["yearly", `Todo ano em ${format(base, "d")} de ${MESES_PT[base.getMonth()]}`],
+    ["weekdays", "Todo dia útil (Seg a Sex)"],
+    ["custom", "Personalizado"],
+  ];
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30 shrink-0">
+            <div className="flex items-center gap-2">
+              <Repeat2 className="w-4 h-4 text-forest-400" />
+              <h2 className="font-display text-lg text-forest">Repetir tarefa</h2>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-sand/20 text-forest-400"><X className="w-5 h-5" /></button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+            {/* Preview da tarefa */}
+            <div className="bg-forest/5 rounded-xl px-3 py-2">
+              <p className="text-sm font-halimun font-semibold text-forest truncate">{tarefa.titulo}</p>
+              {tarefa.descricao && <p className="text-xs font-halimun text-forest-400 truncate">{tarefa.descricao}</p>}
+            </div>
+
+            {/* Modo */}
+            <div>
+              <p className="text-[10px] font-semibold text-forest-400 uppercase tracking-widest mb-2">Modo de repetição</p>
+              <div className="space-y-0.5">
+                {modeOptions.map(([val, label]) => (
+                  <label key={val} onClick={() => setMode(val)} className="flex items-center gap-3 cursor-pointer group rounded-xl px-2 py-1.5 hover:bg-forest/5 transition-colors">
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${mode === val ? "border-forest bg-forest" : "border-forest/30 group-hover:border-forest/60"}`}>
+                      {mode === val && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                    <span className="text-sm text-forest">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Opções personalizadas */}
+            {mode === "custom" && (
+              <div className="bg-forest/5 rounded-xl p-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-forest-400 shrink-0">A cada</span>
+                  <input type="number" min={1} max={99} value={customInterval}
+                    onChange={e => setCustomInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-14 text-sm text-center border border-forest/20 rounded-lg px-2 py-1 outline-none focus:border-forest/50 text-forest bg-white" />
+                  <select value={unit} onChange={e => setUnit(e.target.value as CustomUnit)}
+                    className="flex-1 text-sm border border-forest/20 rounded-lg px-2 py-1 outline-none focus:border-forest/50 text-forest bg-white">
+                    {(["days","weeks","months","years"] as CustomUnit[]).map(u => (
+                      <option key={u} value={u}>{UNIT_LABELS[u]}</option>
+                    ))}
+                  </select>
+                </div>
+                {unit === "weeks" && (
+                  <div>
+                    <p className="text-[10px] text-forest-400 mb-1.5 uppercase tracking-widest">Repetir nos dias</p>
+                    <div className="flex gap-1">
+                      {WEEK_ORDER.map((jsD, i) => (
+                        <button key={jsD} onClick={() => toggleWeekDay(jsD)}
+                          className={`w-8 h-8 rounded-full text-xs font-semibold transition-all ${weekDays.includes(jsD) ? "bg-forest text-cream" : "bg-forest/10 text-forest hover:bg-forest/20"}`}>
+                          {WEEK_LABELS[i]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Encerramento */}
+            <div>
+              <p className="text-[10px] font-semibold text-forest-400 uppercase tracking-widest mb-2">Encerramento</p>
+              <div className="space-y-0.5">
+                <label onClick={() => setEndType("never")} className="flex items-center gap-3 cursor-pointer group rounded-xl px-2 py-1.5 hover:bg-forest/5 transition-colors">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${endType === "never" ? "border-forest bg-forest" : "border-forest/30 group-hover:border-forest/60"}`}>
+                    {endType === "never" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <span className="text-sm text-forest">Nunca (máx. 52 ocorrências)</span>
+                </label>
+
+                <div onClick={() => setEndType("count")} className="flex items-center gap-3 cursor-pointer group rounded-xl px-2 py-1.5 hover:bg-forest/5 transition-colors">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${endType === "count" ? "border-forest bg-forest" : "border-forest/30 group-hover:border-forest/60"}`}>
+                    {endType === "count" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-forest">Após</span>
+                    <input type="number" min={1} max={365} value={endCount}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => { setEndType("count"); setEndCount(Math.max(1, parseInt(e.target.value) || 1)); }}
+                      className="w-16 text-sm text-center border border-forest/20 rounded-lg px-2 py-1 outline-none focus:border-forest/50 text-forest bg-white" />
+                    <span className="text-sm text-forest">ocorrências</span>
+                  </div>
+                </div>
+
+                <div onClick={() => setEndType("date")} className="flex items-center gap-3 cursor-pointer group rounded-xl px-2 py-1.5 hover:bg-forest/5 transition-colors">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${endType === "date" ? "border-forest bg-forest" : "border-forest/30 group-hover:border-forest/60"}`}>
+                    {endType === "date" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-forest">Em</span>
+                    <input type="date" value={endDate} min={format(addDays(base, 1), "yyyy-MM-dd")}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => { setEndType("date"); setEndDate(e.target.value); }}
+                      className="text-sm border border-forest/20 rounded-lg px-2 py-1 outline-none focus:border-forest/50 text-forest bg-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-sand/20 shrink-0 space-y-3">
+            <p className="text-xs text-center text-forest-400">
+              {dates.length === 0
+                ? "Nenhuma ocorrência gerada com estas configurações"
+                : <><span className="font-semibold text-forest">{dates.length}</span> tarefa{dates.length !== 1 ? "s" : ""} serão criadas</>
+              }
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => dates.length > 0 && onConfirm(dates)} disabled={dates.length === 0}
+                className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50">
+                <Repeat2 className="w-4 h-4" /> Criar tarefas
+              </button>
+              <button onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -232,12 +504,14 @@ function ModalCompartilhar({
 
 // ── Componente de tarefa ──────────────────────────────────────────────────────
 function TarefaItem({
-  tarefa, onToggle, onEdit, onDelete, pending,
+  tarefa, onToggle, onEdit, onDelete, onRepeat, canDelete, pending,
 }: {
   tarefa: PlannerTarefa;
   onToggle: () => void;
   onEdit: (titulo: string, descricao: string) => void;
   onDelete: () => void;
+  onRepeat: () => void;
+  canDelete: boolean;
   pending: boolean;
 }) {
   const [editando, setEditando] = useState(false);
@@ -306,9 +580,9 @@ function TarefaItem({
         ) : (
           <div onClick={onToggle} onDoubleClick={e => { e.stopPropagation(); setEditando(true); }}
             className={`cursor-pointer select-none ${textoColor} transition-colors`}>
-            <p className="text-sm font-halimun font-semibold leading-tight break-words">{tarefa.titulo}</p>
+            <p className="text-sm font-halimun font-semibold leading-tight break-words">{renderWithLinks(tarefa.titulo)}</p>
             {tarefa.descricao && (
-              <p className="text-sm font-halimun leading-snug break-words mt-0.5 opacity-80">{tarefa.descricao}</p>
+              <p className="text-sm font-halimun leading-snug break-words mt-0.5 opacity-80">{renderWithLinks(tarefa.descricao)}</p>
             )}
           </div>
         )}
@@ -316,12 +590,17 @@ function TarefaItem({
 
       {!editando && (
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity mt-0.5">
-          <button onClick={() => setEditando(true)} className="p-0.5 rounded hover:bg-forest/10 text-forest-400 hover:text-forest">
+          <button onClick={() => setEditando(true)} title="Editar" className="p-0.5 rounded hover:bg-forest/10 text-forest-400 hover:text-forest">
             <Pencil className="w-3 h-3" />
           </button>
-          <button onClick={onDelete} className="p-0.5 rounded hover:bg-rust/10 text-forest-400 hover:text-rust">
-            <Trash2 className="w-3 h-3" />
+          <button onClick={onRepeat} title="Repetir tarefa" className="p-0.5 rounded hover:bg-forest/10 text-forest-400 hover:text-forest">
+            <Repeat2 className="w-3 h-3" />
           </button>
+          {canDelete && (
+            <button onClick={onDelete} title="Excluir" className="p-0.5 rounded hover:bg-rust/10 text-forest-400 hover:text-rust">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -330,13 +609,14 @@ function TarefaItem({
 
 // ── Célula do dia ─────────────────────────────────────────────────────────────
 function DiaCell({
-  date, tarefas, plannerId, onAddTarefa, onToggleTarefa, onEditTarefa, onDeleteTarefa, pendingId,
+  date, tarefas, plannerId, isOwner, onAddTarefa, onToggleTarefa, onEditTarefa, onDeleteTarefa, onRepeatTarefa, pendingId,
 }: {
-  date: Date; tarefas: PlannerTarefa[]; plannerId: string;
+  date: Date; tarefas: PlannerTarefa[]; plannerId: string; isOwner: boolean;
   onAddTarefa: (titulo: string, data: string, descricao: string) => void;
   onToggleTarefa: (id: string, concluida: boolean) => void;
   onEditTarefa: (id: string, titulo: string, descricao: string) => void;
   onDeleteTarefa: (id: string) => void;
+  onRepeatTarefa: (tarefa: PlannerTarefa) => void;
   pendingId: string | null;
 }) {
   const [adicionando, setAdicionando] = useState(false);
@@ -405,6 +685,8 @@ function DiaCell({
             onToggle={() => onToggleTarefa(t.id, !t.concluida)}
             onEdit={(titulo, desc) => onEditTarefa(t.id, titulo, desc)}
             onDelete={() => onDeleteTarefa(t.id)}
+            onRepeat={() => onRepeatTarefa(t)}
+            canDelete={isOwner}
             pending={pendingId === t.id || t.id.startsWith("temp-")} />
         ))}
       </div>
@@ -672,6 +954,7 @@ export function PlannerClient({ planners: initialPlanners, tarefas: initialTaref
   const [pendingTarefaId, setPendingTarefaId] = useState<string | null>(null);
   const [modalCriarAberto, setModalCriarAberto] = useState(false);
   const [plannerParaCompartilhar, setPlannerParaCompartilhar] = useState<Planner | null>(null);
+  const [tarefaParaRepetir, setTarefaParaRepetir] = useState<PlannerTarefa | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => { setPlanners(initialPlanners); }, [initialPlanners]);
@@ -721,108 +1004,102 @@ export function PlannerClient({ planners: initialPlanners, tarefas: initialTaref
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plannerIdsKey]);
 
-  // ── Realtime: compartilhamentos recebidos (INSERT filtrado pelo currentUserId) ─
+  // ── Fetch inicial: garante planners compartilhados mesmo sem Realtime ──
   useEffect(() => {
-    const channelInsert = supabase
-      .channel(`comp-insert-${currentUserId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "planner_compartilhamentos",
-          filter: `shared_with_profile_id=eq.${currentUserId}`,
-        },
-        (payload: any) => {
-          const pid: string = payload.new.planner_id;
-          // Busca e adiciona o planner à lista
-          supabase
-            .from("planners")
-            .select("id, nome, owner_profile_id, profissional_id, ordem, criado_em")
-            .eq("id", pid)
-            .single()
-            .then(({ data }) => {
-              if (!data) return;
-              setPlanners(prev => prev.some(p => p.id === data.id) ? prev : [...prev, data as Planner]);
-              // Garante que o dono do planner está no cache de perfis
-              const ownerId = data.owner_profile_id;
-              if (ownerId) {
-                setProfilesCache(prev => {
-                  if (prev.some(p => p.id === ownerId)) return prev;
-                  // Busca o perfil do dono se ainda não estiver no cache
-                  supabase
-                    .from("profiles")
-                    .select("id, nome_completo, role, email")
-                    .eq("id", ownerId)
-                    .single()
-                    .then(({ data: profile }) => {
-                      if (profile) setProfilesCache(c => c.some(p => p.id === profile.id) ? c : [...c, profile as Profile]);
-                    });
-                  return prev;
-                });
-              }
+    supabase
+      .from("planner_compartilhamentos")
+      .select("planner_id")
+      .eq("shared_with_profile_id", currentUserId)
+      .then(async ({ data: shared }) => {
+        if (!shared || shared.length === 0) return;
+        const ids = shared.map(r => r.planner_id as string);
+        const { data: sharedPlanners } = await supabase
+          .from("planners")
+          .select("id, nome, owner_profile_id, profissional_id, ordem, criado_em")
+          .in("id", ids);
+        if (!sharedPlanners) return;
+        // Adiciona planners que ainda não estão na lista
+        setPlanners(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const novos = (sharedPlanners as Planner[]).filter(p => !existingIds.has(p.id));
+          return novos.length > 0 ? [...prev, ...novos] : prev;
+        });
+        // Garante donos no cache de perfis
+        const ownerIds = sharedPlanners.map((p: any) => p.owner_profile_id).filter(Boolean);
+        if (ownerIds.length > 0) {
+          const { data: owners } = await supabase
+            .from("profiles")
+            .select("id, nome_completo, role, email")
+            .in("id", ownerIds);
+          if (owners) {
+            setProfilesCache(prev => {
+              const existingIds = new Set(prev.map(p => p.id));
+              const novos = (owners as Profile[]).filter(p => !existingIds.has(p.id));
+              return novos.length > 0 ? [...prev, ...novos] : prev;
             });
+          }
         }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channelInsert); };
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
 
-  // ── Realtime: compartilhamentos removidos (DELETE filtrado pelo currentUserId) ─
+  // ── Realtime: todos os eventos de compartilhamentos (sem filtro, via RLS) ──
   useEffect(() => {
-    const channelDelete = supabase
-      .channel(`comp-delete-${currentUserId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "planner_compartilhamentos",
-          filter: `shared_with_profile_id=eq.${currentUserId}`,
-        },
-        (payload: any) => {
-          const pid: string = payload.old.planner_id;
-          setPlanners(prev => prev.filter(p => p.id !== pid));
-          setSelectedIdx(0);
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channelDelete); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserId]);
-
-  // ── Realtime: atualiza compartilhadosMap para o dono (todos os eventos) ─
-  useEffect(() => {
-    const channelOwner = supabase
-      .channel(`comp-owner-${currentUserId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "planner_compartilhamentos" },
+    const channel = supabase
+      .channel(`comp-${currentUserId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planner_compartilhamentos" },
         (payload: any) => {
           const rec = payload.eventType === "DELETE" ? payload.old : payload.new;
           if (!rec?.planner_id) return;
           const pid: string = rec.planner_id;
           const uid: string = rec.shared_with_profile_id;
+
           if (payload.eventType === "INSERT") {
+            // Atualiza mapa para o dono
             setCompartilhadosMap(prev => ({
               ...prev,
               [pid]: [...(prev[pid] ?? []).filter(id => id !== uid), uid],
             }));
+            // Destinatário recebe o planner
+            if (uid === currentUserId) {
+              supabase
+                .from("planners")
+                .select("id, nome, owner_profile_id, profissional_id, ordem, criado_em")
+                .eq("id", pid)
+                .single()
+                .then(async ({ data }) => {
+                  if (!data) return;
+                  setPlanners(prev => prev.some(p => p.id === data.id) ? prev : [...prev, data as Planner]);
+                  // Garante dono no cache de perfis
+                  const ownerId = (data as any).owner_profile_id;
+                  if (ownerId) {
+                    setProfilesCache(prev => {
+                      if (prev.some(p => p.id === ownerId)) return prev;
+                      supabase.from("profiles").select("id, nome_completo, role, email").eq("id", ownerId).single()
+                        .then(({ data: profile }) => {
+                          if (profile) setProfilesCache(c => c.some(p => p.id === profile.id) ? c : [...c, profile as Profile]);
+                        });
+                      return prev;
+                    });
+                  }
+                });
+            }
           } else if (payload.eventType === "DELETE") {
             setCompartilhadosMap(prev => {
               const next = { ...prev };
               next[pid] = (next[pid] ?? []).filter(id => id !== uid);
               return next;
             });
+            if (uid === currentUserId) {
+              setPlanners(prev => prev.filter(p => p.id !== pid));
+              setSelectedIdx(0);
+            }
           }
         }
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channelOwner); };
+    return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
 
@@ -917,6 +1194,26 @@ export function PlannerClient({ planners: initialPlanners, tarefas: initialTaref
     });
   }
 
+  function handleRepetirTarefa(tarefa: PlannerTarefa, dates: string[]) {
+    setTarefaParaRepetir(null);
+    const temps: PlannerTarefa[] = dates.map((data_tarefa, i) => ({
+      id: `temp-${Date.now()}-${i}`,
+      planner_id: tarefa.planner_id,
+      titulo: tarefa.titulo,
+      descricao: tarefa.descricao,
+      data_tarefa,
+      concluida: false,
+      concluida_em: null,
+      criado_em: new Date().toISOString(),
+    }));
+    setTarefas(prev => [...prev, ...temps]);
+    startTransition(async () => {
+      const res = await criarTarefasRepetidas(tarefa.planner_id, tarefa.titulo, tarefa.descricao ?? undefined, dates);
+      if (res.error) { setErro(res.error); setTarefas(prev => prev.filter(t => !t.id.startsWith("temp-"))); }
+      else refresh();
+    });
+  }
+
   function handleDeleteTarefa(id: string) {
     setTarefas(prev => prev.filter(t => t.id !== id));
     startTransition(async () => {
@@ -982,10 +1279,12 @@ export function PlannerClient({ planners: initialPlanners, tarefas: initialTaref
               {weekDays.map(date => (
                 <DiaCell key={date.toISOString()} date={date} tarefas={tarefas}
                   plannerId={selectedPlanner?.id ?? ""}
+                  isOwner={selectedPlanner?.owner_profile_id === currentUserId}
                   onAddTarefa={(titulo, data, descricao) => handleAddTarefa(titulo, data, descricao)}
                   onToggleTarefa={handleToggleTarefa}
                   onEditTarefa={(id, titulo, descricao) => handleEditTarefa(id, titulo, descricao)}
                   onDeleteTarefa={handleDeleteTarefa}
+                  onRepeatTarefa={setTarefaParaRepetir}
                   pendingId={pendingTarefaId} />
               ))}
             </div>
@@ -1035,6 +1334,13 @@ export function PlannerClient({ planners: initialPlanners, tarefas: initialTaref
           onConfirm={handleCriarPlanner}
           onClose={() => setModalCriarAberto(false)}
           isPending={false} />
+      )}
+
+      {tarefaParaRepetir && (
+        <ModalRepetirTarefa
+          tarefa={tarefaParaRepetir}
+          onClose={() => setTarefaParaRepetir(null)}
+          onConfirm={dates => handleRepetirTarefa(tarefaParaRepetir, dates)} />
       )}
 
       {plannerParaCompartilhar && (
