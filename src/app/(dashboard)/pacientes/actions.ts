@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { friendlyError } from "@/lib/errorMessages";
 
 export async function cadastrarPaciente(formData: FormData) {
   const supabase = createClient();
@@ -16,7 +17,7 @@ export async function cadastrarPaciente(formData: FormData) {
   const { error } = await supabase.from("pacientes").insert({
     nome_completo, telefone, email, cpf, data_nascimento, observacoes,
   });
-  if (error) return redirect(`/pacientes/novo?error=${encodeURIComponent(error.message)}`);
+  if (error) return redirect(`/pacientes/novo?error=${encodeURIComponent(friendlyError(error.message))}`);
   revalidatePath("/pacientes");
   redirect("/pacientes");
 }
@@ -157,14 +158,15 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
     ativo:                          true,
   }).select("id").single();
 
-  if (error) return { error: error.message, id: null };
+  if (error) return { error: friendlyError(error.message), id: null };
 
   // Salvar vínculos com profissionais
   const profissionalIds = formData.getAll("profissional_ids") as string[];
   if (profissionalIds.length > 0 && novo?.id) {
-    await supabase.from("paciente_profissional").insert(
+    const { error: vincErr } = await supabase.from("paciente_profissional").insert(
       profissionalIds.map(pid => ({ paciente_id: novo.id, profissional_id: pid }))
     );
+    if (vincErr) return { error: friendlyError(vincErr.message), id: null };
   }
 
   revalidatePath("/pacientes");
@@ -186,7 +188,7 @@ export async function excluirPacienteConfirmado(id: string): Promise<{ error: st
   const supabase = createClient();
   await supabase.from("agendamentos").delete().eq("paciente_id", id);
   const { error } = await supabase.from("pacientes").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/pacientes");
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
@@ -214,7 +216,7 @@ export async function buscarAgendamentosPaciente(
 export async function deletarAgendamento(agendamentoId: string): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").delete().eq("id", agendamentoId);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   return { error: null };
@@ -224,7 +226,7 @@ export async function deletarTodosAgendamentosPaciente(pacienteId: string): Prom
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").delete().eq("paciente_id", pacienteId)
     .not("status", "in", "(cancelado,faltou)");
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   return { error: null };
@@ -252,7 +254,7 @@ export async function salvarProfissionaisPaciente(
     const { error } = await supabase.from("paciente_profissional").insert(
       profissionalIds.map(pid => ({ paciente_id: pacienteId, profissional_id: pid }))
     );
-    if (error) return { error: error.message };
+    if (error) return { error: friendlyError(error.message) };
   }
   revalidatePath("/pacientes");
   return { error: null };
@@ -263,7 +265,7 @@ export async function toggleAtivoPaciente(id: string): Promise<{ error: string |
   const { data: pac } = await supabase.from("pacientes").select("ativo").eq("id", id).single();
   if (!pac) return { error: "Paciente não encontrado." };
   const { error } = await supabase.from("pacientes").update({ ativo: !pac.ativo }).eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/pacientes");
   revalidatePath("/dashboard");
   return { error: null };
@@ -277,7 +279,7 @@ export async function salvarConfigCampos(
     const { error } = await supabase
       .from("configuracoes_campos_paciente")
       .upsert({ campo: c.campo, obrigatorio: c.obrigatorio });
-    if (error) return { error: error.message };
+    if (error) return { error: friendlyError(error.message) };
   }
   revalidatePath("/pacientes/novo");
   return { error: null };

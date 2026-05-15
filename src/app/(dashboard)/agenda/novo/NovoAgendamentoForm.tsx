@@ -265,7 +265,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       if (res.error) { setSubmitError(res.error); return; }
       if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
       if (encaixeId) await removerEncaixe(encaixeId);
-      await broadcastAgendaChanged();
+      try { await broadcastAgendaChanged(); } catch { /* fire-and-forget */ }
       resetDirty();
       router.push("/dashboard");
     });
@@ -281,7 +281,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       if (res.error) { setSubmitError(res.error); return; }
       if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
       if (encaixeId) await removerEncaixe(encaixeId);
-      await broadcastAgendaChanged();
+      try { await broadcastAgendaChanged(); } catch { /* fire-and-forget */ }
       resetDirty();
       router.push("/dashboard");
     });

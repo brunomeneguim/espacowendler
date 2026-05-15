@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { friendlyError } from "@/lib/errorMessages";
 
 export async function signIn(formData: FormData) {
   const supabase = createClient();
@@ -20,7 +21,7 @@ export async function signIn(formData: FormData) {
   redirect("/dashboard");
 }
 
-export async function signUp(formData: FormData) {
+export async function signUp(formData: FormData): Promise<{ error: string | null; message?: string }> {
   const supabase = createClient();
 
   const email = formData.get("email") as string;
@@ -37,16 +38,12 @@ export async function signUp(formData: FormData) {
   });
 
   if (error) {
-    return redirect(`/cadastro?error=${encodeURIComponent(error.message)}`);
+    return { error: friendlyError(error.message) };
   }
 
   // O profile é criado automaticamente via trigger no banco (ver SQL)
   if (data.user && !data.user.email_confirmed_at) {
-    return redirect(
-      `/cadastro?message=${encodeURIComponent(
-        "Conta criada! Verifique seu email para confirmar."
-      )}`
-    );
+    return { error: null, message: "Conta criada! Verifique seu email para confirmar." };
   }
 
   revalidatePath("/", "layout");
@@ -55,7 +52,10 @@ export async function signUp(formData: FormData) {
 
 export async function signOut() {
   const supabase = createClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error("[signOut] Erro ao encerrar sessão:", error.message);
+  }
   revalidatePath("/", "layout");
   redirect("/login");
 }

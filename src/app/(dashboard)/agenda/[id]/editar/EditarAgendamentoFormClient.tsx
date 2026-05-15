@@ -61,7 +61,7 @@ export function EditarAgendamentoFormClient({
         setErro(res.error);
         return;
       }
-      await broadcastAgendaChanged();
+      try { await broadcastAgendaChanged(); } catch { /* fire-and-forget */ }
       resetDirty();
       router.push("/dashboard");
     });

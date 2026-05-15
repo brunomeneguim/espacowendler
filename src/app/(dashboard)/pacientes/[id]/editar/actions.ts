@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { friendlyError } from "@/lib/errorMessages";
 
 export async function atualizarPacienteCompleto(
   id: string,
@@ -105,7 +106,7 @@ export async function atualizarPacienteCompleto(
     })
     .eq("id", id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
 
   // ── Propagar valor especial para agendamentos futuros não pagos ──────────────
   // Calcula os valores numéricos (mesma lógica usada acima)
@@ -150,9 +151,10 @@ export async function atualizarPacienteCompleto(
   const profissionalIds = formData.getAll("profissional_ids") as string[];
   await supabase.from("paciente_profissional").delete().eq("paciente_id", id);
   if (profissionalIds.length > 0) {
-    await supabase.from("paciente_profissional").insert(
+    const { error: vincErr } = await supabase.from("paciente_profissional").insert(
       profissionalIds.map(pid => ({ paciente_id: id, profissional_id: pid }))
     );
+    if (vincErr) return { error: friendlyError(vincErr.message) };
   }
 
   revalidatePath("/pacientes");
@@ -179,7 +181,7 @@ export async function editarPaciente(id: string, formData: FormData) {
 
   if (error) {
     return redirect(
-      `/pacientes/${id}/editar?error=${encodeURIComponent(error.message)}`
+      `/pacientes/${id}/editar?error=${encodeURIComponent(friendlyError(error.message))}`
     );
   }
 

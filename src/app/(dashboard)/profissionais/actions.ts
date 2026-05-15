@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { friendlyError } from "@/lib/errorMessages";
 
 export async function cadastrarProfissional(formData: FormData) {
   const supabase = createClient();
@@ -22,7 +23,7 @@ export async function cadastrarProfissional(formData: FormData) {
   });
 
   if (error) {
-    return redirect(`/profissionais/novo?error=${encodeURIComponent(error.message)}`);
+    return redirect(`/profissionais/novo?error=${encodeURIComponent(friendlyError(error.message))}`);
   }
 
   revalidatePath("/profissionais");
@@ -40,7 +41,7 @@ export async function adicionarEspecialidade(
     .insert({ nome })
     .select("id, nome")
     .single();
-  if (error) return { error: error.message, data: null };
+  if (error) return { error: friendlyError(error.message), data: null };
   revalidatePath("/profissionais");
   return { error: null, data: data as any };
 }
@@ -50,7 +51,7 @@ export async function removerEspecialidade(
 ): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.from("especialidades").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/profissionais");
   return { error: null };
 }
@@ -62,7 +63,7 @@ export async function toggleAtivoProfissional(id: string): Promise<{ error: stri
   const { data: prof } = await supabase.from("profissionais").select("ativo").eq("id", id).single();
   if (!prof) return { error: "Profissional não encontrado." };
   const { error } = await supabase.from("profissionais").update({ ativo: !prof.ativo }).eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/profissionais");
   revalidatePath("/dashboard");
   return { error: null };
@@ -71,7 +72,7 @@ export async function toggleAtivoProfissional(id: string): Promise<{ error: stri
 export async function alterarCorProfissional(id: string, cor: string): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.from("profissionais").update({ cor }).eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/profissionais");
   revalidatePath("/dashboard");
   return { error: null };
@@ -100,7 +101,7 @@ export async function deletarAgendamentoProfissional(
 ): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").delete().eq("id", agendamentoId);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/dashboard");
   return { error: null };
 }
@@ -109,7 +110,7 @@ export async function deletarTodosAgendamentosProfissional(profissionalId: strin
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").delete().eq("profissional_id", profissionalId)
     .not("status", "in", "(cancelado,faltou)");
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   return { error: null };
@@ -130,7 +131,7 @@ export async function excluirProfissionalConfirmado(id: string): Promise<{ error
   const supabase = createClient();
   await supabase.from("agendamentos").delete().eq("profissional_id", id);
   const { error } = await supabase.from("profissionais").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/profissionais");
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
@@ -147,7 +148,7 @@ export async function salvarConfigCamposProf(
     const { error } = await supabase
       .from("configuracoes_campos_profissional")
       .upsert({ campo: c.campo, obrigatorio: c.obrigatorio });
-    if (error) return { error: error.message };
+    if (error) return { error: friendlyError(error.message) };
   }
   revalidatePath("/profissionais");
   return { error: null };
@@ -209,16 +210,17 @@ export async function completarPerfilProfissional(
     profId = novo?.id;
   }
 
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
 
   // Atualizar especialidades na junction table (multi-select)
   const especialidadeIds = formData.getAll("especialidade_ids") as string[];
   if (profId) {
     await supabase.from("profissional_especialidades").delete().eq("profissional_id", profId);
     if (especialidadeIds.length > 0) {
-      await supabase.from("profissional_especialidades").insert(
+      const { error: espErr } = await supabase.from("profissional_especialidades").insert(
         especialidadeIds.map(eid => ({ profissional_id: profId!, especialidade_id: parseInt(eid) }))
       );
+      if (espErr) return { error: friendlyError(espErr.message) };
     }
   }
 
@@ -229,9 +231,10 @@ export async function completarPerfilProfissional(
       const horarios = JSON.parse(horariosJson) as { dia_semana: number; hora_inicio: string; hora_fim: string }[];
       await supabase.from("horarios_disponiveis").delete().eq("profissional_id", profId);
       if (horarios.length > 0) {
-        await supabase.from("horarios_disponiveis").insert(
+        const { error: horErr } = await supabase.from("horarios_disponiveis").insert(
           horarios.map(h => ({ profissional_id: profId!, ...h }))
         );
+        if (horErr) return { error: friendlyError(horErr.message) };
       }
     } catch { /* ignora JSON inválido */ }
   }
@@ -243,9 +246,10 @@ export async function completarPerfilProfissional(
       const horariosIndisp = JSON.parse(horariosIndispJson) as { dia_semana: number; hora_inicio: string; hora_fim: string }[];
       await supabase.from("horarios_indisponiveis").delete().eq("profissional_id", profId);
       if (horariosIndisp.length > 0) {
-        await supabase.from("horarios_indisponiveis").insert(
+        const { error: horIndispErr } = await supabase.from("horarios_indisponiveis").insert(
           horariosIndisp.map(h => ({ profissional_id: profId!, ...h }))
         );
+        if (horIndispErr) return { error: friendlyError(horIndispErr.message) };
       }
     } catch { /* ignora JSON inválido */ }
   }
@@ -254,7 +258,8 @@ export async function completarPerfilProfissional(
   const novaSenha = get("nova_senha");
   const confirmarSenha = get("confirmar_senha");
   if (novaSenha && novaSenha === confirmarSenha) {
-    await supabase.auth.updateUser({ password: novaSenha });
+    const { error: senhaErr } = await supabase.auth.updateUser({ password: novaSenha });
+    if (senhaErr) return { error: friendlyError(senhaErr.message) };
   }
 
   revalidatePath("/profissionais");
@@ -372,14 +377,15 @@ export async function cadastrarProfissionalCompleto(
   };
 
   const { data: profCriado, error } = await supabase.from("profissionais").insert(profData).select("id").single();
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
 
   // Inserir especialidades na junction table
   const especialidadeIds = formData.getAll("especialidade_ids") as string[];
   if (especialidadeIds.length > 0 && profCriado?.id) {
-    await supabase.from("profissional_especialidades").insert(
+    const { error: espErr } = await supabase.from("profissional_especialidades").insert(
       especialidadeIds.map(eid => ({ profissional_id: profCriado.id, especialidade_id: parseInt(eid) }))
     );
+    if (espErr) return { error: friendlyError(espErr.message) };
   }
 
   // Inserir horários disponíveis, se houver
@@ -388,9 +394,10 @@ export async function cadastrarProfissionalCompleto(
     try {
       const horarios = JSON.parse(horariosJson) as { dia_semana: number; hora_inicio: string; hora_fim: string }[];
       if (horarios.length > 0) {
-        await supabase.from("horarios_disponiveis").insert(
+        const { error: horErr } = await supabase.from("horarios_disponiveis").insert(
           horarios.map(h => ({ profissional_id: profCriado.id, ...h }))
         );
+        if (horErr) return { error: friendlyError(horErr.message) };
       }
     } catch { /* ignora JSON inválido */ }
   }
@@ -401,9 +408,10 @@ export async function cadastrarProfissionalCompleto(
     try {
       const horariosIndisp = JSON.parse(horariosIndispJson) as { dia_semana: number; hora_inicio: string; hora_fim: string }[];
       if (horariosIndisp.length > 0) {
-        await supabase.from("horarios_indisponiveis").insert(
+        const { error: horIndispErr } = await supabase.from("horarios_indisponiveis").insert(
           horariosIndisp.map(h => ({ profissional_id: profCriado.id, ...h }))
         );
+        if (horIndispErr) return { error: friendlyError(horIndispErr.message) };
       }
     } catch { /* ignora JSON inválido */ }
   }

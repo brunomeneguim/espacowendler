@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { friendlyError } from "@/lib/errorMessages";
 
 export async function editarProfissional(profissionalId: string, profileId: string, formData: FormData) {
   const supabase = createClient();
@@ -23,7 +24,7 @@ export async function editarProfissional(profissionalId: string, profileId: stri
   ]);
 
   if (r1.error || r2.error) {
-    const msg = r1.error?.message ?? r2.error?.message ?? "Erro ao salvar";
+    const msg = friendlyError(r1.error?.message ?? r2.error?.message ?? "Erro ao salvar");
     return redirect(`/profissionais/${profissionalId}/editar?error=${encodeURIComponent(msg)}`);
   }
 
@@ -63,15 +64,16 @@ export async function editarProfissionalCompleto(
   };
 
   const { error } = await supabase.from("profissionais").update(profData).eq("id", profissionalId);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
 
   // Atualizar especialidades na junction table
   const especialidadeIds = formData.getAll("especialidade_ids") as string[];
   await supabase.from("profissional_especialidades").delete().eq("profissional_id", profissionalId);
   if (especialidadeIds.length > 0) {
-    await supabase.from("profissional_especialidades").insert(
+    const { error: espErr } = await supabase.from("profissional_especialidades").insert(
       especialidadeIds.map(eid => ({ profissional_id: profissionalId, especialidade_id: parseInt(eid) }))
     );
+    if (espErr) return { error: friendlyError(espErr.message) };
   }
 
   // Redefinir senha se fornecida
@@ -79,7 +81,7 @@ export async function editarProfissionalCompleto(
   if (novaSenha) {
     const admin = createAdminClient();
     const { error: senhaError } = await admin.auth.admin.updateUserById(profileId, { password: novaSenha });
-    if (senhaError) return { error: `Erro ao redefinir senha: ${senhaError.message}` };
+    if (senhaError) return { error: friendlyError(`Erro ao redefinir senha: ${senhaError.message}`) };
   }
 
   revalidatePath("/profissionais");
@@ -96,7 +98,11 @@ export async function gerenciarHorario(
 
   if (action === "remove") {
     const id = formData.get("horario_id") as string;
-    await supabase.from("horarios_disponiveis").delete().eq("id", id);
+    const { error } = await supabase.from("horarios_disponiveis").delete().eq("id", id);
+    if (error) {
+      console.error("[gerenciarHorario] Erro ao remover horário:", friendlyError(error.message));
+      return;
+    }
   } else {
     const dia_semana = parseInt(formData.get("dia_semana") as string);
     const hora_inicio = formData.get("hora_inicio") as string;
@@ -113,12 +119,16 @@ export async function gerenciarHorario(
         .maybeSingle();
 
       if (!existing) {
-        await supabase.from("horarios_disponiveis").insert({
+        const { error } = await supabase.from("horarios_disponiveis").insert({
           profissional_id: profissionalId,
           dia_semana: dia,
           hora_inicio,
           hora_fim,
         });
+        if (error) {
+          console.error("[gerenciarHorario] Erro ao inserir horário:", friendlyError(error.message));
+          return;
+        }
       }
     }
   }
@@ -136,7 +146,11 @@ export async function gerenciarHorarioIndisponivel(
 
   if (action === "remove") {
     const id = formData.get("horario_id") as string;
-    await supabase.from("horarios_indisponiveis").delete().eq("id", id);
+    const { error } = await supabase.from("horarios_indisponiveis").delete().eq("id", id);
+    if (error) {
+      console.error("[gerenciarHorarioIndisponivel] Erro ao remover horário:", friendlyError(error.message));
+      return;
+    }
   } else {
     const dia_semana = parseInt(formData.get("dia_semana") as string);
     const hora_inicio = formData.get("hora_inicio") as string;
@@ -153,12 +167,16 @@ export async function gerenciarHorarioIndisponivel(
         .maybeSingle();
 
       if (!existing) {
-        await supabase.from("horarios_indisponiveis").insert({
+        const { error } = await supabase.from("horarios_indisponiveis").insert({
           profissional_id: profissionalId,
           dia_semana: dia,
           hora_inicio,
           hora_fim,
         });
+        if (error) {
+          console.error("[gerenciarHorarioIndisponivel] Erro ao inserir horário:", friendlyError(error.message));
+          return;
+        }
       }
     }
   }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 import { broadcastAgendaChange } from "@/lib/broadcastAgenda";
+import { friendlyError } from "@/lib/errorMessages";
 
 // Converte data local do usuário → UTC, independente do timezone do servidor.
 // data = "YYYY-MM-DD", hora = "HH:MM", tzOffset = new Date().getTimezoneOffset() do browser
@@ -257,7 +258,7 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
     data_hora_inicio: inicio.toISOString(),
     data_hora_fim:    fim.toISOString(),
   });
-  if (error) return { error: error.message, ignoradas: 0, datasIgnoradas: [] };
+  if (error) return { error: friendlyError(error.message), ignoradas: 0, datasIgnoradas: [] };
 
   // Vincular paciente ao profissional automaticamente
   await vincularPacienteProfissional(supabase, paciente_id, profissional_id);
@@ -271,11 +272,12 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
       const fimRec = new Date(d.getTime() + duracao * 60_000);
       const c = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, d, fimRec);
       if (c) { ignoradas++; datasIgnoradas.push(d.toISOString()); continue; }
-      await supabase.from("agendamentos").insert({
+      const { error: recErr } = await supabase.from("agendamentos").insert({
         ...base,
         data_hora_inicio: d.toISOString(),
         data_hora_fim:    fimRec.toISOString(),
       });
+      if (recErr) return { error: friendlyError(recErr.message), ignoradas, datasIgnoradas };
     }
   }
 
@@ -323,7 +325,7 @@ export async function reagendarAgendamentoRapido(params: {
     created_by: user?.id,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
 
   // Vincular paciente ao profissional automaticamente
   await vincularPacienteProfissional(supabase, pacienteId, profissionalId);
@@ -410,7 +412,7 @@ export async function atualizarStatusAgendamento(
   }
 
   const { error } = await supabase.from("agendamentos").update(update).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(friendlyError(error.message));
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   revalidatePath("/financeiro");
@@ -495,7 +497,7 @@ export async function marcarPagamentoAgendamento(
     .from("agendamentos")
     .update(update)
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/agenda");
   revalidatePath("/financeiro");
   revalidatePath("/dashboard");
@@ -525,11 +527,11 @@ export async function editarAgendamento(id: string, formData: FormData) {
 
   if (!isAusencia) {
     const erroHorario = await verificarHorarioProfissional(supabase, profissional_id, hora, duracao);
-    if (erroHorario) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(erroHorario)}`);
+    if (erroHorario) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(friendlyError(erroHorario))}`);
   }
 
   const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim, id);
-  if (conflito) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(conflito)}`);
+  if (conflito) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(friendlyError(conflito))}`);
 
   const updateData = {
     profissional_id,
@@ -556,7 +558,7 @@ export async function editarAgendamento(id: string, formData: FormData) {
 
   const { error } = await supabase.from("agendamentos").update(updateData).eq("id", id);
 
-  if (error) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(error.message)}`);
+  if (error) return redirect(`/agenda/${id}/editar?error=${encodeURIComponent(friendlyError(error.message))}`);
 
   // Vincular paciente ao profissional automaticamente
   await vincularPacienteProfissional(supabase, paciente_id, profissional_id);
@@ -620,7 +622,7 @@ export async function editarAgendamentoAction(
   }
 
   const { error } = await supabase.from("agendamentos").update(updateData).eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
 
   await vincularPacienteProfissional(supabase, paciente_id, profissional_id);
 
@@ -664,7 +666,7 @@ export async function atualizarAgendamento(
     tipo_agendamento: tipo_agendamento || "consulta_avulsa",
   }).eq("id", id);
 
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
 
   // Vincular paciente ao profissional automaticamente
   await vincularPacienteProfissional(supabase, paciente_id, profissional_id);
@@ -678,7 +680,7 @@ export async function atualizarAgendamento(
 export async function excluirAgendamento(id: string) {
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(friendlyError(error.message));
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   redirect("/agenda");
@@ -706,7 +708,7 @@ export async function excluirGrupoAgendamento(id: string): Promise<{ error: stri
 export async function deletarAgendamentoClient(id: string): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   void broadcastAgendaChange();
@@ -716,7 +718,7 @@ export async function deletarAgendamentoClient(id: string): Promise<{ error: str
 export async function deletarAgendamentosPaciente(pacienteId: string): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase.from("agendamentos").delete().eq("paciente_id", pacienteId);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message) };
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   void broadcastAgendaChange();

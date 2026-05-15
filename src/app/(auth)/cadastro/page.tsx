@@ -11,6 +11,8 @@ export default function CadastroPage({
   searchParams: { error?: string; message?: string };
 }) {
   const [senhaError, setSenhaError] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   async function handleSubmit(formData: FormData) {
     const password = formData.get("password") as string;
@@ -21,7 +23,17 @@ export default function CadastroPage({
       return;
     }
     setSenhaError("");
-    await signUp(formData);
+    setErro(null);
+    setSuccessMessage(null);
+
+    const res = await signUp(formData);
+    if (res.error) {
+      setErro(res.error);
+      return;
+    }
+    if (res.message) {
+      setSuccessMessage(res.message);
+    }
   }
 
   return (
@@ -40,10 +52,10 @@ export default function CadastroPage({
         Preencha os dados para acessar o sistema.
       </p>
 
-      <ErrorBanner message={searchParams.error} />
-      {searchParams.message && (
+      <ErrorBanner message={erro ?? searchParams.error} />
+      {(successMessage || searchParams.message) && (
         <div className="mb-5 p-3 bg-forest/10 border border-forest/20 rounded-xl text-sm text-forest">
-          {searchParams.message}
+          {successMessage ?? searchParams.message}
         </div>
       )}
 
