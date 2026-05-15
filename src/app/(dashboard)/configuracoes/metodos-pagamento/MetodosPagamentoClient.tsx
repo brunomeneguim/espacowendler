@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef } from "react";
 import { Plus, Pencil, Check, X, Loader2, CreditCard, ToggleLeft, ToggleRight, GripVertical, Trash2 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { criarMetodo, atualizarMetodo, reordenarMetodos, excluirMetodo } from "./actions";
 
 interface Metodo {
@@ -108,9 +109,7 @@ export function MetodosPagamentoClient({ metodosIniciais }: { metodosIniciais: M
 
   return (
     <div className="space-y-6">
-      {erro && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">{erro}</div>
-      )}
+      <ErrorBanner message={erro} />
 
       {/* Tabela de métodos */}
       <div className="card p-0 overflow-hidden">

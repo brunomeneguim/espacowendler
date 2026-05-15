@@ -1,8 +1,10 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useTransition, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { editarAgendamentoAction } from "../../actions";
 import { broadcastAgendaChanged } from "@/lib/broadcastAgendaClient";
 import { TzOffsetInput } from "./TzOffsetInput";
@@ -45,6 +47,8 @@ export function EditarAgendamentoFormClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const { markDirty, resetDirty, guardedNavigate, UnsavedDialog } = useUnsavedChanges(formRef);
   const isAusencia = tipoAgendamento === "ausencia";
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -58,20 +62,18 @@ export function EditarAgendamentoFormClient({
         return;
       }
       await broadcastAgendaChanged();
+      resetDirty();
       router.push("/dashboard");
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card space-y-5">
+    <>
+    <form ref={formRef} onSubmit={handleSubmit} onChange={markDirty} className="card space-y-5">
       <TzOffsetInput />
       <input type="hidden" name="tipo_agendamento" value={tipoAgendamento} />
 
-      {erro && (
-        <div className="p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          {erro}
-        </div>
-      )}
+      <ErrorBanner message={erro} />
 
       {isAusencia && (
         <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 flex items-center gap-2">
@@ -153,10 +155,12 @@ export function EditarAgendamentoFormClient({
             ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</>
             : "Salvar alterações"}
         </button>
-        <button type="button" onClick={() => router.push("/dashboard")} className="btn-secondary flex-1">
+        <button type="button" onClick={() => guardedNavigate("/dashboard")} className="btn-secondary flex-1">
           Cancelar
         </button>
       </div>
     </form>
+    {UnsavedDialog}
+    </>
   );
 }

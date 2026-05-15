@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import { UserPlus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Phone, FileText, User, Pencil, Check, X, CalendarPlus } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { adicionarEncaixe, removerEncaixe, editarEncaixe } from "./listaEncaixeActions";
 import type { Encaixe } from "./DashboardContent";
 
@@ -39,9 +40,7 @@ interface Props {
 }
 
 function maskPhone(v: string) {
-  const raw = v.replace(/[^\d+]/g, "");
-  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D/g, "");
-  const d = raw.replace(/\D/g, "").substring(0, 11);
+  const d = v.replace(/\D/g, "").substring(0, 11);
   if (d.length === 0) return "";
   if (d.length <= 2) return `(${d}`;
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -242,7 +241,7 @@ export function ListaEncaixe({ encaixes, profissionais, currentProfId, pacientes
           {/* Formulário de adição */}
           {showForm && (
             <form onSubmit={handleSubmit} className="p-3 bg-sand/10 rounded-xl border border-sand/30 space-y-2.5">
-              {erro && <p className="text-xs text-rust">{erro}</p>}
+              <ErrorBanner message={erro} />
               <div className="grid sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-forest-600 mb-1 block">

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { alterarSenha } from "./actions";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 export function GerenciarContaClient({ email }: { email: string }) {
   const [erro, setErro] = useState<string | null>(null);
@@ -84,9 +85,7 @@ export function GerenciarContaClient({ email }: { email: string }) {
             />
           </div>
 
-          {erro && (
-            <p className="text-sm text-rust">{erro}</p>
-          )}
+          <ErrorBanner message={erro} />
 
           {sucesso && (
             <p className="text-sm text-peach">Senha alterada com sucesso!</p>

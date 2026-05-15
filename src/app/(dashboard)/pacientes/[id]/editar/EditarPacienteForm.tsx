@@ -3,6 +3,7 @@
 import { useState, useRef, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import {
   Camera, Upload, X, Plus, Trash2, Loader2,
   User, MapPin, Phone, FileText, AlertCircle, UserCog, DollarSign, Search,
@@ -55,9 +56,7 @@ function maskCep(v: string) {
   return v.replace(/(\d{5})(\d)/, "$1-$2");
 }
 function maskPhone(v: string) {
-  const raw = v.replace(/[^\d+]/g, "");
-  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D/g, "");
-  const d = raw.replace(/\D/g, "").substring(0, 11);
+  const d = v.replace(/\D/g, "").substring(0, 11);
   if (d.length === 0) return "";
   if (d.length <= 2) return `(${d}`;
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -121,6 +120,8 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
   const [isPending, startTransition] = useTransition();
   const { showToast } = useToast();
   const [erro, setErro] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const { markDirty, resetDirty, guardedNavigate, UnsavedDialog } = useUnsavedChanges(formRef);
 
   useEffect(() => {
     if (erro) { showToast(erro, "error"); setErro(null); }
@@ -182,12 +183,60 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
   const [profSearch, setProfSearch] = useState("");
   const [profSearchOpen, setProfSearchOpen] = useState(false);
   const [profVinculados, setProfVinculados] = useState<ProfissionalOpt[]>(profissionaisVinculados);
+
+  // Marca dirty sempre que a lista de profissionais vinculados mudar
+  useEffect(() => {
+    const origIds = new Set(profissionaisVinculados.map(p => p.id));
+    const changed =
+      profVinculados.length !== profissionaisVinculados.length ||
+      profVinculados.some(p => !origIds.has(p.id));
+    if (changed) markDirty();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profVinculados]);
   const profSearchResults = profSearchOpen
     ? profissionais.filter(
         p => p.nome_completo.toLowerCase().includes(profSearch.toLowerCase()) &&
           !profVinculados.find(v => v.id === p.id)
       )
     : [];
+
+  // ── Card Financeiro ──
+  const SESSOES_DEFAULT = 4;
+
+  function fmtMoney(v: number | null | undefined): string {
+    if (v == null) return "";
+    return v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function parseMoney(s: string): number | null {
+    const n = parseFloat(s.replace(/\./g, "").replace(",", "."));
+    return isNaN(n) ? null : n;
+  }
+
+  const [avulsaRaw, setAvulsaRaw]   = useState(fmtMoney(paciente.valor_consulta_especial));
+  const [planoRaw,  setPlanoRaw]    = useState(fmtMoney(paciente.valor_plano_especial));
+  const [sessoesPlanoEspecial, setSessoesPlanoEspecial] = useState(
+    paciente.sessoes_plano_especial != null ? String(paciente.sessoes_plano_especial) : String(SESSOES_DEFAULT)
+  );
+
+  // Calcula o valor avulsa a partir do plano (plano / sessoes)
+  function calcAvulsaFromPlano(plano: string, sessoes: string) {
+    const p = parseMoney(plano);
+    const s = parseInt(sessoes) || SESSOES_DEFAULT;
+    if (p == null || p <= 0) return;
+    setAvulsaRaw(fmtMoney(p / s));
+  }
+
+  // Calcula o plano a partir da avulsa (avulsa × sessoes)
+  function calcPlanoFromAvulsa(avulsa: string, sessoes: string) {
+    const a = parseMoney(avulsa);
+    const s = parseInt(sessoes) || SESSOES_DEFAULT;
+    if (a == null || a <= 0) return;
+    setPlanoRaw(fmtMoney(a * s));
+  }
+
+  // Valor numérico para envio ao form (hidden inputs)
+  const valorConsultaEspecial = parseMoney(avulsaRaw);
+  const valorPlanoEspecial    = parseMoney(planoRaw);
 
   // Responsável financeiro
   const [respFinMesmoPaciente, setRespFinMesmoPaciente] = useState(
@@ -314,7 +363,7 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
     startTransition(async () => {
       const res = await atualizarPacienteCompleto(paciente.id, fd);
       if (res.error) setErro(res.error);
-      else router.push("/pacientes");
+      else { resetDirty(); router.push("/pacientes"); }
     });
   }
 
@@ -327,7 +376,7 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
 
   return (
     <div className="space-y-5">
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form ref={formRef} onSubmit={handleSubmit} onChange={markDirty} className="space-y-5">
         {/* ── Toggle Individual / Casal ── */}
         <input type="hidden" name="tipo_cadastro" value={tipoCadastro} />
         <div className="flex gap-1 p-1 bg-sand/20 rounded-xl w-fit">
@@ -365,7 +414,7 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => { setProfVinculados(prev => [...prev, p]); setProfSearch(""); setProfSearchOpen(false); }}
+                    onClick={() => { setProfVinculados(prev => [...prev, p]); setProfSearch(""); setProfSearchOpen(false); markDirty(); }}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-sand/20 transition-colors text-forest"
                   >
                     <UserCog className="w-4 h-4 text-forest-400 shrink-0" />
@@ -381,7 +430,7 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
                 <span key={p.id} className="flex items-center gap-1.5 bg-forest/10 text-forest text-sm px-3 py-1.5 rounded-full">
                   <UserCog className="w-3.5 h-3.5" />
                   {p.nome_completo}
-                  <button type="button" onClick={() => setProfVinculados(prev => prev.filter(v => v.id !== p.id))} className="ml-1 text-forest-400 hover:text-rust transition-colors">
+                  <button type="button" onClick={() => { setProfVinculados(prev => prev.filter(v => v.id !== p.id)); markDirty(); }} className="ml-1 text-forest-400 hover:text-rust transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </span>
@@ -921,14 +970,91 @@ export function EditarPacienteForm({ paciente, camposConfig, profissionais, prof
           </div>
         </Section>
 
+        {/* ── Financeiro ── */}
+        <Section icon={DollarSign} title="Financeiro">
+          {/* Hidden inputs com valores numéricos limpos */}
+          <input type="hidden" name="valor_consulta_especial" value={valorConsultaEspecial ?? ""} />
+          <input type="hidden" name="valor_plano_especial"    value={valorPlanoEspecial    ?? ""} />
+
+          <p className="text-sm text-forest-500">
+            Valores personalizados para este paciente. Têm <strong>prioridade</strong> sobre os valores padrão do profissional em todos os agendamentos futuros.
+          </p>
+
+          {/* Linha 1: Consulta Avulsa + Plano Mensal */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Valor da Consulta Avulsa</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-forest-400 font-medium">R$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input-field pl-9"
+                  placeholder="Ex: 180,00"
+                  value={avulsaRaw}
+                  onChange={e => setAvulsaRaw(e.target.value)}
+                  onBlur={() => calcPlanoFromAvulsa(avulsaRaw, sessoesPlanoEspecial)}
+                />
+              </div>
+              <p className="text-xs text-forest-400 mt-1">Valor por sessão individual.</p>
+            </div>
+            <div>
+              <label className="label">Valor do Plano Mensal</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-forest-400 font-medium">R$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input-field pl-9"
+                  placeholder="Ex: 650,00"
+                  value={planoRaw}
+                  onChange={e => setPlanoRaw(e.target.value)}
+                  onBlur={() => calcAvulsaFromPlano(planoRaw, sessoesPlanoEspecial)}
+                />
+              </div>
+              <p className="text-xs text-forest-400 mt-1">Valor total do plano mensal.</p>
+            </div>
+          </div>
+
+          {/* Linha 2: Sessões */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Sessões no plano mensal</label>
+              <input
+                name="sessoes_plano_especial"
+                type="number"
+                min={1}
+                max={99}
+                className="input-field"
+                value={sessoesPlanoEspecial}
+                onChange={e => {
+                  const s = e.target.value;
+                  setSessoesPlanoEspecial(s);
+                  // Recalcula plano se avulsa estiver preenchida
+                  const a = parseMoney(avulsaRaw);
+                  if (a != null && a > 0) {
+                    const qtd = parseInt(s) || SESSOES_DEFAULT;
+                    setPlanoRaw(fmtMoney(a * qtd));
+                  }
+                }}
+              />
+              <p className="text-xs text-forest-400 mt-1">
+                Padrão: {SESSOES_DEFAULT} sessões/mês. Altera o cálculo automático.
+              </p>
+            </div>
+          </div>
+        </Section>
+
         {/* Botões */}
         <div className="flex gap-3 pt-2">
           <button type="submit" disabled={isPending} className="btn-primary flex-1 flex items-center justify-center gap-2">
             {isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</> : "Salvar alterações"}
           </button>
-          <Link href="/pacientes" className="btn-secondary flex-1">Cancelar</Link>
+          <button type="button" onClick={() => guardedNavigate("/pacientes")} className="btn-secondary flex-1">Cancelar</button>
         </div>
       </form>
+
+      {UnsavedDialog}
 
       {/* ── Modal webcam ── */}
       {showWebcam && (

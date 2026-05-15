@@ -3,9 +3,10 @@
 import { useState, useTransition, useMemo, useRef } from "react";
 import {
   ShieldCheck, Loader2, Check, ChevronDown, ChevronUp,
-  RotateCcw, Eye, Pencil, AlertCircle, Trash2, UserPlus,
+  RotateCcw, Eye, Pencil, Trash2, UserPlus,
   Search, AlertTriangle,
 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import type { UserRole } from "@/types/database";
 import {
   atualizarRole, salvarTodasPermissoes, resetarPermissoes,
@@ -125,7 +126,7 @@ function ModalExcluir({ profile, onClose }: { profile: Profile; onClose: () => v
               </p>
             </div>
           </div>
-          {erro && <p className="text-sm text-rust">{erro}</p>}
+          <ErrorBanner message={erro} />
           <div className="flex gap-3 pt-2">
             <button
               onClick={handleConfirm}
@@ -200,7 +201,7 @@ function ModalNovoUsuario({ onClose }: { onClose: () => void }) {
               <label className="label">Confirmar Senha *</label>
               <input name="confirm_password" type="password" required minLength={6} className="input-field" placeholder="Repita a senha" />
             </div>
-            {erro && <p className="text-sm text-rust">{erro}</p>}
+            <ErrorBanner message={erro} />
             <div className="flex gap-3 pt-1">
               <button type="submit" disabled={isPending} className="btn-primary flex items-center gap-2 flex-1 justify-center">
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
@@ -267,7 +268,7 @@ function ModalEditarUsuario({ profile, onClose }: { profile: Profile; onClose: (
                 <option value="false">Inativo</option>
               </select>
             </div>
-            {erro && <p className="text-sm text-rust">{erro}</p>}
+            <ErrorBanner message={erro} />
             <div className="flex gap-3 pt-1">
               <button type="submit" disabled={isPending} className="btn-primary flex items-center gap-2 flex-1 justify-center">
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
@@ -438,11 +439,7 @@ function PermissaoGrid({
             </div>
           ))}
 
-          {erro && (
-            <div className="flex items-center gap-2 text-xs text-rust">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />{erro}
-            </div>
-          )}
+          <ErrorBanner message={erro} />
 
           <div className="flex items-center justify-between pt-1">
             {localHasCustom ? (

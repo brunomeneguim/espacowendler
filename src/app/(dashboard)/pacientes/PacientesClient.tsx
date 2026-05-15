@@ -12,6 +12,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 import { excluirPacienteConfirmado, toggleAtivoPaciente, buscarAgendamentosPaciente, deletarAgendamento, deletarTodosAgendamentosPaciente } from "./actions";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 interface Paciente {
   id: string;
@@ -141,7 +142,7 @@ function ModalExcluir({ paciente, onClose }: { paciente: Paciente; onClose: () =
             </div>
           ) : null}
 
-          {erro && <p className="text-sm text-rust">{erro}</p>}
+          <ErrorBanner message={erro} />
 
           <div className="flex gap-3 pt-2">
             <button
@@ -266,7 +267,7 @@ function ModalConfirmarInativar({ pacienteId, nome, onConfirm, onClose }: { paci
             </div>
           ) : null}
 
-          {erro && <p className="text-sm text-rust">{erro}</p>}
+          <ErrorBanner message={erro} />
 
           <div className="flex gap-3 pt-2">
             <button

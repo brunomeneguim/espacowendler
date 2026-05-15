@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { BookOpen, X, Plus, Trash2, Loader2 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { adicionarEspecialidade, removerEspecialidade } from "./actions";
 
 interface Especialidade { id: number; nome: string }
@@ -64,7 +65,7 @@ export function ConfigEspecialidadesButton({ especialidades: inicial }: Props) {
               <p className="text-sm text-forest-500 mb-3">
                 Adicione as especialidades que aparecerão no cadastro de profissionais.
               </p>
-              {erro && <p className="text-xs text-rust mb-2">{erro}</p>}
+              <ErrorBanner message={erro} />
               <div className="flex gap-2">
                 <input
                   type="text"

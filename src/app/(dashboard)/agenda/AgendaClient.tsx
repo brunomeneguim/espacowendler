@@ -5,14 +5,17 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Search, Pencil, Calendar, Plus, Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { deletarAgendamentoClient, deletarAgendamentosPaciente } from "./actions";
 
 const STATUS_BADGE: Record<string, string> = {
+  agendado:   "bg-peach/30 text-rust",
   confirmado: "bg-forest text-cream",
   realizado:  "bg-teal-600 text-white",
+  finalizado: "bg-gray-200 text-gray-600",
   cancelado:  "bg-rust/10 text-rust",
   faltou:     "bg-orange-100 text-orange-700",
-  agendado:   "bg-peach/30 text-rust",
+  ausencia:   "bg-gray-100 text-gray-500",
 };
 const STATUS_LABEL: Record<string, string> = {
   agendado: "Agendado", confirmado: "Confirmado", realizado: "Realizado",
@@ -96,7 +99,7 @@ function ModalExcluir({ agendamento, onClose, onDeleted }: ModalProps) {
             </label>
           )}
 
-          {erro && <p className="text-sm text-rust">{erro}</p>}
+          <ErrorBanner message={erro} />
 
           <div className="flex gap-3 pt-2">
             <button

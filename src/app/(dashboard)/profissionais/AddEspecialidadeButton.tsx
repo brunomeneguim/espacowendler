@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Plus, Loader2 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { adicionarEspecialidade } from "./actions";
 
 interface Props {
@@ -62,7 +63,7 @@ export function AddEspecialidadeButton({ onAdded }: Props) {
                   onChange={e => setNome(e.target.value)}
                   autoFocus
                 />
-                {erro && <p className="text-sm text-rust">{erro}</p>}
+                <ErrorBanner message={erro} />
                 <div className="flex gap-3 pt-1">
                   <button
                     type="submit"

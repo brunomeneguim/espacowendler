@@ -9,8 +9,9 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Plus, Check, UserX, XCircle,
   LayoutGrid, AlignLeft, Pencil, CalendarDays, Clock,
   DoorOpen, X, Save, Loader2, Monitor, Trash2, RotateCcw, List, Search, Cake, Stethoscope, Users, AlertTriangle,
-  FileText, DollarSign, CheckCircle2, PhoneCall, CalendarPlus, User,
+  FileText, DollarSign, CheckCircle2, PhoneCall, CalendarPlus, User, MessageSquare,
 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 const Users2Icon = Users;
 
@@ -48,14 +49,15 @@ interface Agendamento {
   pago?: boolean;
   forma_pagamento?: string | null;
   valor_sessao?: number | null;
-  paciente: { id: string; nome_completo: string; telefone?: string } | null;
+  quantidade_sessoes?: number | null;
+  paciente: { id: string; nome_completo: string; telefone?: string; valor_consulta_especial?: number | null; valor_plano_especial?: number | null } | null;
   profissional: { id: string; cor?: string | null; profile: { nome_completo: string } | null } | null;
   sala: { id: number; nome: string } | null;
 }
 interface Profissional { id: string; profile_id?: string | null; cor?: string | null; valor_consulta?: number | null; tempo_atendimento?: number | null; profile: { nome_completo: string } | null }
 interface Paciente     { id: string; nome_completo: string; telefone?: string }
 interface HorarioDisponivel { profissional_id: string; dia_semana: number; hora_inicio: string; hora_fim: string }
-interface Sala         { id: number; nome: string }
+interface Sala         { id: number; nome: string; ordem?: number }
 interface Aniversariante {
   id: string;
   nome_completo: string;
@@ -276,7 +278,7 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
         </div>
 
         <form id="edit-modal-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          {erro && <div className="p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">{erro}</div>}
+          <ErrorBanner message={erro} />
 
           <div>
             <label className="label">Tipo de Agendamento</label>
@@ -360,6 +362,39 @@ function EditModal({ ag, profissionais, pacientes, salas, onClose, onSaved }: Ed
             <label className="label">Observações <span className="text-forest-400">(opcional)</span></label>
             <textarea name="observacoes" rows={3} className="input-field resize-none" defaultValue={ag.observacoes ?? ""} />
           </div>
+
+          {/* Valor da sessão — informativo com fallback para preço do paciente/profissional */}
+          {ag.tipo_agendamento !== "ausencia" && (() => {
+            // Cadeia de prioridade: valor gravado → preço especial do paciente → preço padrão do profissional
+            const profModal = profissionais.find(p => p.id === ag.profissional?.id);
+            const valorFallback = ag.tipo_agendamento === "plano_mensal"
+              ? (ag.paciente?.valor_plano_especial ?? null)
+              : (ag.paciente?.valor_consulta_especial ?? profModal?.valor_consulta ?? null);
+            const valorExibido = ag.valor_sessao ?? valorFallback;
+            const isFallback   = ag.valor_sessao == null && valorFallback != null;
+            return (
+              <div className="rounded-xl border border-sand/40 px-4 py-3 bg-cream/40 flex items-center gap-3">
+                <DollarSign className="w-4 h-4 text-forest-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-forest-500 leading-tight">
+                    Valor da sessão{isFallback && <span className="ml-1 text-amber-600">(padrão)</span>}
+                  </p>
+                  <p className="text-sm font-semibold text-forest leading-tight">
+                    {valorExibido != null
+                      ? Number(valorExibido).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                      : "Não definido"}
+                  </p>
+                </div>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                  ag.pago
+                    ? "bg-green-100 text-green-700"
+                    : "bg-amber-100 text-amber-700"
+                }`}>
+                  {ag.pago ? "Pago" : "Pendente"}
+                </span>
+              </div>
+            );
+          })()}
         </form>
 
         <div className="px-6 py-4 border-t border-sand/30 bg-cream/40 flex gap-3">
@@ -390,7 +425,7 @@ interface CardProps {
   onEdit: () => void;
   onDelete: () => void;
   onStatus: (s: Status) => void;
-  onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string) => void;
+  onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string, qtd?: number) => void;
   onUndoPayment?: (id: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   onMoveStart?: (agId: string, startMouseY: number, originalTopPx: number, durationMin: number, el: HTMLDivElement) => void;
@@ -418,53 +453,155 @@ const FORMAS_PAGAMENTO = [
 function PaymentForm({
   agId,
   defaultValor,
+  valorUnitario,
   onConfirm,
 }: {
   agId: string;
   defaultValor?: number | null;
-  onConfirm: (forma: string, valor: number | null, outrosDesc?: string) => void;
+  valorUnitario?: number | null;
+  onConfirm: (forma: string, valor: number | null, outrosDesc?: string, qtd?: number) => void;
 }) {
   const [forma, setForma] = useState("pix");
-  const [centavos, setCentavos] = useState(() =>
-    defaultValor != null ? Math.round(defaultValor * 100) : 0
-  );
   const [outrosDesc, setOutrosDesc] = useState("");
 
-  // Sync centavos when defaultValor changes (e.g. when card re-opens)
-  useEffect(() => {
-    setCentavos(defaultValor != null ? Math.round(defaultValor * 100) : 0);
-  }, [defaultValor]);
+  // Valor unitário de referência (precisa ser declarado antes dos estados que dependem dele)
+  const unitCentavos = valorUnitario != null && valorUnitario > 0
+    ? Math.round(valorUnitario * 100)
+    : 0;
 
+  // Estado separado para reais e centavos — entrada natural da esquerda para direita
+  const [intStr, setIntStr] = useState<string>(() => {
+    const c = defaultValor != null ? Math.round(defaultValor * 100) : 0;
+    return String(Math.floor(c / 100));
+  });
+  const [decStr, setDecStr] = useState<string>(() => {
+    const c = defaultValor != null ? Math.round(defaultValor * 100) : 0;
+    return String(c % 100).padStart(2, "0");
+  });
+  const [hasDecimal, setHasDecimal] = useState(false);
+
+  // Quantidade como estado — não re-derivada do valor digitado pelo usuário
+  const [quantidade, setQuantidade] = useState<number>(() =>
+    unitCentavos > 0 && defaultValor != null
+      ? Math.max(1, Math.round(Math.round(defaultValor * 100) / unitCentavos))
+      : 1
+  );
+
+  // Sincroniza quando defaultValor muda (ex.: card reabre com outro agendamento)
+  useEffect(() => {
+    const c = defaultValor != null ? Math.round(defaultValor * 100) : 0;
+    setIntStr(String(Math.floor(c / 100)));
+    setDecStr(String(c % 100).padStart(2, "0"));
+    setHasDecimal(false);
+    setQuantidade(unitCentavos > 0 && c > 0
+      ? Math.max(1, Math.round(c / unitCentavos))
+      : 1
+    );
+  }, [defaultValor, unitCentavos]);
+
+  // Valor exibido no input (com separador de milhar)
+  const displayValor = hasDecimal
+    ? `${(parseInt(intStr || "0") || 0).toLocaleString("pt-BR")},${decStr}`
+    : `${(parseInt(intStr || "0") || 0).toLocaleString("pt-BR")},${decStr.padEnd(2, "0").slice(0, 2)}`;
+
+  // Centavos total derivado (para cálculos internos)
+  const centavos = (parseInt(intStr || "0") || 0) * 100
+    + (parseInt(decStr.padEnd(2, "0").slice(0, 2)) || 0);
   const valorNum = centavos > 0 ? centavos / 100 : null;
 
   function handleValorKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const inp = e.currentTarget;
+    const allSelected = inp.selectionStart === 0 && inp.selectionEnd === inp.value.length;
+
     if (e.key >= "0" && e.key <= "9") {
       e.preventDefault();
-      setCentavos(prev => Math.min(prev * 10 + parseInt(e.key), 9999999));
+      if (allSelected) {
+        // Selecionou tudo: reinicia com este dígito nos reais
+        setIntStr(e.key === "0" ? "0" : e.key);
+        setDecStr("00");
+        setHasDecimal(false);
+      } else if (!hasDecimal) {
+        // Modo reais: constrói da esquerda para direita (máx 7 dígitos)
+        setIntStr(prev => {
+          const next = prev === "0" ? e.key : prev + e.key;
+          return next.length <= 7 ? next : prev;
+        });
+      } else {
+        // Modo centavos: máximo 2 dígitos
+        setDecStr(prev => (prev.length < 2 ? prev + e.key : prev));
+      }
+    } else if (e.key === "," || e.key === ".") {
+      e.preventDefault();
+      if (!hasDecimal) {
+        setHasDecimal(true);
+        setDecStr("");
+      }
     } else if (e.key === "Backspace") {
       e.preventDefault();
-      setCentavos(prev => Math.floor(prev / 10));
+      if (allSelected) {
+        setIntStr("0"); setDecStr("00"); setHasDecimal(false);
+      } else if (hasDecimal && decStr.length > 0) {
+        setDecStr(prev => prev.slice(0, -1));
+      } else if (hasDecimal) {
+        setHasDecimal(false);
+        setDecStr("00");
+      } else {
+        setIntStr(prev => (prev.length > 1 ? prev.slice(0, -1) : "0"));
+      }
     } else if (e.key === "Delete") {
       e.preventDefault();
-      setCentavos(0);
+      setIntStr("0"); setDecStr("00"); setHasDecimal(false);
     }
+  }
+
+  // Quando o usuário digita a quantidade, recalcula com o valor atual do campo
+  function handleQtdChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const newQtd = Math.max(1, parseInt(e.target.value) || 1);
+    // Por sessão = valor atual ÷ quantidade atual (não usa valorUnitario original)
+    const perSession = quantidade > 0 && centavos > 0
+      ? Math.round(centavos / quantidade)
+      : unitCentavos;
+    if (perSession > 0) {
+      const total = newQtd * perSession;
+      setIntStr(String(Math.floor(total / 100)));
+      setDecStr(String(total % 100).padStart(2, "0"));
+      setHasDecimal(false);
+    }
+    setQuantidade(newQtd);
   }
 
   return (
     <div className="px-2.5 py-2 space-y-2" onClick={e => e.stopPropagation()}>
       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Registrar pagamento</p>
 
-      {/* Valor da sessão */}
+      {/* Valor + Quantidade lado a lado */}
       <div className="flex items-center gap-1.5">
-        <span className="text-xs text-gray-400 shrink-0">R$</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={formatCentavos(centavos)}
-          onChange={() => {}}
-          onKeyDown={handleValorKeyDown}
-          className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-forest/30 text-right tabular-nums"
-        />
+        {/* Valor — compacto */}
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+          <span className="text-xs text-gray-400 shrink-0">R$</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={displayValor}
+            onChange={() => {}}
+            onFocus={e => e.target.select()}
+            onKeyDown={handleValorKeyDown}
+            className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-forest/30 text-right tabular-nums"
+          />
+        </div>
+
+        {/* Quantidade de sessões */}
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[10px] text-gray-400 whitespace-nowrap">Sessões</span>
+          <input
+            type="number"
+            min={1}
+            max={99}
+            value={quantidade}
+            onChange={handleQtdChange}
+            className="w-14 text-xs border border-gray-200 rounded-lg px-1.5 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-forest/30 text-center tabular-nums"
+          />
+        </div>
       </div>
 
       {/* Método de pagamento */}
@@ -498,7 +635,7 @@ function PaymentForm({
 
       <button
         type="button"
-        onClick={() => onConfirm(forma, valorNum, forma === "outros" ? outrosDesc.trim() || undefined : undefined)}
+        onClick={() => onConfirm(forma, valorNum, forma === "outros" ? outrosDesc.trim() || undefined : undefined, quantidade)}
         className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
       >
         <Check className="w-3 h-3" /> Confirmar pagamento
@@ -596,6 +733,11 @@ function FaltaJustificadaModal({
 function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onEdit, onDelete, onStatus, onPayment, onUndoPayment, onResizeStart, onMoveStart, pending, canEdit, canMove, expanded, onExpand, privacyMode }: CardProps) {
   const cfg = STATUS[ag.status] ?? STATUS.agendado;
   const ativo = ag.status === "agendado" || ag.status === "confirmado";
+
+  // Valor unitário efetivo: preço especial do paciente → preço padrão do profissional
+  const valorUnitarioEfetivo: number | null = ag.tipo_agendamento === "plano_mensal"
+    ? (ag.paciente?.valor_plano_especial ?? profValorConsulta ?? null)
+    : (ag.paciente?.valor_consulta_especial ?? profValorConsulta ?? null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [popupPos, setPopupPos] = useState<React.CSSProperties>({});
 
@@ -657,31 +799,47 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
         onMoveStart(ag.id, e.clientY, topPx, durationMin, cardRef.current);
       }}
     >
-      {/* ✓ Check — confirmado e finalizado */}
-      {(ag.status === "confirmado" || ag.status === "finalizado") && (
-        <div className="absolute top-0.5 right-1 z-10 pointer-events-none">
-          <Check
-            className="w-3 h-3"
-            style={{ color: (ag.status === "finalizado" || isColorDark(bgColor)) ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.75)" }}
-            strokeWidth={3}
-          />
-        </div>
-      )}
-      {/* $ Pagamento — canto inferior direito */}
+      {/* Ícones canto superior direito: check (confirmado/finalizado) + observação */}
+      <div className="absolute top-0.5 right-0.5 z-10 flex items-center gap-0.5">
+        {ag.observacoes && (
+          <span
+            title={ag.observacoes}
+            className="cursor-help"
+            style={{ color: (ag.status === "finalizado" || isColorDark(bgColor)) ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.60)" }}
+          >
+            <MessageSquare className="w-3 h-3" strokeWidth={2.5} />
+          </span>
+        )}
+        {(ag.status === "confirmado" || ag.status === "finalizado") && (
+          <span className="pointer-events-none">
+            <Check
+              className="w-3 h-3"
+              style={{ color: (ag.status === "finalizado" || isColorDark(bgColor)) ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,0.75)" }}
+              strokeWidth={3}
+            />
+          </span>
+        )}
+      </div>
+      {/* Ícones canto inferior direito: ⚠ inadimplente + $ pagamento */}
       {ag.status !== "ausencia" && ag.status !== "cancelado" && (
-        <div className="absolute bottom-1 right-1 z-10 pointer-events-none">
+        <div className="absolute bottom-1 right-1 z-10 pointer-events-none flex items-center gap-0.5">
+          {ag.status === "finalizado" && !ag.pago && (
+            <span title="Inadimplente — pagamento pendente">
+              <AlertTriangle className="w-3 h-3 text-amber-400 drop-shadow" strokeWidth={2.5} />
+            </span>
+          )}
           <span
             title={ag.pago ? `Pago${ag.forma_pagamento ? ` · ${FORMA_LABELS[ag.forma_pagamento] ?? ag.forma_pagamento}` : ""}` : "Pagamento pendente"}
-            className="w-4 h-4 rounded-full flex items-center justify-center"
+            className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
             style={{ backgroundColor: ag.pago ? "rgba(34,197,94,0.85)" : "rgba(239,68,68,0.80)", boxShadow: "0 0 0 1.5px rgba(0,0,0,0.35)" }}
           >
             <DollarSign className="w-2.5 h-2.5 text-white" />
           </span>
         </div>
       )}
-      <div className="px-1.5 pt-0.5 pb-4 leading-tight flex flex-col gap-px">
+      <div className="px-1.5 pt-0.5 pb-5 leading-tight flex flex-col gap-px">
         {/* Linha 1: horário + paciente */}
-        <div className="flex items-center gap-0.5 pr-3 min-w-0">
+        <div className="flex items-center gap-0.5 pr-6 min-w-0">
           <User className="w-2.5 h-2.5 shrink-0 opacity-60" style={{ color: textColor }} strokeWidth={2} />
           <p className="text-xs font-semibold truncate" style={{ color: textColor }}>
             {format(new Date(ag.data_hora_inicio), "HH:mm")} {privacyMode ? "● ● ●" : (ag.paciente?.nome_completo ?? "—")}
@@ -689,7 +847,7 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
         </div>
         {/* Linha 2: profissional (oculto no modo privacidade) */}
         {!privacyMode && (
-          <div className="flex items-center gap-0.5 min-w-0">
+          <div className="flex items-center gap-0.5 pr-6 min-w-0">
             <Stethoscope className="w-2.5 h-2.5 shrink-0 opacity-60" style={{ color: textMuted }} strokeWidth={2} />
             <p className="text-[10px] truncate" style={{ color: textMuted }}>
               {ag.profissional?.profile?.nome_completo}
@@ -727,13 +885,9 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
               )}
               {ag.status === "confirmado" && (
                 <button
-                  title={ag.pago ? "Finalizar sessão" : "Registre o pagamento antes de finalizar"}
-                  onClick={() => ag.pago && onStatus("finalizado")}
-                  className={`flex-1 flex items-center justify-center h-8 rounded-lg transition-colors ${
-                    ag.pago
-                      ? "bg-teal-50 text-teal-700 hover:bg-teal-100"
-                      : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  }`}
+                  title="Finalizar sessão"
+                  onClick={() => onStatus("finalizado")}
+                  className="flex-1 flex items-center justify-center h-8 rounded-lg transition-colors bg-teal-50 text-teal-700 hover:bg-teal-100"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                 </button>
@@ -748,8 +902,12 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
                   </button>
                 </>
               )}
-              {(ag.status === "faltou" || ag.status === "cancelado" || ag.status === "confirmado" || ag.status === "ausencia" || ag.status === "finalizado") && (
-                <button title="Desfazer" onClick={() => onStatus("agendado")} className="flex-1 flex items-center justify-center h-8 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+              {(ag.status === "faltou" || ag.status === "cancelado" || ag.status === "confirmado" || ag.status === "ausencia" || ag.status === "finalizado" || ag.status === "realizado") && (
+                <button
+                  title="Desfazer"
+                  onClick={() => onStatus(ag.status === "realizado" ? "confirmado" : "agendado")}
+                  className="flex-1 flex items-center justify-center h-8 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                >
                   <RotateCcw className="w-4 h-4" />
                 </button>
               )}
@@ -798,18 +956,27 @@ function AgendamentoCard({ ag, style, bordaProf, profHex, profValorConsulta, onE
                       <button
                         title="Desfazer pagamento"
                         onClick={e => { e.stopPropagation(); onUndoPayment(ag.id); }}
-                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors shrink-0"
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-forest-400 hover:text-red-500 transition-colors shrink-0"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
                 ) : (
-                  <PaymentForm
-                    agId={ag.id}
-                    defaultValor={ag.valor_sessao ?? profValorConsulta}
-                    onConfirm={(forma, valor, outrosDesc) => onPayment(ag.id, forma, valor, outrosDesc)}
-                  />
+                  <>
+                    {ag.status === "finalizado" && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border-t border-amber-100">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <p className="text-xs text-amber-700 font-medium">Sessão finalizada sem pagamento — inadimplente</p>
+                      </div>
+                    )}
+                    <PaymentForm
+                      agId={ag.id}
+                      defaultValor={ag.valor_sessao ?? valorUnitarioEfetivo}
+                      valorUnitario={valorUnitarioEfetivo}
+                      onConfirm={(forma, valor, outrosDesc, qtd) => onPayment(ag.id, forma, valor, outrosDesc, qtd)}
+                    />
+                  </>
                 )}
               </div>
             )}
@@ -937,7 +1104,7 @@ interface ColunaProps {
   onEdit: (ag: Agendamento) => void;
   onDelete: (id: string) => void;
   onStatus: (id: string, s: Status) => void;
-  onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string) => void;
+  onPayment: (id: string, forma: string, valor: number | null, outrosDesc?: string, qtd?: number) => void;
   onUndoPayment?: (id: string) => void;
   onResizeStart: (agId: string, startY: number, durationMin: number, el: HTMLDivElement) => void;
   onMoveStart?: (agId: string, startMouseY: number, originalTopPx: number, durationMin: number, el: HTMLDivElement, dia: Date) => void;
@@ -961,11 +1128,11 @@ function DiaColuna({ dia, ags, agsOutros, horariosParaDia, mostrarHorarios, prof
   const horas = Array.from({ length: TOTAL_HORAS }, (_, i) => HORA_INICIO + i);
   // Slots com card de meia largura (faltou/cancelado) mas sem card normal por cima
   const slotsMetade = new Set(
-    ags.filter(a => ["cancelado","faltou"].includes(a.status))
+    ags.filter(a => ["cancelado","faltou","ausencia"].includes(a.status))
        .map(a => new Date(a.data_hora_inicio).getHours())
   );
   const slotsOcupados = new Set(
-    ags.filter(a=>!["cancelado","faltou"].includes(a.status))
+    ags.filter(a=>!["cancelado","faltou","ausencia"].includes(a.status))
        .map(a => new Date(a.data_hora_inicio).getHours())
   );
 
@@ -1414,6 +1581,7 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   const [isPending, startTransition] = useTransition();
   const [showAniversariantes, setShowAniversariantes] = useState(false);
   const [showEspelho, setShowEspelho] = useState(false);
+  const [legendasVisiveis, setLegendasVisiveis] = useState(false);
   const { privacyMode } = usePrivacyMode();
 
   // ── Modais de falta ─────────────────────────────────────────────
@@ -1835,8 +2003,6 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
   function handleStatus(id: string, novoStatus: Status) {
     startTransition(async () => {
       await atualizarStatusAgendamento(id, novoStatus);
-      setExpandedId(null);
-      setExpandedListId(null);
       if (novoStatus === "finalizado") {
         router.push("/dashboard");
         return;
@@ -1880,9 +2046,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
     });
   }
 
-  function handlePayment(id: string, forma: string, valor: number | null, outrosDesc?: string) {
+  function handlePayment(id: string, forma: string, valor: number | null, outrosDesc?: string, qtd?: number) {
     startTransition(async () => {
-      await marcarPagamentoAgendamento(id, true, forma, valor, outrosDesc);
+      await marcarPagamentoAgendamento(id, true, forma, valor, outrosDesc, qtd);
       refreshCalendar();
     });
   }
@@ -1976,7 +2142,12 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
 
       {/* Tabs de sala */}
       <div className="flex gap-1 p-1 bg-sand/20 rounded-xl w-fit">
-        {salas.map(s => {
+        {[...salas].sort((a, b) => {
+          const aOnline = a.nome.toLowerCase().includes("online") ? 1 : 0;
+          const bOnline = b.nome.toLowerCase().includes("online") ? 1 : 0;
+          if (aOnline !== bOnline) return aOnline - bOnline;
+          return (a.ordem ?? a.id) - (b.ordem ?? b.id);
+        }).map(s => {
           const isOnline = s.nome.toLowerCase().includes("online");
           return (
             <button
@@ -2199,6 +2370,9 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                           const isExpanded = expandedListId === a.id;
                           const profHex = a.profissional?.cor ? getCorById(a.profissional.cor).hex : "#ffffff";
                           const profValorConsulta = profValorConsultaMap.get(a.profissional?.id ?? "");
+                          const valorUnitarioEfetivoLista: number | null | undefined = a.tipo_agendamento === "plano_mensal"
+                            ? (a.paciente?.valor_plano_especial ?? profValorConsulta ?? null)
+                            : (a.paciente?.valor_consulta_especial ?? profValorConsulta ?? null);
                           return (
                             <li key={a.id} className="border-b border-sand/20 last:border-b-0">
                               {/* Linha principal */}
@@ -2248,34 +2422,34 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                                   {/* Botões de status */}
                                   <div className="flex flex-wrap gap-1.5">
                                     {ativo && a.status === "agendado" && (
-                                      <button title="Confirmar presença" onClick={() => { handleStatus(a.id, "confirmado"); setExpandedListId(null); }}
+                                      <button title="Confirmar presença" onClick={() => handleStatus(a.id, "confirmado")}
                                         className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-xs font-medium transition-colors">
                                         <Check className="w-3.5 h-3.5" /> Confirmar presença
                                       </button>
                                     )}
                                     {a.status === "confirmado" && (
                                       <button
-                                        title={a.pago ? "Finalizar sessão" : "Registre o pagamento antes de finalizar"}
-                                        onClick={() => { if (a.pago) { handleStatus(a.id, "finalizado"); setExpandedListId(null); }}}
-                                        className={`flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium transition-colors ${a.pago ? "bg-teal-50 text-teal-700 hover:bg-teal-100" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+                                        title="Finalizar sessão"
+                                        onClick={() => handleStatus(a.id, "finalizado")}
+                                        className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium transition-colors bg-teal-50 text-teal-700 hover:bg-teal-100"
                                       >
                                         <CheckCircle2 className="w-3.5 h-3.5" /> Finalizar
                                       </button>
                                     )}
                                     {ativo && (
                                       <>
-                                        <button title="Falta Cobrada" onClick={() => { handleStatus(a.id, "faltou"); setExpandedListId(null); }}
+                                        <button title="Falta Cobrada" onClick={() => handleStatus(a.id, "faltou")}
                                           className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-xs font-medium transition-colors">
                                           <UserX className="w-3.5 h-3.5" /> Falta Cobrada
                                         </button>
-                                        <button title="Falta Justificada" onClick={() => { handleStatus(a.id, "cancelado"); setExpandedListId(null); }}
+                                        <button title="Falta Justificada" onClick={() => handleStatus(a.id, "cancelado")}
                                           className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium transition-colors">
                                           <XCircle className="w-3.5 h-3.5" /> Falta Justificada
                                         </button>
                                       </>
                                     )}
-                                    {(a.status === "faltou" || a.status === "cancelado" || a.status === "confirmado" || a.status === "ausencia" || a.status === "finalizado") && (
-                                      <button title="Desfazer" onClick={() => { handleStatus(a.id, "agendado"); setExpandedListId(null); }}
+                                    {(a.status === "faltou" || a.status === "cancelado" || a.status === "confirmado" || a.status === "ausencia" || a.status === "finalizado" || a.status === "realizado") && (
+                                      <button title="Desfazer" onClick={() => handleStatus(a.id, a.status === "realizado" ? "confirmado" : "agendado")}
                                         className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 text-xs font-medium transition-colors">
                                         <RotateCcw className="w-3.5 h-3.5" /> Desfazer
                                       </button>
@@ -2310,18 +2484,27 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
                                           </p>
                                           <button
                                             title="Desfazer pagamento"
-                                            onClick={() => { handleUndoPayment(a.id); setExpandedListId(null); }}
+                                            onClick={() => handleUndoPayment(a.id)}
                                             className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors shrink-0"
                                           >
                                             <RotateCcw className="w-3.5 h-3.5" />
                                           </button>
                                         </div>
                                       ) : (
-                                        <PaymentForm
-                                          agId={a.id}
-                                          defaultValor={a.valor_sessao ?? profValorConsulta}
-                                          onConfirm={(forma, valor, outrosDesc) => { handlePayment(a.id, forma, valor, outrosDesc); setExpandedListId(null); }}
-                                        />
+                                        <>
+                                          {a.status === "finalizado" && (
+                                            <div className="flex items-center gap-2 py-2 mb-1 bg-amber-50 rounded-lg px-3">
+                                              <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                              <p className="text-xs text-amber-700 font-medium">Sessão finalizada sem pagamento — inadimplente</p>
+                                            </div>
+                                          )}
+                                          <PaymentForm
+                                            agId={a.id}
+                                            defaultValor={a.valor_sessao ?? valorUnitarioEfetivoLista}
+                                            valorUnitario={valorUnitarioEfetivoLista}
+                                            onConfirm={(forma, valor, outrosDesc, qtd) => handlePayment(a.id, forma, valor, outrosDesc, qtd)}
+                                          />
+                                        </>
                                       )}
                                     </div>
                                   )}
@@ -2483,27 +2666,59 @@ export function CalendarioSemanal({ agendamentos, profissionais, pacientes, aniv
 
       {/* Legenda */}
       {viewMode !== "lista" && (
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-wrap gap-2">
-            {LEGENDA_ORDEM.map(key => {
-              const cfg = STATUS[key];
-              return (
-                <span key={key} className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border border-gray-200 bg-white text-gray-600">
-                  <span className={`w-2 h-2 rounded-full ${cfg.dot}`} /> {cfg.label}
+        <div className="flex items-center gap-2">
+          {/* Botão toggle */}
+          <button
+            type="button"
+            onClick={() => setLegendasVisiveis(v => !v)}
+            title={legendasVisiveis ? "Ocultar legendas" : "Mostrar legendas"}
+            className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-forest-400 hover:text-forest hover:bg-sand/30 transition-colors"
+          >
+            {legendasVisiveis ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+            )}
+          </button>
+
+          {/* Legendas com animação de reveal esquerda→direita */}
+          <div
+            className="overflow-hidden"
+            style={{
+              maxWidth: legendasVisiveis ? "1200px" : "0px",
+              transition: "max-width 0.4s ease",
+            }}
+          >
+            <div className="flex flex-nowrap items-center gap-2 pr-1">
+              {LEGENDA_ORDEM.map(key => {
+                const cfg = STATUS[key];
+                return (
+                  <span key={key} className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border border-gray-200 bg-white text-gray-600 whitespace-nowrap">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} /> {cfg.label}
+                  </span>
+                );
+              })}
+              {filtroProf !== "todos" && (
+                <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-green-50 border-green-200 text-green-800 whitespace-nowrap">
+                  <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" /> Horário disponível
                 </span>
-              );
-            })}
+              )}
+              {currentProfId && (
+                <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-red-50 border-red-200 text-red-700 whitespace-nowrap">
+                  <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" /> Horário indisponível
+                </span>
+              )}
+              <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-red-50 border-red-200 text-red-700 whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" /> Inadimplente
+              </span>
+              <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-amber-50 border-amber-200 text-amber-700 whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" /> Aguardando pagamento
+              </span>
+              <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-emerald-50 border-emerald-200 text-emerald-700 whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> Pagamento efetuado
+              </span>
+            </div>
           </div>
-          {filtroProf!=="todos"&&(
-            <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-green-50 border-green-200 text-green-800">
-              <span className="w-2 h-2 rounded-full bg-green-400" /> Horário disponível
-            </span>
-          )}
-          {currentProfId&&(
-            <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-red-50 border-red-200 text-red-700">
-              <span className="w-2 h-2 rounded-full bg-red-400" /> Horário Indisponível
-            </span>
-          )}
         </div>
       )}
 

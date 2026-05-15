@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { signUp } from "../actions";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 export default function CadastroPage({
   searchParams,
@@ -39,11 +40,7 @@ export default function CadastroPage({
         Preencha os dados para acessar o sistema.
       </p>
 
-      {searchParams.error && (
-        <div className="mb-5 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          {searchParams.error}
-        </div>
-      )}
+      <ErrorBanner message={searchParams.error} />
       {searchParams.message && (
         <div className="mb-5 p-3 bg-forest/10 border border-forest/20 rounded-xl text-sm text-forest">
           {searchParams.message}
@@ -120,9 +117,7 @@ export default function CadastroPage({
             placeholder="Repita a senha"
             className="input-field"
           />
-          {senhaError && (
-            <p className="mt-1.5 text-sm text-rust">{senhaError}</p>
-          )}
+          <ErrorBanner message={senhaError} />
         </div>
 
         <button type="submit" className="btn-primary w-full mt-6">

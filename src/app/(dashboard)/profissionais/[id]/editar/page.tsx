@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { ArrowLeft, Trash2, Clock, Ban } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { editarProfissional, gerenciarHorario, gerenciarHorarioIndisponivel } from "./actions";
 import { EditarPerfilProfissionalForm } from "./EditarPerfilProfissionalForm";
 
@@ -81,11 +82,7 @@ export default async function EditarProfissionalPage({
         description="Altere os dados do profissional"
       />
 
-      {searchParams.error && (
-        <div className="mb-5 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          {decodeURIComponent(searchParams.error)}
-        </div>
-      )}
+      <ErrorBanner message={searchParams.error ? decodeURIComponent(searchParams.error) : undefined} />
 
       {/* ── Formulário completo ── */}
       <EditarPerfilProfissionalForm

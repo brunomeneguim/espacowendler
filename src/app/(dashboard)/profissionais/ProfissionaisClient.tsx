@@ -12,6 +12,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 import { excluirProfissional, excluirProfissionalConfirmado, toggleAtivoProfissional, alterarCorProfissional, buscarAgendamentosProfissional, deletarAgendamentoProfissional, deletarTodosAgendamentosProfissional } from "./actions";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { PROF_CORES } from "@/lib/profCores";
 
 interface Profissional {
@@ -198,7 +199,7 @@ function ModalExcluir({ prof, onClose }: { prof: Profissional; onClose: () => vo
             </div>
           ) : null}
 
-          {erro && <p className="text-sm text-rust">{erro}</p>}
+          <ErrorBanner message={erro} />
 
           <div className="flex gap-3 pt-2">
             <button
@@ -317,7 +318,7 @@ function ModalConfirmarInativar({ prof, onConfirm, onClose }: { prof: Profission
             </div>
           ) : null}
 
-          {erro && <p className="text-sm text-rust">{erro}</p>}
+          <ErrorBanner message={erro} />
 
           <div className="flex gap-3 pt-2">
             <button

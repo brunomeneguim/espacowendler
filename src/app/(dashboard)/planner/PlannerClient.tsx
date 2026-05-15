@@ -11,6 +11,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Check, Trash2, Pencil, X,
   CalendarRange, MoreHorizontal, Share2, Users, Repeat2,
 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import {
   criarPlanner, renomearPlanner, excluirPlanner,
@@ -214,8 +215,8 @@ function ModalRepetirTarefa({ tarefa, onClose, onConfirm }: {
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
             {/* Preview da tarefa */}
             <div className="bg-forest/5 rounded-xl px-3 py-2">
-              <p className="text-sm font-halimun font-semibold text-forest truncate">{tarefa.titulo}</p>
-              {tarefa.descricao && <p className="text-xs font-halimun text-forest-400 truncate">{tarefa.descricao}</p>}
+              <p className="text-xl font-bakerie font-semibold text-forest truncate">{tarefa.titulo}</p>
+              {tarefa.descricao && <p className="text-xl font-bakerie text-forest-400 truncate">{tarefa.descricao}</p>}
             </div>
 
             {/* Modo */}
@@ -415,7 +416,7 @@ function ModalCompartilhar({
             <div className="flex items-center gap-2">
               <Share2 className="w-4 h-4 text-forest-400" />
               <h2 className="font-display text-lg text-forest">Compartilhar</h2>
-              <span className="text-sm text-forest-400 font-halimun">· {planner.nome}</span>
+              <span className="text-base text-forest-400 font-bakerie">· {planner.nome}</span>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-sand/20 text-forest-400">
               <X className="w-5 h-5" />
@@ -481,7 +482,7 @@ function ModalCompartilhar({
                 Compartilhando com <span className="font-semibold text-forest">{selecionados.size}</span> usuário{selecionados.size !== 1 ? "s" : ""}
               </p>
             )}
-            {erro && <p className="text-xs text-rust text-center">{erro}</p>}
+            <ErrorBanner message={erro} />
             <div className="flex gap-3">
               <button
                 onClick={handleSalvar}
@@ -569,20 +570,28 @@ function TarefaItem({
         )}
 
         {editando ? (
-          <div className="flex flex-col gap-1">
+          <div
+            className="flex flex-col gap-1"
+            onBlur={e => {
+              // Só salva se o foco saiu totalmente do container (não passou para o outro input)
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                handleEditSave();
+              }
+            }}
+          >
             <input ref={tituloRef} value={titulo} onChange={e => setTitulo(e.target.value)}
               onKeyDown={handleKeyDown} placeholder="Título"
               className="w-full text-xs font-semibold text-forest bg-white border border-forest/30 rounded px-1.5 py-0.5 outline-none focus:border-forest/60" />
             <input value={descricao} onChange={e => setDescricao(e.target.value)}
-              onBlur={handleEditSave} onKeyDown={handleKeyDown} placeholder="Descrição (opcional)"
+              onKeyDown={handleKeyDown} placeholder="Descrição (opcional)"
               className="w-full text-xs text-forest bg-white border border-forest/30 rounded px-1.5 py-0.5 outline-none focus:border-forest/60" />
           </div>
         ) : (
           <div onClick={onToggle} onDoubleClick={e => { e.stopPropagation(); setEditando(true); }}
             className={`cursor-pointer select-none ${textoColor} transition-colors`}>
-            <p className="text-sm font-halimun font-semibold leading-tight break-words">{renderWithLinks(tarefa.titulo)}</p>
+            <p className="text-xl font-bakerie font-semibold leading-tight break-words">{renderWithLinks(tarefa.titulo)}</p>
             {tarefa.descricao && (
-              <p className="text-sm font-halimun leading-snug break-words mt-0.5 opacity-80">{renderWithLinks(tarefa.descricao)}</p>
+              <p className="text-xl font-bakerie leading-snug break-words mt-0.5 opacity-80">{renderWithLinks(tarefa.descricao)}</p>
             )}
           </div>
         )}
@@ -819,10 +828,10 @@ function PlannerTab({
           onBlur={handleRename}
           onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setNome(planner.nome); setEditando(false); } }}
           onClick={e => e.stopPropagation()}
-          className="min-w-0 w-32 text-sm font-halimun bg-transparent border-b border-forest/40 outline-none text-forest" autoFocus />
+          className="min-w-0 w-32 text-xl font-bakerie bg-transparent border-b border-forest/40 outline-none text-forest" autoFocus />
       ) : (
         <span
-          className={`text-sm font-halimun whitespace-nowrap transition-colors ${active ? "text-forest font-semibold" : "text-forest-400 hover:text-forest"}`}
+          className={`text-xl font-bakerie whitespace-nowrap transition-colors ${active ? "text-forest font-semibold" : "text-forest-400 hover:text-forest"}`}
           onDoubleClick={e => { if (!isOwner) return; e.stopPropagation(); setEditando(true); }}
         >
           {planner.nome}
@@ -1252,12 +1261,7 @@ export function PlannerClient({ planners: initialPlanners, tarefas: initialTaref
           </div>
         </div>
 
-        {erro && (
-          <div className="mt-3 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust flex items-center gap-2">
-            <span className="flex-1">{erro}</span>
-            <button onClick={() => setErro(null)}><X className="w-4 h-4" /></button>
-          </div>
-        )}
+        <ErrorBanner message={erro} onDismiss={() => setErro(null)} />
       </div>
 
       {/* ── Área principal ─────────────────────────────────────────── */}

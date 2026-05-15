@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Guard de alterações não salvas ─────────────────────────────── */
+dialog.unsaved-guard {
+  border: none;
+  padding: 1.5rem;          /* equivale a p-6 */
+  border-radius: 1rem;      /* equivale a rounded-2xl */
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* shadow-2xl */
+  max-width: min(24rem, calc(100vw - 2rem));
+  width: 100%;
+  background: white;
+  color: inherit;
+  /* Centralização vertical + horizontal (Chrome posiciona no topo por padrão) */
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+}
+dialog.unsaved-guard::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
 @media print {
   @page {
     size: A4;

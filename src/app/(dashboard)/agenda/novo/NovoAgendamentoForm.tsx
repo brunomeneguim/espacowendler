@@ -3,13 +3,15 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { RepeatIcon, Loader2, UserPlus, AlertTriangle, Search, X } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { criarAgendamento, verificarHorarioIndisponivel } from "../actions";
 import { removerEncaixe } from "../../dashboard/listaEncaixeActions";
 import { broadcastAgendaChanged } from "@/lib/broadcastAgendaClient";
 
-interface Prof  { id: string; nome: string; especialidade?: string }
-interface Pac   { id: string; nome_completo: string; telefone?: string }
+interface Prof  { id: string; nome: string; especialidade?: string; valor_consulta?: number | null; valor_plano?: number | null; tempo_atendimento?: number | null }
+interface Pac   { id: string; nome_completo: string; telefone?: string; valor_consulta_especial?: number | null; valor_plano_especial?: number | null; sessoes_plano_especial?: number | null }
 interface Sala  { id: number; nome: string }
 
 interface Props {
@@ -36,6 +38,7 @@ function SearchableSelect({
   defaultId,
   defaultLabel,
   readOnly,
+  onSelect,
 }: {
   name: string;
   items: SearchItem[];
@@ -43,6 +46,7 @@ function SearchableSelect({
   defaultId?: string;
   defaultLabel?: string;
   readOnly?: boolean;
+  onSelect?: (id: string) => void;
 }) {
   // Se não há defaultId mas há defaultLabel, tenta encontrar o item pelo nome
   const defaultItem = items.find(i =>
@@ -79,6 +83,7 @@ function SearchableSelect({
     setSelectedLabel("");
     setQuery("");
     setOpen(false);
+    onSelect?.("");
   }
 
   // Modo somente-leitura (campos pré-preenchidos do reagendar)
@@ -145,6 +150,7 @@ function SearchableSelect({
                   setSelectedLabel(item.label);
                   setQuery("");
                   setOpen(false);
+                  onSelect?.(item.id);
                 }}
               >
                 <p className="text-sm font-medium text-forest">{item.label}</p>
@@ -162,6 +168,8 @@ function SearchableSelect({
 export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHora, defaultSalaId, defaultPacienteId, defaultPacienteNome, defaultProfissionalId, encaixeId, error }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
+  const { markDirty, resetDirty, guardedNavigate, UnsavedDialog } = useUnsavedChanges(formRef);
   const [tipoAg, setTipoAg] = useState<"consulta_avulsa" | "plano_mensal" | "ausencia">("consulta_avulsa");
   const [repetir, setRepetir] = useState(false);
   const [recorrencia, setRecorrencia] = useState<"semanal" | "quinzenal" | "mensal">("semanal");
@@ -174,6 +182,40 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
   const [avisoPendente, setAvisoPendente] = useState(false);
   const fdRef = useRef<FormData | null>(null);
   useEffect(() => { setTzOffset(new Date().getTimezoneOffset()); }, []);
+
+  // Profissional e paciente selecionados (para calcular valor/quantidade/duração)
+  const [profSelecionadoId, setProfSelecionadoId] = useState(defaultProfissionalId ?? "");
+  const [pacSelecionadoId, setPacSelecionadoId] = useState(defaultPacienteId ?? "");
+  const [duracao, setDuracao] = useState<number>(60);
+
+  const profAtual = profs.find(p => p.id === profSelecionadoId);
+  const pacAtual  = pacs.find(p => p.id === pacSelecionadoId);
+
+  // Valor unitário: prioridade → valor especial do paciente → valor padrão do profissional
+  const valorUnitario: number | null = tipoAg === "plano_mensal"
+    ? (pacAtual?.valor_plano_especial ?? profAtual?.valor_plano ?? null)
+    : (pacAtual?.valor_consulta_especial ?? profAtual?.valor_consulta ?? null);
+
+  const quantidadeDefault = tipoAg === "plano_mensal"
+    ? (pacAtual?.sessoes_plano_especial ?? 4)
+    : 1;
+
+  const [qtdSessoes, setQtdSessoes] = useState(quantidadeDefault);
+  const valorTotal = valorUnitario != null ? valorUnitario * qtdSessoes : null;
+
+  // Recalcula qtd quando muda o tipo de agendamento
+  useEffect(() => {
+    setQtdSessoes(tipoAg === "plano_mensal" ? (pacAtual?.sessoes_plano_especial ?? 4) : 1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipoAg, profSelecionadoId, pacSelecionadoId]);
+
+  // Auto-preenche a duração com o tempo_atendimento do profissional selecionado
+  useEffect(() => {
+    if (profAtual?.tempo_atendimento) {
+      setDuracao(profAtual.tempo_atendimento);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profSelecionadoId]);
 
   // Dados formatados para o SearchableSelect
   const profsItems: SearchItem[] = profs.map(p => ({
@@ -224,6 +266,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
       if (encaixeId) await removerEncaixe(encaixeId);
       await broadcastAgendaChanged();
+      resetDirty();
       router.push("/dashboard");
     });
   }
@@ -239,6 +282,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       if (res.ignoradas > 0) { setIgnoradasAviso(res.ignoradas); setDatasIgnoradas(res.datasIgnoradas); return; }
       if (encaixeId) await removerEncaixe(encaixeId);
       await broadcastAgendaChanged();
+      resetDirty();
       router.push("/dashboard");
     });
   }
@@ -277,7 +321,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
                 )}
               </div>
             </div>
-            <button type="button" onClick={() => { setIgnoradasAviso(0); setDatasIgnoradas([]); router.push("/dashboard"); }}
+            <button type="button" onClick={() => { setIgnoradasAviso(0); setDatasIgnoradas([]); resetDirty(); router.push("/dashboard"); }}
               className="btn-primary w-full">
               Entendido
             </button>
@@ -319,13 +363,9 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
       </>
     )}
 
-    <form onSubmit={handleSubmit} className="card space-y-5">
+    <form ref={formRef} onSubmit={handleSubmit} onChange={markDirty} className="card space-y-5">
       <input type="hidden" name="tz_offset" value={tzOffset} />
-      {submitError && (
-        <div className="p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          {decodeURIComponent(submitError)}
-        </div>
-      )}
+      <ErrorBanner message={submitError ? decodeURIComponent(submitError) : null} />
 
       {/* Tipo de Agendamento */}
       <div>
@@ -349,6 +389,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
             placeholder="Digite o nome do profissional…"
             defaultId={defaultProfissionalId}
             readOnly={!!encaixeId}
+            onSelect={id => setProfSelecionadoId(id)}
           />
         )}
       </div>
@@ -372,6 +413,7 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
                   defaultId={defaultPacienteId}
                   defaultLabel={defaultPacienteNome}
                   readOnly={!!encaixeId}
+                  onSelect={id => setPacSelecionadoId(id)}
                 />
               </div>
               {!encaixeId && (
@@ -385,6 +427,56 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Valor da consulta + Quantidade de sessões */}
+      {tipoAg !== "ausencia" && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="label">
+              Valor da consulta
+              {pacAtual?.valor_consulta_especial != null && (
+                <span className="ml-2 text-[10px] font-normal text-forest bg-forest/10 px-1.5 py-0.5 rounded-full">
+                  Personalizado
+                </span>
+              )}
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-forest-400 font-medium">R$</span>
+              <input
+                name="valor_sessao"
+                type="text"
+                inputMode="decimal"
+                className="input-field pl-9"
+                placeholder="—"
+                value={valorTotal != null
+                  ? valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : ""}
+                readOnly
+              />
+            </div>
+            <p className="text-xs text-forest-400 mt-1">
+              {valorUnitario != null
+                ? `R$ ${valorUnitario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} por sessão`
+                : "Profissional sem valor cadastrado"}
+            </p>
+          </div>
+          <div>
+            <label className="label">Quantidade de sessões</label>
+            <input
+              name="quantidade_sessoes"
+              type="number"
+              min={1}
+              max={99}
+              value={qtdSessoes}
+              onChange={e => setQtdSessoes(Math.max(1, parseInt(e.target.value) || 1))}
+              className="input-field"
+            />
+            <p className="text-xs text-forest-400 mt-1">
+              {tipoAg === "plano_mensal" ? "Sessões inclusas no plano mensal" : "Geralmente 1 para consulta avulsa"}
+            </p>
+          </div>
         </div>
       )}
 
@@ -409,7 +501,16 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
         </div>
         <div>
           <label htmlFor="duracao" className="label">Duração (min)</label>
-          <input id="duracao" name="duracao" type="number" min="15" step="5" defaultValue="60" className="input-field" />
+          <input
+            id="duracao"
+            name="duracao"
+            type="number"
+            min="15"
+            step="5"
+            value={duracao}
+            onChange={e => setDuracao(Math.max(15, parseInt(e.target.value) || 60))}
+            className="input-field"
+          />
         </div>
       </div>
 
@@ -514,9 +615,10 @@ export function NovoAgendamentoForm({ profs, pacs, salas, defaultData, defaultHo
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           {isPending ? "Agendando…" : tipoAg === "ausencia" ? "Registrar ausência" : repetir ? "Agendar sessões" : "Agendar sessão"}
         </button>
-        <Link href="/dashboard" className="btn-secondary flex-1">Cancelar</Link>
+        <button type="button" onClick={() => guardedNavigate("/dashboard")} className="btn-secondary flex-1">Cancelar</button>
       </div>
     </form>
+    {UnsavedDialog}
     </>
   );
 }

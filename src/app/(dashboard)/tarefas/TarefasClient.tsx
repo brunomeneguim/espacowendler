@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toaster";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -9,6 +10,7 @@ import {
   Flag, StickyNote, CheckSquare, ChevronDown, ChevronUp,
   Pencil, RepeatIcon, Save, Cake, Gift,
 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { criarTarefa, atualizarTarefa, alternarTarefa, excluirTarefa, criarPostit, atualizarPostit, excluirPostit, concluirLembreteAniversario } from "./actions";
 
 // ── Tipos ─────────────────────────────────────────────────────────
@@ -114,7 +116,7 @@ function ModalTarefa({
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-sand/20 text-forest-400"><X className="w-5 h-5" /></button>
           </div>
           <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-            {erro && <div className="p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">{erro}</div>}
+            <ErrorBanner message={erro} />
             <div>
               <label className="label">Título <span className="text-rust">*</span></label>
               <input name="titulo" type="text" required className="input-field" placeholder="Descreva a tarefa…"
@@ -181,17 +183,18 @@ function ModalPostit({
 }) {
   const [isPending, startTransition] = useTransition();
   const [cor, setCor] = useState(postit?.cor ?? "yellow");
+  const [erro, setErro] = useState<string | null>(null);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     fd.set("cor", cor);
+    setErro(null);
     startTransition(async () => {
-      if (postit) {
-        await atualizarPostit(postit.id, fd);
-      } else {
-        await criarPostit(fd);
-      }
+      const res = postit
+        ? await atualizarPostit(postit.id, fd)
+        : await criarPostit(fd);
+      if (res.error) { setErro(res.error); return; }
       onSaved();
       onClose();
     });
@@ -207,6 +210,7 @@ function ModalPostit({
             <button onClick={onClose} className="p-1 rounded hover:bg-black/10 text-gray-500"><X className="w-4 h-4" /></button>
           </div>
           <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3">
+            <ErrorBanner message={erro} />
             <textarea name="conteudo" rows={4} required autoFocus
               className="w-full bg-transparent text-gray-800 placeholder-gray-400 resize-none outline-none text-sm"
               placeholder="Escreva um lembrete…"
@@ -355,6 +359,7 @@ interface Props {
 
 export function TarefasClient({ tarefas, postits, profiles, currentUserId, currentRole, lembretes }: Props) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pendingAnivId, setPendingAnivId] = useState<number | null>(null);
@@ -369,8 +374,9 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
   async function handleToggle(id: string, concluida: boolean) {
     setPendingId(id);
     startTransition(async () => {
-      await alternarTarefa(id, concluida);
+      const res = await alternarTarefa(id, concluida);
       setPendingId(null);
+      if (res.error) { showToast(res.error); return; }
       refresh();
     });
   }
@@ -378,8 +384,9 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
   async function handleDeleteTarefa(id: string) {
     setPendingId(id);
     startTransition(async () => {
-      await excluirTarefa(id);
+      const res = await excluirTarefa(id);
       setPendingId(null);
+      if (res.error) { showToast(res.error); return; }
       refresh();
     });
   }
@@ -387,8 +394,9 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
   async function handleDeletePostit(id: string) {
     setPendingId(id);
     startTransition(async () => {
-      await excluirPostit(id);
+      const res = await excluirPostit(id);
       setPendingId(null);
+      if (res.error) { showToast(res.error); return; }
       refresh();
     });
   }
@@ -396,8 +404,9 @@ export function TarefasClient({ tarefas, postits, profiles, currentUserId, curre
   async function handleToggleAniversario(id: number, concluida: boolean) {
     setPendingAnivId(id);
     startTransition(async () => {
-      await concluirLembreteAniversario(id, concluida);
+      const res = await concluirLembreteAniversario(id, concluida);
       setPendingAnivId(null);
+      if (res.error) { showToast(res.error); return; }
       refresh();
     });
   }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signIn } from "../actions";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 export default function LoginPage({
   searchParams,
@@ -22,11 +23,7 @@ export default function LoginPage({
         Acesse sua conta para ver sua agenda.
       </p>
 
-      {searchParams.error && (
-        <div className="mb-5 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          {searchParams.error}
-        </div>
-      )}
+      <ErrorBanner message={searchParams.error} />
 
       <form action={signIn} className="space-y-4">
         <div>

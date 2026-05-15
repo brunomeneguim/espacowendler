@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Upload, X, Loader2, User, Lock, FileText, Stethoscope, Clock, Ban,
-  AlertCircle, ChevronDown, Check, Trash2,
+  ChevronDown, Check, Trash2,
 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { completarPerfilProfissional } from "../actions";
 import { PROF_CORES } from "@/lib/profCores";
 import { EspecialidadesMultiSelect } from "../EspecialidadesMultiSelect";
@@ -101,9 +102,7 @@ function MoneyInput({ name, defaultValue, placeholder }: { name: string; default
 
 // ── Masks ──────────────────────────────────────────────────────────
 function maskPhone(v: string) {
-  const raw = v.replace(/[^\d+]/g, "");
-  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D/g, "");
-  const d = raw.replace(/\D/g, "").substring(0, 11);
+  const d = v.replace(/\D/g, "").substring(0, 11);
   if (d.length === 0) return "";
   if (d.length <= 2) return `(${d}`;
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -277,11 +276,7 @@ export function CompletarPerfilForm({
 
   return (
     <div className="space-y-5">
-      {erro && (
-        <div className="flex items-start gap-2 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {erro}
-        </div>
-      )}
+      <ErrorBanner message={erro} />
 
       <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -568,11 +563,7 @@ export function CompletarPerfilForm({
                 <input name="confirmar_senha" type="password" className="input-field" placeholder="Repita a senha" />
               </div>
             </div>
-            {senhaErro && (
-              <p className="text-sm text-rust flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 shrink-0" /> {senhaErro}
-              </p>
-            )}
+            <ErrorBanner message={senhaErro} />
           </div>
         </Section>
 

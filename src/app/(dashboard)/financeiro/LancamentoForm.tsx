@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { Loader2 } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { criarLancamento, editarLancamento } from "./actions";
 
 interface Paciente { id: string; nome_completo: string }
@@ -33,28 +35,46 @@ interface Props {
 }
 
 function MoneyInput({ defaultValue }: { defaultValue?: number | null }) {
-  const toDisplay = (v: number | null | undefined) => {
-    if (!v && v !== 0) return "";
-    return v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-  const [display, setDisplay] = useState(toDisplay(defaultValue));
-  const [raw, setRaw] = useState(defaultValue ? String(defaultValue) : "");
+  const toFormatted = (v: number) =>
+    v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const digits = e.target.value.replace(/\D/g, "");
-    if (!digits) { setDisplay(""); setRaw(""); return; }
-    const num = parseInt(digits, 10) / 100;
-    setRaw(num.toFixed(2));
-    setDisplay(num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  const [display, setDisplay] = useState(
+    defaultValue != null ? toFormatted(defaultValue) : ""
+  );
+  const [hidden, setHidden] = useState(
+    defaultValue != null ? defaultValue.toFixed(2) : ""
+  );
+
+  function handleBlur() {
+    if (!display.trim()) { setHidden(""); return; }
+    // Remove separador de milhar (ponto) e troca vírgula decimal por ponto
+    const normalized = display.replace(/\./g, "").replace(",", ".");
+    const parsed = parseFloat(normalized);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setHidden(parsed.toFixed(2));
+      setDisplay(toFormatted(parsed));
+    } else {
+      setHidden("");
+      setDisplay("");
+    }
   }
 
   return (
     <>
-      <input type="hidden" name="valor" value={raw} />
+      <input type="hidden" name="valor" value={hidden} />
       <div className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-forest-400 font-medium">R$</span>
-        <input type="text" inputMode="numeric" className="input-field pl-9" placeholder="0,00"
-          value={display} onChange={handleChange} required />
+        <input
+          type="text"
+          inputMode="decimal"
+          className="input-field pl-9"
+          placeholder="0,00"
+          value={display}
+          onChange={e => setDisplay(e.target.value)}
+          onFocus={e => e.target.select()}
+          onBlur={handleBlur}
+          required
+        />
       </div>
     </>
   );
@@ -67,6 +87,8 @@ export function LancamentoForm({ pacientes, profissionais, lancamento = {}, prof
   const [tipo, setTipo] = useState(lancamento.tipo ?? "receita");
   const [status, setStatus] = useState(lancamento.status ?? "pendente");
   const today = new Date().toISOString().split("T")[0];
+  const formRef = useRef<HTMLFormElement>(null);
+  const { markDirty, resetDirty, guardedNavigate, UnsavedDialog } = useUnsavedChanges(formRef);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -77,17 +99,15 @@ export function LancamentoForm({ pacientes, profissionais, lancamento = {}, prof
         ? await editarLancamento(lancamento.id, fd)
         : await criarLancamento(fd);
       if (res.error) { setErro(res.error); return; }
+      resetDirty();
       router.push("/financeiro");
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card space-y-5 max-w-2xl">
-      {erro && (
-        <div className="flex items-start gap-2 p-3 bg-rust/10 border border-rust/20 rounded-xl text-sm text-rust">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {erro}
-        </div>
-      )}
+    <>
+    <form ref={formRef} onSubmit={handleSubmit} onChange={markDirty} className="card space-y-5 max-w-2xl">
+      <ErrorBanner message={erro} />
 
       {/* Tipo */}
       <div>
@@ -214,8 +234,10 @@ export function LancamentoForm({ pacientes, profissionais, lancamento = {}, prof
           className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50">
           {isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</> : lancamento.id ? "Salvar alterações" : "Criar lançamento"}
         </button>
-        <Link href="/financeiro" className="btn-secondary flex-1">Cancelar</Link>
+        <button type="button" onClick={() => guardedNavigate("/financeiro")} className="btn-secondary flex-1">Cancelar</button>
       </div>
     </form>
+    {UnsavedDialog}
+    </>
   );
 }

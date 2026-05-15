@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TrendingUp, TrendingDown, DollarSign, Calendar, Trash2, Loader2, Pencil, Check, X, RotateCcw, DoorOpen } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Calendar, Trash2, Loader2, Pencil, Check, X, RotateCcw, DoorOpen, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { excluirLancamentoProfissional, editarLancamentoProfissional, desfazerPagamentoSessaoFinanceiro } from "./actions";
 
 interface Agendamento {
@@ -34,6 +35,7 @@ interface Lancamento {
 interface Totais {
   totalSessoes: number;
   totalReceita: number;
+  totalPendente: number;
   totalAluguel: number;
   totalDespesas: number;
   totalLiquido: number;
@@ -93,6 +95,23 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
     }
   }
 
+  function shiftMonth(delta: number) {
+    const [y, m] = periodo.inicio.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(lastDay.getDate()).padStart(2, "0");
+    router.push(`/financeiro?periodo_inicio=${d.getFullYear()}-${mm}-01&periodo_fim=${d.getFullYear()}-${mm}-${dd}`);
+  }
+
+  function goToCurrentMonth() {
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(lastDay.getDate()).padStart(2, "0");
+    router.push(`/financeiro?periodo_inicio=${now.getFullYear()}-${mm}-01&periodo_fim=${now.getFullYear()}-${mm}-${dd}`);
+  }
+
   function handleExcluir(id: string) {
     setDeletandoId(id);
     setErro(null);
@@ -145,9 +164,9 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
     });
   }
 
-  // Derivar entradas virtuais de aluguel a partir dos agendamentos
+  // Derivar entradas virtuais de aluguel a partir dos agendamentos (somente sessões pagas)
   const aluguelVirtual = agendamentos
-    .filter(ag => ag.aluguel_cobrado && (ag.aluguel_valor ?? 0) > 0)
+    .filter(ag => ag.aluguel_cobrado && ag.pago && (ag.aluguel_valor ?? 0) > 0)
     .map(ag => ({
       agId: ag.id,
       data: ag.data_hora_inicio,
@@ -158,29 +177,47 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
   return (
     <div className="space-y-6">
       {/* Filtro de período — sem botão, auto-filtra ao mudar data */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="label">De</label>
-          <input
-            type="date"
-            defaultValue={periodo.inicio}
-            className="input-field h-9 text-sm"
-            onChange={e => handleDateChange("inicio", e.target.value)}
-          />
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => shiftMonth(-1)}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-sand/40 bg-white text-forest-600 hover:bg-sand/20 text-xs font-medium transition-colors">
+            <ChevronLeft className="w-3.5 h-3.5" /> Anterior
+          </button>
+          <button onClick={goToCurrentMonth}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-sand/40 bg-white text-forest-600 hover:bg-sand/20 text-xs font-medium transition-colors">
+            Mês atual
+          </button>
+          <button onClick={() => shiftMonth(1)}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-sand/40 bg-white text-forest-600 hover:bg-sand/20 text-xs font-medium transition-colors">
+            Próximo <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <div>
-          <label className="label">Até</label>
-          <input
-            type="date"
-            defaultValue={periodo.fim}
-            className="input-field h-9 text-sm"
-            onChange={e => handleDateChange("fim", e.target.value)}
-          />
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="label">De</label>
+            <input
+              type="date"
+              defaultValue={periodo.inicio}
+              key={periodo.inicio}
+              className="input-field h-9 text-sm"
+              onChange={e => handleDateChange("inicio", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Até</label>
+            <input
+              type="date"
+              defaultValue={periodo.fim}
+              key={periodo.fim}
+              className="input-field h-9 text-sm"
+              onChange={e => handleDateChange("fim", e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 rounded-lg bg-forest/10 flex items-center justify-center shrink-0">
@@ -195,18 +232,27 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
             <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
               <TrendingUp className="w-4 h-4 text-green-600" />
             </div>
-            <p className="text-xs text-forest-500">Receita bruta</p>
+            <p className="text-xs text-forest-500">Receita recebida</p>
           </div>
           <p className="text-xl font-display font-medium text-green-600">{fmt(totais.totalReceita)}</p>
         </div>
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-              <TrendingDown className="w-4 h-4 text-amber-600" />
+              <Clock className="w-4 h-4 text-amber-600" />
+            </div>
+            <p className="text-xs text-forest-500">A receber</p>
+          </div>
+          <p className="text-xl font-display font-medium text-amber-600">{fmt(totais.totalPendente)}</p>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
+              <TrendingDown className="w-4 h-4 text-orange-500" />
             </div>
             <p className="text-xs text-forest-500">Aluguel sala</p>
           </div>
-          <p className="text-xl font-display font-medium text-amber-600">− {fmt(totais.totalAluguel)}</p>
+          <p className="text-xl font-display font-medium text-orange-500">− {fmt(totais.totalAluguel)}</p>
         </div>
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -217,7 +263,7 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
           </div>
           <p className="text-xl font-display font-medium text-red-500">− {fmt(totais.totalDespesas)}</p>
         </div>
-        <div className="card p-4 sm:col-span-1 col-span-2">
+        <div className="card p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center shrink-0">
               <DollarSign className="w-4 h-4 text-teal-600" />
@@ -228,14 +274,13 @@ export function FinanceiroProfissionalClient({ agendamentos, lancamentos, period
         </div>
       </div>
 
-      {erro && (
-        <div className="text-sm text-rust bg-rust/10 border border-rust/20 rounded-xl px-4 py-3">{erro}</div>
-      )}
+      <ErrorBanner message={erro} />
 
       {/* Tabela de sessões */}
       <div className="card p-0 overflow-hidden">
         <div className="px-5 py-3 bg-forest/5 border-b border-sand/30">
-          <p className="font-display text-sm text-forest">Atendimentos do período</p>
+          <p className="font-display text-sm text-forest">Atendimentos e sessões agendadas</p>
+          <p className="text-xs text-forest-400 mt-0.5">Todas as sessões do período — pagas e pendentes</p>
         </div>
         {agendamentos.length === 0 ? (
           <div className="text-center py-10">

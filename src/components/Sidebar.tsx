@@ -8,26 +8,28 @@ import {
   Stethoscope, CheckSquare, Settings2, Check,
   ChevronUp, ChevronDown, X, Pencil, Building2, GripVertical,
   DollarSign, BarChart2, Eye, EyeOff, ShieldCheck, CreditCard, AlertTriangle,
+  CalendarRange, Wrench,
 } from "lucide-react";
 import type { UserRole } from "@/types/database";
 import { signOut } from "@/app/(auth)/actions";
 import { salvarMenuConfig } from "@/app/(dashboard)/menuConfigActions";
 import type { MenuItem } from "@/app/(dashboard)/menuConfigActions";
 import { usePrivacyMode } from "@/app/(dashboard)/PrivacyContext";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { usePermissoes } from "@/app/(dashboard)/PermissoesContext";
 import { usePerfilCompleto } from "@/app/(dashboard)/PerfilCompletoContext";
 
 // ── Mapeamento de ícones (string → componente) ────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
-  Calendar, Users, UserCircle, Stethoscope, CheckSquare, Building2, DollarSign, BarChart2,
+  Calendar, Users, UserCircle, Stethoscope, CheckSquare, Building2, DollarSign, BarChart2, CalendarRange,
 };
 
 // ── Quais hrefs cada role pode ver ───────────────────────────────
 const ROLE_ACCESS: Record<UserRole, string[]> = {
-  admin:       ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
-  supervisor:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
-  profissional:["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
-  secretaria:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios"],
+  admin:       ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/planner"],
+  supervisor:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/planner"],
+  profissional:["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/planner"],
+  secretaria:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/planner"],
 };
 
 // Label customizada por role para /dashboard e /pacientes
@@ -80,7 +82,7 @@ export function Sidebar({
   }, [pathname]);
 
   function isPageVisible(href: string): boolean {
-    if (hasCustomPermissions) return permissoes[href]?.podeVer ?? false;
+    if (hasCustomPermissions) return permissoes[href]?.podeVer ?? access.includes(href);
     return access.includes(href);
   }
 
@@ -239,7 +241,7 @@ export function Sidebar({
               </div>
             ))}
 
-            {saveError && <p className="text-xs text-rust mt-2 px-2">{saveError}</p>}
+            <ErrorBanner message={saveError} />
 
             {/* Save / Cancel */}
             <div className="flex gap-2 pt-3">
@@ -356,6 +358,17 @@ export function Sidebar({
                   >
                     <CreditCard className="w-4 h-4" strokeWidth={1.5} />
                     Métodos de Pagamento
+                  </Link>
+                  <Link
+                    href="/configuracoes/sistema"
+                    className={`flex items-center gap-3 w-full px-4 py-2 rounded-xl text-sm transition-colors ${
+                      pathname.startsWith("/configuracoes/sistema")
+                        ? "bg-cream/10 text-peach font-medium"
+                        : "text-cream/70 hover:text-cream hover:bg-cream/5"
+                    }`}
+                  >
+                    <Wrench className="w-4 h-4" strokeWidth={1.5} />
+                    Sistema
                   </Link>
                 </>
               )}
