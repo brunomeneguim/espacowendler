@@ -9,14 +9,14 @@ export default async function SalasPage() {
   if (!["admin", "supervisor", "secretaria", "profissional"].includes(profile.role)) redirect("/dashboard");
 
   const canManage = ["admin", "supervisor"].includes(profile.role);
+  const isAdmin = profile.role === "admin";
 
   const supabase = createClient();
   const [{ data: salas }, { data: profissionais }] = await Promise.all([
     supabase
       .from("salas")
-      .select("id, nome, ativo")
-      .order("ativo", { ascending: false })
-      .order("nome"),
+      .select("id, nome, ativo, ordem")
+      .order("ordem", { ascending: true }),
     supabase
       .from("profissionais")
       .select("id, valor_aluguel_sala, profile:profiles(nome_completo)")
@@ -37,6 +37,7 @@ export default async function SalasPage() {
         salas={(salas ?? []) as any}
         profissionais={(profissionais ?? []) as any}
         canManage={canManage}
+        isAdmin={isAdmin}
       />
     </div>
   );

@@ -62,7 +62,7 @@ export default async function EditarAgendamentoPage({
   return (
     <div className="p-6 md:p-10 max-w-3xl">
       <Link
-        href="/agenda"
+        href="/dashboard"
         className="inline-flex items-center gap-2 text-sm text-forest-600 hover:text-forest mb-4"
       >
         <ArrowLeft className="w-4 h-4" />

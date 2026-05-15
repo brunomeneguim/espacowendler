@@ -229,3 +229,38 @@ export async function marcarComoPago(id: string, forma_pagamento: string): Promi
   revalidatePath("/financeiro");
   return { error: null };
 }
+
+export async function registrarPagamentoInadimplente(agendamentoId: string, forma_pagamento: string): Promise<{ error: string | null }> {
+  await requireAccess();
+  const supabase = createClient();
+
+  // Buscar dados do agendamento e profissional para preencher valores
+  const { data: ag } = await supabase
+    .from("agendamentos")
+    .select("profissional_id, valor_sessao, sala_id, profissional:profissionais(valor_consulta, valor_aluguel_sala)")
+    .eq("id", agendamentoId)
+    .single();
+
+  if (!ag) return { error: "Agendamento não encontrado." };
+
+  const prof = (ag as any).profissional;
+  const valorSessao = ag.valor_sessao ?? prof?.valor_consulta ?? null;
+  const cobrarAluguel = !!ag.sala_id;
+  const valorAluguel = cobrarAluguel ? (prof?.valor_aluguel_sala ?? 50) : null;
+
+  const { error } = await supabase
+    .from("agendamentos")
+    .update({
+      pago: true,
+      forma_pagamento,
+      valor_sessao: valorSessao,
+      aluguel_cobrado: cobrarAluguel,
+      aluguel_valor: valorAluguel,
+    })
+    .eq("id", agendamentoId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/financeiro");
+  revalidatePath("/dashboard");
+  return { error: null };
+}

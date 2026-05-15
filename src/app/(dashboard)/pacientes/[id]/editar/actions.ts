@@ -83,10 +83,68 @@ export async function atualizarPacienteCompleto(
       resp_fin_bairro:             respFinMesmoPaciente ? null : get("resp_fin_bairro"),
       resp_fin_logradouro:         respFinMesmoPaciente ? null : get("resp_fin_logradouro"),
       resp_fin_numero:             respFinMesmoPaciente ? null : get("resp_fin_numero"),
+      // Financeiro personalizado
+      valor_consulta_especial:     (() => {
+        const v = get("valor_consulta_especial");
+        if (!v) return null;
+        const n = parseFloat(String(v).replace(",", "."));
+        return isNaN(n) ? null : n;
+      })(),
+      valor_plano_especial:        (() => {
+        const v = get("valor_plano_especial");
+        if (!v) return null;
+        const n = parseFloat(String(v).replace(",", "."));
+        return isNaN(n) ? null : n;
+      })(),
+      sessoes_plano_especial:      (() => {
+        const v = get("sessoes_plano_especial");
+        if (!v) return null;
+        const n = parseInt(v);
+        return isNaN(n) ? null : n;
+      })(),
     })
     .eq("id", id);
 
   if (error) return { error: error.message };
+
+  // ── Propagar valor especial para agendamentos futuros não pagos ──────────────
+  // Calcula os valores numéricos (mesma lógica usada acima)
+  const novoValorAvulsa = (() => {
+    const v = get("valor_consulta_especial");
+    if (!v) return null;
+    const n = parseFloat(String(v).replace(",", "."));
+    return isNaN(n) ? null : n;
+  })();
+  const novoValorPlano = (() => {
+    const v = get("valor_plano_especial");
+    if (!v) return null;
+    const n = parseFloat(String(v).replace(",", "."));
+    return isNaN(n) ? null : n;
+  })();
+
+  const agora = new Date().toISOString();
+
+  // Agendamentos avulsos futuros não pagos → atualiza valor_sessao com avulsa
+  if (novoValorAvulsa != null) {
+    await supabase
+      .from("agendamentos")
+      .update({ valor_sessao: novoValorAvulsa })
+      .eq("paciente_id", id)
+      .eq("pago", false)
+      .eq("tipo_agendamento", "consulta_avulsa")
+      .gte("data_hora_inicio", agora);
+  }
+
+  // Agendamentos de plano futuros não pagos → atualiza valor_sessao com plano
+  if (novoValorPlano != null) {
+    await supabase
+      .from("agendamentos")
+      .update({ valor_sessao: novoValorPlano })
+      .eq("paciente_id", id)
+      .eq("pago", false)
+      .eq("tipo_agendamento", "plano_mensal")
+      .gte("data_hora_inicio", agora);
+  }
 
   // Atualizar vínculos com profissionais
   const profissionalIds = formData.getAll("profissional_ids") as string[];
@@ -99,6 +157,7 @@ export async function atualizarPacienteCompleto(
 
   revalidatePath("/pacientes");
   revalidatePath("/dashboard");
+  revalidatePath("/agenda");
   return { error: null };
 }
 

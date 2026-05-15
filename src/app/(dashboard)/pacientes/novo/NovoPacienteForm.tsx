@@ -3,6 +3,7 @@
 import { useState, useRef, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import {
   ArrowLeft, Camera, Upload, X, Plus, Trash2, Loader2,
   User, MapPin, Phone, FileText, AlertCircle, UserCog, DollarSign, Search,
@@ -58,9 +59,7 @@ function maskCep(v: string) {
   return v.replace(/(\d{5})(\d)/, "$1-$2");
 }
 function maskPhone(v: string) {
-  const raw = v.replace(/[^\d+]/g, "");
-  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D/g, "");
-  const d = raw.replace(/\D/g, "").substring(0, 11);
+  const d = v.replace(/\D/g, "").substring(0, 11);
   if (d.length === 0) return "";
   if (d.length <= 2) return `(${d}`;
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -117,6 +116,111 @@ function PhoneFieldWithDDI({
   );
 }
 
+// ── Card Financeiro (componente com estado próprio) ───────────────
+function FinanceiroCard() {
+  const SESSOES_DEFAULT = 4;
+
+  function fmtMoney(v: number | null | undefined): string {
+    if (v == null) return "";
+    return v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function parseMoney(s: string): number | null {
+    const n = parseFloat(s.replace(/\./g, "").replace(",", "."));
+    return isNaN(n) ? null : n;
+  }
+
+  const [avulsaRaw, setAvulsaRaw] = useState("");
+  const [planoRaw,  setPlanoRaw]  = useState("");
+  const [sessoes,   setSessoes]   = useState(String(SESSOES_DEFAULT));
+
+  function calcPlanoFromAvulsa(avulsa: string, s: string) {
+    const a = parseMoney(avulsa);
+    const q = parseInt(s) || SESSOES_DEFAULT;
+    if (a != null && a > 0) setPlanoRaw(fmtMoney(a * q));
+  }
+  function calcAvulsaFromPlano(plano: string, s: string) {
+    const p = parseMoney(plano);
+    const q = parseInt(s) || SESSOES_DEFAULT;
+    if (p != null && p > 0) setAvulsaRaw(fmtMoney(p / q));
+  }
+
+  const valorAvulsa = parseMoney(avulsaRaw);
+  const valorPlano  = parseMoney(planoRaw);
+
+  return (
+    <Section icon={DollarSign} title="Financeiro">
+      {/* Hidden inputs com valores numéricos limpos */}
+      <input type="hidden" name="valor_consulta_especial" value={valorAvulsa ?? ""} />
+      <input type="hidden" name="valor_plano_especial"    value={valorPlano  ?? ""} />
+
+      <p className="text-sm text-forest-500">
+        Opcional. Valores personalizados para este paciente — têm <strong>prioridade</strong> sobre os valores padrão do profissional em todos os agendamentos futuros.
+      </p>
+
+      {/* Linha 1: Consulta Avulsa + Plano Mensal */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Valor da Consulta Avulsa</label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-forest-400 font-medium">R$</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="input-field pl-9"
+              placeholder="Ex: 180,00"
+              value={avulsaRaw}
+              onChange={e => setAvulsaRaw(e.target.value)}
+              onBlur={() => calcPlanoFromAvulsa(avulsaRaw, sessoes)}
+            />
+          </div>
+          <p className="text-xs text-forest-400 mt-1">Valor por sessão individual.</p>
+        </div>
+        <div>
+          <label className="label">Valor do Plano Mensal</label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-forest-400 font-medium">R$</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="input-field pl-9"
+              placeholder="Ex: 650,00"
+              value={planoRaw}
+              onChange={e => setPlanoRaw(e.target.value)}
+              onBlur={() => calcAvulsaFromPlano(planoRaw, sessoes)}
+            />
+          </div>
+          <p className="text-xs text-forest-400 mt-1">Valor total do plano mensal.</p>
+        </div>
+      </div>
+
+      {/* Linha 2: Sessões */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Sessões no plano mensal</label>
+          <input
+            name="sessoes_plano_especial"
+            type="number"
+            min={1}
+            max={99}
+            className="input-field"
+            value={sessoes}
+            onChange={e => {
+              const s = e.target.value;
+              setSessoes(s);
+              const a = parseMoney(avulsaRaw);
+              if (a != null && a > 0) {
+                const q = parseInt(s) || SESSOES_DEFAULT;
+                setPlanoRaw(fmtMoney(a * q));
+              }
+            }}
+          />
+          <p className="text-xs text-forest-400 mt-1">Padrão: {SESSOES_DEFAULT} sessões/mês.</p>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 // ── Componente principal ──────────────────────────────────────────
 interface Props {
   camposConfig: CampoConfig[];
@@ -129,6 +233,8 @@ export function NovoPacienteForm({ camposConfig, profissionais, fromAgenda }: Pr
   const [isPending, startTransition] = useTransition();
   const { showToast } = useToast();
   const [erro, setErro] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const { markDirty, resetDirty, guardedNavigate, UnsavedDialog } = useUnsavedChanges(formRef);
 
   useEffect(() => {
     if (erro) { showToast(erro, "error"); setErro(null); }
@@ -307,8 +413,8 @@ export function NovoPacienteForm({ camposConfig, profissionais, fromAgenda }: Pr
     startTransition(async () => {
       const res = await criarPacienteCompleto(fd);
       if (res.error) setErro(res.error);
-      else if (fromAgenda && res.id) router.push(`/agenda/novo?paciente_id=${res.id}`);
-      else router.push("/pacientes");
+      else if (fromAgenda && res.id) { resetDirty(); router.push(`/agenda/novo?paciente_id=${res.id}`); }
+      else { resetDirty(); router.push("/pacientes"); }
     });
   }
 
@@ -321,7 +427,7 @@ export function NovoPacienteForm({ camposConfig, profissionais, fromAgenda }: Pr
 
   return (
     <div className="space-y-5">
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form ref={formRef} onSubmit={handleSubmit} onChange={markDirty} className="space-y-5">
         {/* ── Toggle Individual / Casal ── */}
         <input type="hidden" name="tipo_cadastro" value={tipoCadastro} />
         <div className="flex gap-1 p-1 bg-sand/20 rounded-xl w-fit">
@@ -899,14 +1005,19 @@ export function NovoPacienteForm({ camposConfig, profissionais, fromAgenda }: Pr
           </div>
         </Section>
 
+        {/* ── Financeiro ── */}
+        <FinanceiroCard />
+
         {/* Botões */}
         <div className="flex gap-3 pt-2">
           <button type="submit" disabled={isPending} className="btn-primary flex-1 flex items-center justify-center gap-2">
             {isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando…</> : "Cadastrar paciente"}
           </button>
-          <Link href="/pacientes" className="btn-secondary flex-1">Cancelar</Link>
+          <button type="button" onClick={() => guardedNavigate("/pacientes")} className="btn-secondary flex-1">Cancelar</button>
         </div>
       </form>
+
+      {UnsavedDialog}
 
       {/* ── Modal webcam ── */}
       {showWebcam && (

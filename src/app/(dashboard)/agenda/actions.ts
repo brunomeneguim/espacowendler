@@ -6,6 +6,16 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
 import { broadcastAgendaChange } from "@/lib/broadcastAgenda";
 
+// Converte data local do usuário → UTC, independente do timezone do servidor.
+// data = "YYYY-MM-DD", hora = "HH:MM", tzOffset = new Date().getTimezoneOffset() do browser
+function localToUtc(data: string, hora: string, tzOffset: number): Date {
+  const [y, m, d] = data.split("-").map(Number);
+  const [h, min]  = hora.split(":").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, h, min));
+  dt.setUTCMinutes(dt.getUTCMinutes() + tzOffset);
+  return dt;
+}
+
 // ── Vincular paciente ↔ profissional automaticamente ─────────────
 async function vincularPacienteProfissional(
   supabase: ReturnType<typeof createClient>,
@@ -102,7 +112,7 @@ async function verificarConflito(
 ): Promise<string | null> {
   let q = supabase
     .from("agendamentos")
-    .select("id, data_hora_inicio, profissional_id, paciente_id, sala_id")
+    .select("id, data_hora_inicio, profissional_id, paciente_id, sala_id, tipo_agendamento, status")
     .not("status", "in", "(cancelado,faltou)")
     .lt("data_hora_inicio", fim.toISOString())
     .gt("data_hora_fim", inicio.toISOString());
@@ -123,8 +133,8 @@ async function verificarConflito(
     if (c.profissional_id === profissional_id) {
       return `Este profissional já possui um agendamento às ${h}. Escolha outro horário ou profissional.`;
     }
-    // Mesma sala com profissional diferente
-    if (sala_id && c.sala_id === sala_id) {
+    // Mesma sala com profissional diferente (ausência não ocupa sala)
+    if (sala_id && c.sala_id === sala_id && c.tipo_agendamento !== "ausencia") {
       return `Esta sala já está ocupada às ${h}. Escolha outra sala ou outro horário.`;
     }
   }
@@ -182,12 +192,12 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
   const recorrencia       = isAusencia ? "nenhuma" : ((formData.get("recorrencia") as string) || "nenhuma");
   const meses             = parseInt((formData.get("meses_recorrencia") as string) || "3", 10);
   const mensal_tipo       = (formData.get("mensal_tipo") as string) || "dia_mes";
+  const qtdSessoes        = Math.max(1, parseInt((formData.get("quantidade_sessoes") as string) || "1", 10) || 1);
 
   const { data: { user } } = await supabase.auth.getUser();
 
   const tzOffset = parseInt((formData.get("tz_offset") as string) || "0");
-  const inicio = new Date(`${data}T${hora}:00`);
-  inicio.setMinutes(inicio.getMinutes() + tzOffset);
+  const inicio = localToUtc(data, hora, tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
 
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
@@ -202,6 +212,31 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
   const conflito = await verificarConflito(supabase, profissional_id, paciente_id, salaIdNum, inicio, fim);
   if (conflito) return { error: conflito, ignoradas: 0, datasIgnoradas: [] };
 
+  // ── Calcular valor da sessão com cadeia de prioridade: paciente especial → profissional padrão
+  let valorSessao: number | null = null;
+  if (!isAusencia && profissional_id) {
+    const [{ data: profPreco }, { data: pacPreco }] = await Promise.all([
+      supabase
+        .from("profissionais")
+        .select("valor_consulta, valor_plano")
+        .eq("id", profissional_id)
+        .single(),
+      paciente_id
+        ? supabase
+            .from("pacientes")
+            .select("valor_consulta_especial, valor_plano_especial")
+            .eq("id", paciente_id)
+            .single()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    const valorUnitario = tipo_agendamento === "plano_mensal"
+      ? ((pacPreco as any)?.valor_plano_especial ?? (profPreco as any)?.valor_plano ?? null)
+      : ((pacPreco as any)?.valor_consulta_especial ?? (profPreco as any)?.valor_consulta ?? null);
+
+    if (valorUnitario != null) valorSessao = valorUnitario * qtdSessoes;
+  }
+
   const grupo_id = recorrencia !== "nenhuma" ? randomUUID() : null;
 
   const base = {
@@ -213,6 +248,8 @@ export async function criarAgendamento(formData: FormData): Promise<{ error: str
     observacoes,
     created_by: user?.id,
     recorrencia_grupo_id: grupo_id,
+    valor_sessao: isAusencia ? null : valorSessao,
+    quantidade_sessoes: isAusencia ? 1 : qtdSessoes,
   };
 
   const { error } = await supabase.from("agendamentos").insert({
@@ -265,8 +302,7 @@ export async function reagendarAgendamentoRapido(params: {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const inicio = new Date(`${data}T${hora}:00`);
-  inicio.setMinutes(inicio.getMinutes() + tzOffset);
+  const inicio = localToUtc(data, hora, tzOffset);
   const fim = new Date(inicio.getTime() + duracaoMin * 60_000);
 
   const erroHorario = await verificarHorarioProfissional(supabase, profissionalId, hora, duracaoMin);
@@ -307,23 +343,40 @@ export async function atualizarStatusAgendamento(
   const update: Record<string, unknown> = { status };
 
   if (status === "realizado" || status === "finalizado") {
+    // Busca agendamento + profissional + paciente em paralelo para calcular valor com prioridade correta
     const { data: ag } = await supabase
       .from("agendamentos")
-      .select("profissional_id, tipo_agendamento")
+      .select("profissional_id, paciente_id, tipo_agendamento, valor_sessao")
       .eq("id", id)
       .single();
 
     if (ag && ag.tipo_agendamento !== "ausencia") {
-      const { data: prof } = await supabase
-        .from("profissionais")
-        .select("valor_consulta, valor_aluguel_sala")
-        .eq("id", ag.profissional_id)
-        .single();
+      const [{ data: prof }, { data: pac }] = await Promise.all([
+        supabase
+          .from("profissionais")
+          .select("valor_consulta, valor_plano, valor_aluguel_sala")
+          .eq("id", ag.profissional_id)
+          .single(),
+        ag.paciente_id
+          ? supabase
+              .from("pacientes")
+              .select("valor_consulta_especial, valor_plano_especial")
+              .eq("id", ag.paciente_id)
+              .single()
+          : Promise.resolve({ data: null }),
+      ]);
 
       if (prof) {
         update.aluguel_cobrado = true;
         update.aluguel_valor   = prof.valor_aluguel_sala ?? 50;
-        update.valor_sessao    = prof.valor_consulta ?? null;
+
+        // Só define valor_sessao se ainda não estiver definido (preserva valor já gravado)
+        if (!ag.valor_sessao) {
+          const valorPadrao = ag.tipo_agendamento === "plano_mensal"
+            ? ((pac as any)?.valor_plano_especial ?? prof.valor_plano ?? null)
+            : ((pac as any)?.valor_consulta_especial ?? prof.valor_consulta ?? null);
+          update.valor_sessao = valorPadrao;
+        }
       }
     }
   }
@@ -369,7 +422,8 @@ export async function marcarPagamentoAgendamento(
   pago: boolean,
   forma_pagamento: string | null,
   valor_sessao?: number | null,
-  outrosDesc?: string
+  outrosDesc?: string,
+  quantidade_sessoes?: number
 ): Promise<{ error: string | null }> {
   const supabase = createClient();
 
@@ -379,22 +433,40 @@ export async function marcarPagamentoAgendamento(
   };
 
   if (pago) {
-    // Buscar agendamento para obter profissional_id, valor já gravado e observacoes atuais
+    // Buscar agendamento para obter profissional_id, paciente_id, valor já gravado e observacoes
     const { data: ag } = await supabase
       .from("agendamentos")
-      .select("profissional_id, tipo_agendamento, valor_sessao, observacoes")
+      .select("profissional_id, paciente_id, tipo_agendamento, valor_sessao, observacoes")
       .eq("id", id)
       .single();
 
     if (ag && ag.tipo_agendamento !== "ausencia") {
-      const { data: prof } = await supabase
-        .from("profissionais")
-        .select("valor_consulta, valor_aluguel_sala")
-        .eq("id", ag.profissional_id)
-        .single();
+      const [{ data: prof }, { data: pac }] = await Promise.all([
+        supabase
+          .from("profissionais")
+          .select("valor_consulta, valor_plano, valor_aluguel_sala")
+          .eq("id", ag.profissional_id)
+          .single(),
+        ag.paciente_id
+          ? supabase
+              .from("pacientes")
+              .select("valor_consulta_especial, valor_plano_especial, sessoes_plano_especial")
+              .eq("id", ag.paciente_id)
+              .single()
+          : Promise.resolve({ data: null }),
+      ]);
 
-      // Prioridade: valor informado pelo usuário → já gravado → padrão do profissional
-      update.valor_sessao = valor_sessao ?? ag.valor_sessao ?? prof?.valor_consulta ?? null;
+      // Valor padrão por tipo de agendamento:
+      // paciente especial → profissional padrão → null
+      const valorPadrao = ag.tipo_agendamento === "plano_mensal"
+        ? (pac?.valor_plano_especial ?? prof?.valor_plano ?? null)
+        : (pac?.valor_consulta_especial ?? prof?.valor_consulta ?? null);
+
+      // Prioridade: valor informado pelo usuário → já gravado → valor padrão (paciente ou prof)
+      update.valor_sessao = valor_sessao ?? ag.valor_sessao ?? valorPadrao ?? null;
+      if (quantidade_sessoes && quantidade_sessoes > 0) {
+        update.quantidade_sessoes = quantidade_sessoes;
+      }
 
       if (prof) {
         update.aluguel_cobrado = true;
@@ -417,16 +489,6 @@ export async function marcarPagamentoAgendamento(
     update.valor_sessao    = null;
     update.aluguel_cobrado = false;
     update.aluguel_valor   = null;
-
-    // Se estava finalizado, reverter para confirmado (pagamento era pré-requisito)
-    const { data: agAtual } = await supabase
-      .from("agendamentos")
-      .select("status")
-      .eq("id", id)
-      .single();
-    if (agAtual?.status === "finalizado") {
-      update.status = "confirmado";
-    }
   }
 
   const { error } = await supabase
@@ -457,8 +519,7 @@ export async function editarAgendamento(id: string, formData: FormData) {
   const editarGrupo      = formData.get("editar_grupo") === "true";
   const tzOffset         = parseInt((formData.get("tz_offset") as string) || "0");
 
-  const inicio = new Date(`${data}T${hora}:00`);
-  inicio.setMinutes(inicio.getMinutes() + tzOffset);
+  const inicio = localToUtc(data, hora, tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
 
@@ -502,7 +563,7 @@ export async function editarAgendamento(id: string, formData: FormData) {
 
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
-  redirect("/agenda");
+  redirect("/dashboard");
 }
 
 // ── Versão sem redirect (para uso client-side com broadcast) ──────
@@ -525,8 +586,7 @@ export async function editarAgendamentoAction(
   const editarGrupo      = formData.get("editar_grupo") === "true";
   const tzOffset         = parseInt((formData.get("tz_offset") as string) || "0");
 
-  const inicio = new Date(`${data}T${hora}:00`);
-  inicio.setMinutes(inicio.getMinutes() + tzOffset);
+  const inicio = localToUtc(data, hora, tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
 
@@ -583,8 +643,7 @@ export async function atualizarAgendamento(
   tipo_agendamento?: string
 ): Promise<{ error: string | null }> {
   const supabase = createClient();
-  const inicio = new Date(`${data}T${hora}:00`);
-  inicio.setMinutes(inicio.getMinutes() + tzOffset);
+  const inicio = localToUtc(data, hora, tzOffset);
   const fim    = new Date(inicio.getTime() + duracao * 60_000);
   const salaIdNum = sala_id ? parseInt(sala_id) : null;
 
@@ -660,5 +719,6 @@ export async function deletarAgendamentosPaciente(pacienteId: string): Promise<{
   if (error) return { error: error.message };
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
+  void broadcastAgendaChange();
   return { error: null };
 }

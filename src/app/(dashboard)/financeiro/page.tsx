@@ -19,8 +19,13 @@ export default async function FinanceiroPage({
     return FinanceiroProfissionalPage({ profile, searchParams });
   }
 
-  // Apenas roles que não são profissional chegam aqui; todos têm acesso
+  // Apenas roles que não são profissional chegam aqui
   if (!["admin", "supervisor", "secretaria"].includes(profile.role)) {
+    redirect("/dashboard");
+  }
+
+  // Secretaria: verificar flag de acesso ao financeiro
+  if (profile.role === "secretaria" && !profile.secretaria_ver_financeiro) {
     redirect("/dashboard");
   }
 
@@ -51,69 +56,70 @@ export default async function FinanceiroPage({
   if (filtros.tipo)   q = q.eq("tipo", filtros.tipo);
   if (filtros.status) q = q.eq("status", filtros.status);
 
-  const mesInicio = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
-  const mesFim    = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-
   // ── Buscar todos os dados em paralelo ──
   let agsPeriodoQ = supabase
     .from("agendamentos")
     .select("id, data_hora_inicio, valor_sessao, forma_pagamento, aluguel_cobrado, aluguel_valor, profissional_id, profissional:profissionais(id, profile:profiles(nome_completo)), paciente:pacientes(nome_completo), sala:salas(id, nome)")
     .eq("pago", true)
-    .in("status", ["realizado", "finalizado"])
+    .in("status", ["agendado", "confirmado", "realizado", "finalizado", "faltou"])
     .gte("data_hora_inicio", `${filtros.periodo_inicio}T00:00:00.000Z`)
     .lte("data_hora_inicio", `${filtros.periodo_fim}T23:59:59.999Z`)
     .order("data_hora_inicio", { ascending: false });
-  if (filtros.sala_id) agsPeriodoQ = agsPeriodoQ.eq("sala_id", filtros.sala_id);
+  if (filtros.sala_id)         agsPeriodoQ = agsPeriodoQ.eq("sala_id", filtros.sala_id);
+  if (filtros.profissional_id) agsPeriodoQ = agsPeriodoQ.eq("profissional_id", filtros.profissional_id);
 
   const [
     { data: lancamentos },
-    { data: todosMes },
+    { data: todosPeriodo },
     { data: profissionaisList },
-    { data: agsMesRaw },
     { data: agsPeriodoRaw },
     { data: salasList },
-    { data: agsPendentesMes },
-    { data: agsInadimplenteMes },
+    { data: agsPendentes },
+    { data: agsInadimplentes },
   ] = await Promise.all([
     q,
+    // Lançamentos do período para KPIs de receita/despesa
     supabase
       .from("lancamentos")
       .select("tipo, valor, status, data_vencimento")
-      .gte("data_lancamento", mesInicio)
-      .lte("data_lancamento", mesFim),
+      .gte("data_lancamento", filtros.periodo_inicio)
+      .lte("data_lancamento", filtros.periodo_fim),
     supabase
       .from("profissionais")
       .select("id, valor_consulta, valor_aluguel_sala, profile:profiles(nome_completo)")
       .eq("ativo", true)
       .order("id"),
-    // Atendimentos pagos do mês atual (para KPI receita)
-    supabase
-      .from("agendamentos")
-      .select("valor_sessao, profissional_id")
-      .eq("pago", true)
-      .in("status", ["realizado", "finalizado"])
-      .gte("data_hora_inicio", `${mesInicio}T00:00:00.000Z`)
-      .lte("data_hora_inicio", `${mesFim}T23:59:59.999Z`),
-    // Atendimentos pagos do período filtrado (para tabela)
+    // Atendimentos pagos do período (para tabela e KPI receita)
     agsPeriodoQ,
     // Salas (para filtro)
     supabase.from("salas").select("id, nome").eq("ativo", true).order("id"),
-    // Pendentes: agendados/confirmados/realizados mas não pagos no mês
-    supabase
-      .from("agendamentos")
-      .select("valor_sessao, profissional_id")
-      .eq("pago", false)
-      .in("status", ["agendado", "confirmado", "realizado"])
-      .gte("data_hora_inicio", `${mesInicio}T00:00:00.000Z`)
-      .lte("data_hora_inicio", `${mesFim}T23:59:59.999Z`),
-    // Inadimplentes: finalizados mas não pagos no mês
-    supabase
-      .from("agendamentos")
-      .select("valor_sessao, profissional_id")
-      .eq("pago", false)
-      .eq("status", "finalizado")
-      .gte("data_hora_inicio", `${mesInicio}T00:00:00.000Z`)
-      .lte("data_hora_inicio", `${mesFim}T23:59:59.999Z`),
+    // Pendentes: agendados/confirmados não pagos no período
+    (() => {
+      let qP = supabase
+        .from("agendamentos")
+        .select("valor_sessao, profissional_id")
+        .eq("pago", false)
+        .in("status", ["agendado", "confirmado"])
+        .gte("data_hora_inicio", `${filtros.periodo_inicio}T00:00:00.000Z`)
+        .lte("data_hora_inicio", `${filtros.periodo_fim}T23:59:59.999Z`);
+      if (filtros.profissional_id) qP = qP.eq("profissional_id", filtros.profissional_id);
+      if (filtros.sala_id)         qP = qP.eq("sala_id", filtros.sala_id);
+      return qP;
+    })(),
+    // Inadimplentes: realizados/finalizados não pagos no período
+    (() => {
+      let q2 = supabase
+        .from("agendamentos")
+        .select("id, valor_sessao, profissional_id, sala_id, data_hora_inicio, paciente:pacientes(nome_completo), profissional:profissionais(profile:profiles(nome_completo))")
+        .eq("pago", false)
+        .in("status", ["realizado", "finalizado"])
+        .gte("data_hora_inicio", `${filtros.periodo_inicio}T00:00:00.000Z`)
+        .lte("data_hora_inicio", `${filtros.periodo_fim}T23:59:59.999Z`)
+        .order("data_hora_inicio", { ascending: false });
+      if (filtros.profissional_id) q2 = q2.eq("profissional_id", filtros.profissional_id);
+      if (filtros.sala_id)         q2 = q2.eq("sala_id", filtros.sala_id);
+      return q2;
+    })(),
   ]);
 
   // Mapa profissional_id → valor_consulta para fallback
@@ -121,32 +127,40 @@ export default async function FinanceiroPage({
     (profissionaisList ?? []).map((p: any) => [p.id, Number(p.valor_consulta ?? 0)])
   );
 
-  const totaisMes = (todosMes ?? []).reduce(
-    (acc: { receitaPaga: number; pendente: number; inadimplente: number; despesasMes: number }, l: any) => {
+  const agsPeriodo = (agsPeriodoRaw ?? []) as any[];
+
+  const totaisMes = (todosPeriodo ?? []).reduce(
+    (acc: { receitaPaga: number; pendente: number; inadimplente: number; despesasPeriodo: number; saldoLiquido: number }, l: any) => {
       if (l.tipo === "receita" && l.status === "pago") acc.receitaPaga += Number(l.valor);
-      if (l.tipo === "despesa") acc.despesasMes += Number(l.valor);
+      if (l.tipo === "despesa") acc.despesasPeriodo += Number(l.valor);
       return acc;
     },
-    { receitaPaga: 0, pendente: 0, inadimplente: 0, despesasMes: 0 }
+    { receitaPaga: 0, pendente: 0, inadimplente: 0, despesasPeriodo: 0, saldoLiquido: 0 }
   );
 
-  // Receita dos atendimentos pagos no mês
-  const receitaAtendimentosMes = (agsMesRaw ?? []).reduce(
+  // Receita dos atendimentos pagos no período (sessão + aluguel de sala quando cobrado)
+  const receitaAtendimentosPeriodo = agsPeriodo.reduce(
+    (s, a: any) => {
+      const sessao  = Number(a.valor_sessao ?? profValorMap.get(a.profissional_id) ?? 0);
+      const aluguel = a.aluguel_cobrado ? Number(a.aluguel_valor ?? 0) : 0;
+      return s + sessao + aluguel;
+    }, 0
+  );
+  totaisMes.receitaPaga += receitaAtendimentosPeriodo;
+
+  // Pendente = agendados/confirmados não pagos
+  totaisMes.pendente = (agsPendentes ?? []).reduce(
     (s, a: any) => s + Number(a.valor_sessao ?? profValorMap.get(a.profissional_id) ?? 0), 0
   );
-  totaisMes.receitaPaga += receitaAtendimentosMes;
 
-  // Pendente = agendados/confirmados/realizados mas não pagos (sessões agendadas sem pagamento)
-  totaisMes.pendente = (agsPendentesMes ?? []).reduce(
+  // Inadimplente = realizados/finalizados não pagos
+  const inadimplentesList = (agsInadimplentes ?? []) as any[];
+  totaisMes.inadimplente = inadimplentesList.reduce(
     (s, a: any) => s + Number(a.valor_sessao ?? profValorMap.get(a.profissional_id) ?? 0), 0
   );
 
-  // Inadimplente = finalizados mas não pagos (sessão ocorreu, não foi pago)
-  totaisMes.inadimplente = (agsInadimplenteMes ?? []).reduce(
-    (s, a: any) => s + Number(a.valor_sessao ?? profValorMap.get(a.profissional_id) ?? 0), 0
-  );
-
-  const agsPeriodo = (agsPeriodoRaw ?? []) as any[];
+  // Saldo líquido do período
+  totaisMes.saldoLiquido = totaisMes.receitaPaga - totaisMes.despesasPeriodo;
 
   // ── Atendimentos do profissional selecionado ──
   let profAgendamentos: any[] = [];
@@ -202,6 +216,7 @@ export default async function FinanceiroPage({
         profSelecionado={profSelecionado}
         profTotais={profTotais}
         agendamentosPeriodo={agsPeriodo}
+        inadimplentes={(inadimplentesList as any) ?? []}
       />
     </div>
   );
@@ -241,7 +256,6 @@ async function FinanceiroProfissionalPage({
       .from("agendamentos")
       .select("id, data_hora_inicio, status, pago, forma_pagamento, valor_sessao, aluguel_cobrado, aluguel_valor, paciente:pacientes(nome_completo)")
       .eq("profissional_id", profissional.id)
-      .eq("pago", true)
       .not("status", "in", "(ausencia,cancelado)")
       .gte("data_hora_inicio", `${periodo.inicio}T00:00:00.000Z`)
       .lte("data_hora_inicio", `${periodo.fim}T23:59:59.999Z`)
@@ -259,8 +273,13 @@ async function FinanceiroProfissionalPage({
   const lancamentos = (lancamentosRaw ?? []) as any[];
 
   const totalSessoes       = ags.filter((a: any) => ["realizado", "finalizado", "faltou"].includes(a.status)).length;
-  const totalReceitaAgs    = ags.reduce((s, a) => s + Number(a.valor_sessao ?? profissional.valor_consulta ?? 0), 0);
-  const totalAluguel       = ags.filter(a => a.aluguel_cobrado).reduce((s, a) => s + Number(a.aluguel_valor ?? profissional.valor_aluguel_sala ?? 50), 0);
+  // Receita: apenas sessões efetivamente pagas
+  const totalReceitaAgs    = ags.filter(a => a.pago).reduce((s, a) => s + Number(a.valor_sessao ?? profissional.valor_consulta ?? 0), 0);
+  // Pendente: agendadas/confirmadas/realizadas mas ainda não pagas
+  const totalPendente      = ags.filter(a => !a.pago && ["agendado", "confirmado", "realizado"].includes(a.status))
+                               .reduce((s, a) => s + Number(a.valor_sessao ?? profissional.valor_consulta ?? 0), 0);
+  // Aluguel: apenas de sessões já pagas
+  const totalAluguel       = ags.filter(a => a.aluguel_cobrado && a.pago).reduce((s, a) => s + Number(a.aluguel_valor ?? profissional.valor_aluguel_sala ?? 50), 0);
   const totalReceitaManual = lancamentos.filter(l => l.tipo === "receita").reduce((s, l) => s + Number(l.valor ?? 0), 0);
   const totalDespesas      = lancamentos.filter(l => l.tipo === "despesa").reduce((s, l) => s + Number(l.valor ?? 0), 0);
   const totalReceita       = totalReceitaAgs + totalReceitaManual;
@@ -282,7 +301,7 @@ async function FinanceiroProfissionalPage({
         lancamentos={lancamentos}
         periodo={periodo}
         profissional={{ valor_consulta: profissional.valor_consulta, valor_aluguel_sala: profissional.valor_aluguel_sala }}
-        totais={{ totalSessoes, totalReceita, totalAluguel, totalDespesas, totalLiquido }}
+        totais={{ totalSessoes, totalReceita, totalPendente, totalAluguel, totalDespesas, totalLiquido }}
       />
     </div>
   );

@@ -14,12 +14,12 @@ export default async function NovoAgendamentoPage({
   const [{ data: profsRaw }, { data: pacs }, { data: salas }] = await Promise.all([
     supabase
       .from("profissionais")
-      .select("id, profile:profiles(nome_completo, role), profissional_especialidades(especialidade:especialidades(nome))")
+      .select("id, valor_consulta, valor_plano, tempo_atendimento, profile:profiles(nome_completo, role), profissional_especialidades(especialidade:especialidades(nome))")
       .eq("ativo", true)
       .order("id"),
     supabase
       .from("pacientes")
-      .select("id, nome_completo, telefone")
+      .select("id, nome_completo, telefone, valor_consulta_especial, valor_plano_especial, sessoes_plano_especial")
       .eq("ativo", true)
       .order("nome_completo"),
     supabase
@@ -35,13 +35,16 @@ export default async function NovoAgendamentoPage({
       id: p.id,
       nome: p.profile?.nome_completo ?? p.id,
       especialidade: p.profissional_especialidades?.[0]?.especialidade?.nome ?? undefined,
+      valor_consulta: p.valor_consulta ?? null,
+      valor_plano: p.valor_plano ?? null,
+      tempo_atendimento: p.tempo_atendimento ?? null,
     }));
 
   const hoje = new Date().toISOString().split("T")[0];
 
   return (
     <div className="p-6 md:p-10 max-w-3xl">
-      <Link href="/agenda" className="inline-flex items-center gap-2 text-sm text-forest-600 hover:text-forest mb-4">
+      <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm text-forest-600 hover:text-forest mb-4">
         <ArrowLeft className="w-4 h-4" /> Voltar para agenda
       </Link>
 

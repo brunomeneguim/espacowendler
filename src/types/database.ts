@@ -14,6 +14,7 @@ export interface Profile {
   telefone: string | null;
   role: UserRole;
   ativo: boolean;
+  secretaria_ver_financeiro: boolean;
   created_at: string;
   updated_at: string;
 }

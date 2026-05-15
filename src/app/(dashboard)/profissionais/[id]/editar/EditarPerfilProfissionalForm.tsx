@@ -2,19 +2,22 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import {
-  Upload, X, Loader2, User, ChevronDown, Check, Eye, EyeOff, KeyRound, Stethoscope,
+  Upload, X, Loader2, User, ChevronDown, Eye, EyeOff, KeyRound, Stethoscope,
 } from "lucide-react";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { editarProfissionalCompleto } from "./actions";
 import { PROF_CORES } from "@/lib/profCores";
 import { useToast } from "@/components/Toaster";
 import { EspecialidadesMultiSelect } from "../../EspecialidadesMultiSelect";
 import { DDISelector } from "../../../pacientes/novo/DDISelector";
 
-// ── Dropdown de cor ───────────────────────────────────────────────
+// ── Dropdown de cor (paleta visual) ──────────────────────────────
 function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const corAtual = PROF_CORES.find(c => c.id === value);
+  // Cores disponíveis: livres + a própria cor atual deste profissional
+  const coresDisponiveis = PROF_CORES.filter(c => !coresUsadas.includes(c.id) || c.id === value);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -43,24 +46,37 @@ function CorDropdown({ coresUsadas, value, onChange }: { coresUsadas: string[]; 
         <ChevronDown className={`w-4 h-4 text-forest-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-sand/40 rounded-xl shadow-xl overflow-hidden">
-          <div className="grid grid-cols-2 gap-0.5 p-2 max-h-64 overflow-y-auto">
-            {PROF_CORES.map(c => {
-              const usada = coresUsadas.includes(c.id) && c.id !== value;
+        <div className="absolute z-50 mt-1 bg-white border border-sand/40 rounded-xl shadow-xl p-3 min-w-[200px]">
+          <p className="text-[10px] font-semibold text-forest-400 uppercase tracking-wider mb-2">
+            Cores disponíveis
+          </p>
+          <div className="grid grid-cols-8 gap-1.5">
+            {coresDisponiveis.map(c => {
               const sel = value === c.id;
               return (
-                <button key={c.id} type="button" disabled={usada}
+                <button
+                  key={c.id}
+                  type="button"
+                  title={c.label}
                   onClick={() => { onChange(c.id); setOpen(false); }}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left ${usada ? "opacity-40 cursor-not-allowed" : "hover:bg-sand/20 cursor-pointer"} ${sel ? "bg-forest/5 font-medium" : ""}`}
+                  className="relative w-7 h-7 rounded-full transition-transform hover:scale-110 focus:outline-none"
+                  style={{ backgroundColor: c.hex }}
                 >
-                  <span className="w-5 h-5 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: c.hex }} />
-                  <span className="flex-1 truncate text-forest">{c.label}</span>
-                  {usada && <span className="text-[10px] text-forest-400">Em uso</span>}
-                  {sel && <Check className="w-3.5 h-3.5 text-forest shrink-0" />}
+                  {sel && (
+                    <span
+                      className="absolute inset-0 rounded-full ring-2 ring-white ring-offset-1"
+                      style={{ boxShadow: `0 0 0 2px ${c.hex}` }}
+                    />
+                  )}
                 </button>
               );
             })}
           </div>
+          {coresDisponiveis.length === 0 && (
+            <p className="text-xs text-forest-400 text-center py-2">
+              Todas as cores já estão em uso.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -95,9 +111,7 @@ function validarCnpj(raw: string): boolean {
 
 // ── Máscara telefone ────────────────────────────────────────────
 function maskPhone(v: string) {
-  const raw = v.replace(/[^\d+]/g, "");
-  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D/g, "");
-  const d = raw.replace(/\D/g, "").substring(0, 11);
+  const d = v.replace(/\D/g, "").substring(0, 11);
   if (d.length === 0) return "";
   if (d.length <= 2) return `(${d}`;
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -210,6 +224,8 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
   const [isPending, startTransition] = useTransition();
   const { showToast } = useToast();
   const [erro, setErro] = useState<string | null>(searchError ?? null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const { markDirty, resetDirty, UnsavedDialog } = useUnsavedChanges(formRef);
 
   useEffect(() => {
     if (erro) { showToast(erro, "error"); setErro(null); }
@@ -276,12 +292,13 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
     startTransition(async () => {
       const res = await editarProfissionalCompleto(profissionalId, profileId, fd);
       if (res?.error) setErro(res.error);
+      else resetDirty();
     });
   }
 
   return (
     <div className="space-y-5">
-      <form id="prof-edit-form" onSubmit={handleSubmit} className="space-y-5">
+      <form id="prof-edit-form" ref={formRef} onSubmit={handleSubmit} onChange={markDirty} className="space-y-5">
         {/* ── Usuário ── */}
         <Section icon={User} title="Usuário">
           <div>
@@ -492,6 +509,7 @@ export function EditarPerfilProfissionalForm({ profissionalId, profileId, profil
         </Section>
 
       </form>
+      {UnsavedDialog}
     </div>
   );
 }

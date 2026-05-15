@@ -22,6 +22,12 @@ const halimun = localFont({
   display: "swap",
 });
 
+const bakerie = localFont({
+  src: "./fonts/Bakerie.otf",
+  variable: "--font-bakerie",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Espaço Wendler — Agenda de Atendimentos",
   description:
@@ -37,7 +43,36 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className={`${fraunces.variable} ${interTight.variable} ${halimun.variable}`}>
+    <html lang="pt-BR" className={`${fraunces.variable} ${interTight.variable} ${halimun.variable} ${bakerie.variable}`}>
+      {/* Desativa autocomplete do navegador em TODO o sistema.
+          Roda como script inline — antes do React hidratar — para não haver
+          nenhuma janela de tempo em que o Chrome consiga capturar os campos. */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+(function(){
+  function fix(el){
+    if(el.getAttribute('autocomplete')==='off') return;
+    el.setAttribute('autocomplete','off');
+    el.setAttribute('data-form-type','other');
+  }
+  function walk(root){
+    if(!root || root.nodeType!==1) return;
+    if(/^(INPUT|SELECT|TEXTAREA)$/.test(root.tagName)) fix(root);
+    if(root.querySelectorAll) root.querySelectorAll('input,select,textarea').forEach(fix);
+  }
+  walk(document.documentElement);
+  new MutationObserver(function(ms){
+    ms.forEach(function(m){
+      m.addedNodes.forEach(walk);
+      if(m.type==='attributes' && m.target) fix(m.target);
+    });
+  }).observe(document.documentElement,{
+    childList:true, subtree:true,
+    attributes:true, attributeFilter:['autocomplete']
+  });
+})();
+        `}} />
+      </head>
       <body>{children}</body>
     </html>
   );

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import {
   Upload, X, Loader2, User, FileText, AlertCircle, ChevronDown, Check, Clock, Trash2, Stethoscope, Ban,
 } from "lucide-react";
@@ -97,9 +98,7 @@ function validarCnpj(raw: string): boolean {
 
 // ── Masks ──────────────────────────────────────────────────────────
 function maskPhone(v: string) {
-  const raw = v.replace(/[^\d+]/g, "");
-  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D/g, "");
-  const d = raw.replace(/\D/g, "").substring(0, 11);
+  const d = v.replace(/\D/g, "").substring(0, 11);
   if (d.length === 0) return "";
   if (d.length <= 2) return `(${d}`;
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -170,6 +169,8 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
   const [isPending, startTransition] = useTransition();
   const { showToast } = useToast();
   const [erro, setErro] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const { markDirty, resetDirty, guardedNavigate, UnsavedDialog } = useUnsavedChanges(formRef);
 
   useEffect(() => {
     if (erro) { showToast(erro, "error"); setErro(null); }
@@ -281,7 +282,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
     startTransition(async () => {
       const res = await cadastrarProfissionalCompleto(fd);
       if (res?.error) setErro(res.error);
-      else router.push("/profissionais");
+      else { resetDirty(); router.push("/profissionais"); }
     });
   }
 
@@ -315,7 +316,7 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
 
   return (
     <div className="space-y-5">
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form ref={formRef} onSubmit={handleSubmit} onChange={markDirty} className="space-y-5">
         {/* ── Selecionar usuário ── */}
         <Section icon={User} title="Usuário">
           <div>
@@ -682,14 +683,16 @@ export function NovoProfissionalForm({ profiles, initialEspecialidades, coresUsa
           >
             {isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Cadastrando…</> : "Cadastrar profissional"}
           </button>
-          <a
-            href="/profissionais"
+          <button
+            type="button"
+            onClick={() => guardedNavigate("/profissionais")}
             className="btn-secondary flex-1 flex items-center justify-center gap-2"
           >
             Cancelar
-          </a>
+          </button>
         </div>
       </form>
+      {UnsavedDialog}
     </div>
   );
 }

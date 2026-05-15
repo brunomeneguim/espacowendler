@@ -135,6 +135,25 @@ export async function criarPacienteCompleto(formData: FormData): Promise<{ error
     resp_fin_bairro:                respFinMesmoPaciente ? null : get("resp_fin_bairro"),
     resp_fin_logradouro:            respFinMesmoPaciente ? null : get("resp_fin_logradouro"),
     resp_fin_numero:                respFinMesmoPaciente ? null : get("resp_fin_numero"),
+    // Financeiro personalizado
+    valor_consulta_especial:        (() => {
+      const v = get("valor_consulta_especial");
+      if (!v) return null;
+      const n = parseFloat(String(v).replace(",", "."));
+      return isNaN(n) ? null : n;
+    })(),
+    valor_plano_especial:           (() => {
+      const v = get("valor_plano_especial");
+      if (!v) return null;
+      const n = parseFloat(String(v).replace(",", "."));
+      return isNaN(n) ? null : n;
+    })(),
+    sessoes_plano_especial:         (() => {
+      const v = get("sessoes_plano_especial");
+      if (!v) return null;
+      const n = parseInt(v);
+      return isNaN(n) ? null : n;
+    })(),
     ativo:                          true,
   }).select("id").single();
 

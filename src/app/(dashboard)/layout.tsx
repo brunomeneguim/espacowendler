@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { ToastProvider } from "@/components/Toaster";
+import { DisableAutocomplete } from "@/components/DisableAutocomplete";
 import { PrivacyProvider } from "./PrivacyContext";
 import { PermissoesProvider } from "./PermissoesContext";
 import { PerfilCompletoProvider } from "./PerfilCompletoContext";
@@ -57,6 +58,7 @@ export default async function DashboardLayout({
                 nome={profile.nome_completo}
                 menuConfig={(menuConfig as any) ?? []}
               />
+              <DisableAutocomplete />
               <main className="flex-1 min-w-0">{children}</main>
             </PerfilCompletoProvider>
           </PermissoesProvider>

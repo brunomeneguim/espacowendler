@@ -34,7 +34,7 @@ export default async function DashboardPage({
   fetchEnd.setDate(fetchEnd.getDate() + 1);
 
   const agendamentosSelect =
-    "id, data_hora_inicio, data_hora_fim, status, observacoes, tipo_agendamento, pago, forma_pagamento, valor_sessao, paciente:pacientes(id, nome_completo, telefone), profissional:profissionais(id, cor, profile:profiles(nome_completo)), sala:salas(id, nome)";
+    "id, data_hora_inicio, data_hora_fim, status, observacoes, tipo_agendamento, pago, forma_pagamento, valor_sessao, quantidade_sessoes, paciente:pacientes(id, nome_completo, telefone, valor_consulta_especial, valor_plano_especial), profissional:profissionais(id, cor, profile:profiles(nome_completo)), sala:salas(id, nome)";
 
   const [
     { data: agendamentos },
@@ -63,9 +63,9 @@ export default async function DashboardPage({
       .select("profissional_id, dia_semana, hora_inicio, hora_fim"),
     supabase
       .from("salas")
-      .select("id, nome")
+      .select("id, nome, ordem")
       .eq("ativo", true)
-      .order("id"),
+      .order("ordem", { ascending: true }),
     supabase
       .from("pacientes")
       .select("id, nome_completo, telefone")
