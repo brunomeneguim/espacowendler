@@ -46,6 +46,61 @@ export async function toggleAtivoSala(id: number): Promise<{ error: string | nul
   return { error: null };
 }
 
+export async function reordenarSalas(ids: number[]): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const updates = ids.map((id, index) =>
+    supabase.from("salas").update({ ordem: index }).eq("id", id)
+  );
+  const results = await Promise.all(updates);
+  const err = results.find(r => r.error);
+  if (err?.error) return { error: err.error.message };
+  revalidatePath("/salas");
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
+export async function excluirSala(id: number): Promise<{ error: string | null; count?: number }> {
+  const supabase = createClient();
+
+  // Contar agendamentos vinculados (qualquer status, passado ou futuro)
+  const { count, error: countErr } = await supabase
+    .from("agendamentos")
+    .select("id", { count: "exact", head: true })
+    .eq("sala_id", id);
+
+  if (countErr) return { error: countErr.message };
+
+  if ((count ?? 0) > 0) {
+    // Retornar contagem para a UI perguntar ao usuário
+    return { error: null, count: count! };
+  }
+
+  const { error } = await supabase.from("salas").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/salas");
+  revalidatePath("/dashboard");
+  revalidatePath("/agenda");
+  return { error: null, count: 0 };
+}
+
+export async function excluirSalaComAgendamentos(id: number): Promise<{ error: string | null }> {
+  const supabase = createClient();
+
+  // Excluir todos os agendamentos da sala
+  const { error: agErr } = await supabase.from("agendamentos").delete().eq("sala_id", id);
+  if (agErr) return { error: agErr.message };
+
+  // Excluir a sala
+  const { error } = await supabase.from("salas").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/salas");
+  revalidatePath("/dashboard");
+  revalidatePath("/agenda");
+  return { error: null };
+}
+
 export async function atualizarAluguelProfissional(
   profissionalId: string,
   valorAluguel: number

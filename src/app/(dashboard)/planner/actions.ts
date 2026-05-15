@@ -86,6 +86,7 @@ export async function salvarCompartilhamentos(
       profileIds.map((pid) => ({
         planner_id: plannerId,
         shared_with_profile_id: pid,
+        owner_profile_id: profile.id,
         criado_por: profile.id,
       })),
     );
@@ -164,6 +165,31 @@ export async function alternarTarefaPlanner(id: string, concluida: boolean): Pro
     concluida,
     concluida_em: concluida ? new Date().toISOString() : null,
   }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/planner");
+  return { error: null };
+}
+
+export async function criarTarefasRepetidas(
+  plannerId: string,
+  titulo: string,
+  descricao: string | undefined,
+  datas: string[],
+): Promise<{ error: string | null }> {
+  if (!titulo.trim()) return { error: "Título não pode ser vazio." };
+  if (datas.length === 0) return { error: "Nenhuma data selecionada." };
+  const profile = await getCurrentProfile();
+  const supabase = createClient();
+
+  const { error } = await supabase.from("planner_tarefas").insert(
+    datas.map((data_tarefa) => ({
+      planner_id: plannerId,
+      titulo: titulo.trim(),
+      data_tarefa,
+      descricao: descricao?.trim() || null,
+      criado_por: profile.id,
+    })),
+  );
   if (error) return { error: error.message };
   revalidatePath("/planner");
   return { error: null };
