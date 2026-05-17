@@ -52,7 +52,7 @@ export async function signUp(formData: FormData): Promise<{ error: string | null
   redirect("/aguardando");
 }
 
-export async function signInWithGoogle(): Promise<{ error: string | null }> {
+export async function signInWithGoogle() {
   const supabase = createClient();
   const origin = headers().get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -67,9 +67,11 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
     },
   });
 
-  if (error) return { error: friendlyError(error.message) };
+  if (error) {
+    redirect(`/login?error=${encodeURIComponent(friendlyError(error.message))}`);
+  }
   if (data.url) redirect(data.url);
-  return { error: "Não foi possível iniciar o login com Google." };
+  redirect(`/login?error=${encodeURIComponent("Não foi possível iniciar o login com Google.")}`);
 }
 
 export async function signOut() {
