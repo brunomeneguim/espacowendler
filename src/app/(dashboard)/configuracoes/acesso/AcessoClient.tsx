@@ -27,6 +27,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   supervisor:   "Supervisor",
   profissional: "Profissional",
   secretaria:   "Secretaria",
+  pendente:     "Pendente",
 };
 
 const ROLE_CORES: Record<UserRole, string> = {
@@ -34,6 +35,7 @@ const ROLE_CORES: Record<UserRole, string> = {
   supervisor:   "bg-blue-100 text-blue-700 border-blue-200",
   profissional: "bg-teal-100 text-teal-700 border-teal-200",
   secretaria:   "bg-amber-100 text-amber-700 border-amber-200",
+  pendente:     "bg-gray-100 text-gray-500 border-gray-200",
 };
 
 const ROLE_ACCESS_DEFAULT: Record<UserRole, string[]> = {
@@ -41,6 +43,7 @@ const ROLE_ACCESS_DEFAULT: Record<UserRole, string[]> = {
   supervisor:   ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta", "/configuracoes/ocultar-informacoes"],
   profissional: ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta", "/configuracoes/ocultar-informacoes"],
   secretaria:   ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/configuracoes/conta", "/configuracoes/ocultar-informacoes"],
+  pendente:     [],
 };
 
 const PAGINAS = [
