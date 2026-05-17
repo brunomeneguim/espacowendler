@@ -91,7 +91,8 @@ export async function excluirMembro(id: string): Promise<{ error: string | null 
   if (id === current.id) return { error: "Você não pode excluir sua própria conta." };
 
   const supabase = createClient();
-  // Remove agendamentos vinculados ao profissional
+
+  // Remove dados relacionados
   const { data: prof } = await supabase
     .from("profissionais")
     .select("id")
@@ -101,8 +102,14 @@ export async function excluirMembro(id: string): Promise<{ error: string | null 
     await supabase.from("agendamentos").delete().eq("profissional_id", prof.id);
   }
   await supabase.from("profissionais").delete().eq("profile_id", id);
-  const { error } = await supabase.from("profiles").delete().eq("id", id);
-  if (error) return { error: error.message };
+  await supabase.from("profiles").delete().eq("id", id);
+
+  // Remove também do Auth — essencial para que o usuário possa se recadastrar
+  // (sem isso o trigger handle_new_user não dispara no próximo login OAuth)
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const adminClient = createAdminClient();
+  const { error: authError } = await adminClient.auth.admin.deleteUser(id);
+  if (authError) return { error: authError.message };
 
   revalidatePath("/configuracoes/acesso");
   return { error: null };
@@ -148,12 +155,37 @@ export async function aprovarPendente(
   if (current.role !== "admin") return { error: "Apenas administradores podem aprovar usuários." };
 
   const supabase = createClient();
+
+  // Busca email e nome antes de aprovar para o email de notificação
+  const { data: perfil } = await supabase
+    .from("profiles")
+    .select("email, nome_completo")
+    .eq("id", profileId)
+    .single();
+
   const { error } = await supabase
     .from("profiles")
     .update({ role: novoRole, ativo: true })
     .eq("id", profileId);
 
   if (error) return { error: error.message };
+
+  // Envia email de aprovação (falha silenciosa — não bloqueia o fluxo)
+  if (perfil?.email) {
+    try {
+      const { sendEmail, emailAprovacaoHtml } = await import("@/lib/email");
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+      await sendEmail({
+        to: perfil.email,
+        subject: "Seu acesso foi aprovado — Espaço Wendler",
+        html: emailAprovacaoHtml(perfil.nome_completo ?? "", siteUrl),
+      });
+    } catch (emailErr) {
+      console.error("[aprovarPendente] Falha ao enviar email:", emailErr);
+    }
+  }
+
   revalidatePath("/configuracoes/acesso");
   return { error: null };
 }

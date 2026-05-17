@@ -1,9 +1,51 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Clock, LogOut } from "lucide-react";
 import { signOut } from "../actions";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AguardandoPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    async function subscribe() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      channel = supabase
+        .channel(`profile-aprovacao-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "profiles",
+            filter: `id=eq.${user.id}`,
+          },
+          (payload) => {
+            const novoRole = (payload.new as { role: string }).role;
+            if (novoRole && novoRole !== "pendente") {
+              router.push("/dashboard");
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    subscribe();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [router]);
+
   return (
     <div className="animate-slide-up text-center">
       <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
