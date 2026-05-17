@@ -4,13 +4,13 @@ import { useState, useTransition, useMemo, useRef } from "react";
 import {
   ShieldCheck, Loader2, Check, ChevronDown, ChevronUp,
   RotateCcw, Eye, Pencil, Trash2, UserPlus,
-  Search, AlertTriangle,
+  Search, AlertTriangle, UserCheck, X,
 } from "lucide-react";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import type { UserRole } from "@/types/database";
 import {
   atualizarRole, salvarTodasPermissoes, resetarPermissoes,
-  toggleAtivo, excluirMembro, criarUsuario, editarUsuarioCompleto,
+  toggleAtivo, excluirMembro, criarUsuario, editarUsuarioCompleto, aprovarPendente,
 } from "./actions";
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -79,6 +79,7 @@ interface Profile {
   role: UserRole;
   ativo: boolean;
   telefone?: string | null;
+  avatar_url?: string | null;
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -477,12 +478,96 @@ function PermissaoGrid({
 
 // ── Componente Principal ──────────────────────────────────────────────────────
 
+// ── Seção de aprovação de pendentes ──────────────────────────────────────────
+
+function PendenteRow({ profile, onAprovar }: { profile: Profile; onAprovar: (id: string, role: UserRole) => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+  const [roleEscolhido, setRoleEscolhido] = useState<UserRole>("profissional");
+
+  function handleAprovar() {
+    setErro(null);
+    startTransition(async () => {
+      const res = await aprovarPendente(profile.id, roleEscolhido);
+      if (res.error) setErro(res.error);
+      else onAprovar(profile.id, roleEscolhido);
+    });
+  }
+
+  function handleRejeitar() {
+    startTransition(async () => {
+      const res = await excluirMembro(profile.id);
+      if (res.error) setErro(res.error);
+      else onAprovar(profile.id, "pendente"); // remove da lista
+    });
+  }
+
+  return (
+    <li className="flex items-center gap-3 px-5 py-3.5 hover:bg-cream/20 transition-colors flex-wrap">
+      {/* Avatar */}
+      {profile.avatar_url ? (
+        <img
+          src={profile.avatar_url}
+          alt={profile.nome_completo}
+          className="w-9 h-9 rounded-full object-cover shrink-0"
+        />
+      ) : (
+        <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+          <span className="text-sm font-semibold text-amber-700">
+            {profile.nome_completo.charAt(0).toUpperCase()}
+          </span>
+        </div>
+      )}
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-forest truncate">{profile.nome_completo}</p>
+        <p className="text-xs text-forest-400 truncate">{profile.email}</p>
+      </div>
+
+      {/* Ações */}
+      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <select
+          value={roleEscolhido}
+          onChange={e => setRoleEscolhido(e.target.value as UserRole)}
+          disabled={isPending}
+          className="text-sm border border-sand/40 rounded-lg px-2.5 py-1.5 bg-white text-forest focus:outline-none focus:ring-2 focus:ring-forest/20"
+        >
+          {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+
+        <button
+          onClick={handleAprovar}
+          disabled={isPending}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 font-medium"
+        >
+          {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+          Aprovar
+        </button>
+
+        <button
+          onClick={handleRejeitar}
+          disabled={isPending}
+          title="Rejeitar e remover"
+          className="p-1.5 rounded-lg border border-sand/40 hover:bg-rust/5 text-forest-400 hover:text-rust transition-colors disabled:opacity-50"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {erro && <p className="text-xs text-rust w-full text-right">{erro}</p>}
+    </li>
+  );
+}
+
 export function AcessoClient({
   profiles,
+  pendentes: pendentesProp,
   currentId,
   permissoesPorPerfil,
 }: {
   profiles: Profile[];
+  pendentes: (Profile & { avatar_url?: string | null })[];
   currentId: string;
   permissoesPorPerfil: Record<string, PermissaoMap>;
 }) {
@@ -490,6 +575,7 @@ export function AcessoClient({
   const [excluindo, setExcluindo]   = useState<Profile | null>(null);
   const [novoUsuario, setNovoUsuario] = useState(false);
   const [editando, setEditando]     = useState<Profile | null>(null);
+  const [pendentes, setPendentes]   = useState<(Profile & { avatar_url?: string | null })[]>(pendentesProp);
   const [toast, setToast]           = useState<string | null>(null);
   const [toastVisivel, setToastVisivel] = useState(false);
   const [expanded, setExpanded]     = useState<Set<string>>(new Set());
@@ -546,6 +632,10 @@ export function AcessoClient({
         mostrarToast(novoAtivo ? "Usuário ativado!" : "Usuário desativado!");
       }
     });
+  }
+
+  function handleAprovar(id: string, _role: UserRole) {
+    setPendentes(prev => prev.filter(p => p.id !== id));
   }
 
   const filtrados = useMemo(() =>
@@ -682,6 +772,23 @@ export function AcessoClient({
       {excluindo  && <ModalExcluir   profile={excluindo} onClose={() => setExcluindo(null)} />}
       {novoUsuario && <ModalNovoUsuario onClose={() => setNovoUsuario(false)} />}
       {editando   && <ModalEditarUsuario profile={editando} onClose={() => setEditando(null)} />}
+
+      {/* Aguardando aprovação */}
+      {pendentes.length > 0 && (
+        <div className="card p-0 overflow-hidden border-amber-200">
+          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
+              Aguardando aprovação ({pendentes.length})
+            </p>
+          </div>
+          <ul className="divide-y divide-sand/20">
+            {pendentes.map(p => (
+              <PendenteRow key={p.id} profile={p as Profile} onAprovar={handleAprovar} />
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Barra de busca + botão */}
       <div className="flex items-center gap-3">

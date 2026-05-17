@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "supervisor" | "profissional" | "secretaria";
+export type UserRole = "admin" | "supervisor" | "profissional" | "secretaria" | "pendente";
 
 export type AgendamentoStatus =
   | "agendado"
@@ -15,6 +15,7 @@ export interface Profile {
   role: UserRole;
   ativo: boolean;
   secretaria_ver_financeiro: boolean;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 }

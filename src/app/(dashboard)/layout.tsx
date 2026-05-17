@@ -17,6 +17,11 @@ export default async function DashboardLayout({
   const profile = await getCurrentProfile();
   const supabase = createClient();
 
+  // Usuário pendente → aguardando aprovação do admin
+  if (profile.role === "pendente") {
+    redirect("/aguardando");
+  }
+
   // Profissional sem perfil completo → forçar completar cadastro
   let perfilCompleto = true;
   if (profile.role === "profissional") {

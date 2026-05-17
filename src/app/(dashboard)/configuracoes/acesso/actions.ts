@@ -140,6 +140,24 @@ export async function criarUsuario(formData: FormData): Promise<{ error: string 
   return { error: null };
 }
 
+export async function aprovarPendente(
+  profileId: string,
+  novoRole: UserRole
+): Promise<{ error: string | null }> {
+  const current = await getCurrentProfile();
+  if (current.role !== "admin") return { error: "Apenas administradores podem aprovar usuários." };
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ role: novoRole, ativo: true })
+    .eq("id", profileId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/configuracoes/acesso");
+  return { error: null };
+}
+
 export async function editarUsuarioCompleto(
   id: string,
   formData: FormData

@@ -46,10 +46,18 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Usuário logado tentando acessar login → manda para dashboard
+  // Usuário logado tentando acessar login/cadastro → manda para dashboard
+  // (o layout do dashboard redireciona pendentes para /aguardando)
   if (user && (pathname === "/login" || pathname === "/cadastro")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
+
+  // Permite que usuários autenticados acessem /aguardando sem loop
+  if (!user && pathname === "/aguardando") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 

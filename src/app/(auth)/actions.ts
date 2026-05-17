@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { friendlyError } from "@/lib/errorMessages";
+import { headers } from "next/headers";
 
 export async function signIn(formData: FormData) {
   const supabase = createClient();
@@ -46,8 +47,29 @@ export async function signUp(formData: FormData): Promise<{ error: string | null
     return { error: null, message: "Conta criada! Verifique seu email para confirmar." };
   }
 
+  // Usuário recém-criado fica pendente até aprovação do admin
   revalidatePath("/", "layout");
-  redirect("/profissionais/completar");
+  redirect("/aguardando");
+}
+
+export async function signInWithGoogle(): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const origin = headers().get("origin") ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${origin}/auth/callback`,
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
+      },
+    },
+  });
+
+  if (error) return { error: friendlyError(error.message) };
+  if (data.url) redirect(data.url);
+  return { error: "Não foi possível iniciar o login com Google." };
 }
 
 export async function signOut() {

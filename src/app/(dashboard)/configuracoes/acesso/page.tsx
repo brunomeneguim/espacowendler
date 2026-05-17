@@ -10,11 +10,17 @@ export default async function ControleAcessoPage() {
 
   const supabase = createClient();
 
-  const [{ data: profiles }, { data: todasPermissoes }] = await Promise.all([
+  const [{ data: profiles }, { data: pendentes }, { data: todasPermissoes }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, nome_completo, email, role, ativo, telefone")
+      .select("id, nome_completo, email, role, ativo, telefone, avatar_url")
+      .neq("role", "pendente")
       .order("nome_completo"),
+    supabase
+      .from("profiles")
+      .select("id, nome_completo, email, role, ativo, telefone, avatar_url")
+      .eq("role", "pendente")
+      .order("created_at", { ascending: true }),
     supabase
       .from("permissoes_usuario")
       .select("profile_id, pagina, pode_ver, pode_editar"),
@@ -35,6 +41,7 @@ export default async function ControleAcessoPage() {
       />
       <AcessoClient
         profiles={(profiles as any) ?? []}
+        pendentes={(pendentes as any) ?? []}
         currentId={profile.id}
         permissoesPorPerfil={permissoesPorPerfil}
       />
