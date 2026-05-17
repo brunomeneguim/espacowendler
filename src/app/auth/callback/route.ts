@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         const { createAdminClient } = await import("@/lib/supabase/admin");
         const adminClient = createAdminClient();
 
-        const meta = (data.user.raw_user_meta_data ?? {}) as Record<string, string>;
+        const meta = (data.user.user_metadata ?? {}) as Record<string, string>;
         const nome = [meta.nome_completo, meta.full_name, meta.name, data.user.email]
           .map((v) => (typeof v === "string" ? v.trim() : ""))
           .find((v) => v !== "") ?? "";
