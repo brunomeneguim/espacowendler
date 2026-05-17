@@ -30,6 +30,7 @@ const ROLE_ACCESS: Record<UserRole, string[]> = {
   supervisor:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/planner"],
   profissional:["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/planner"],
   secretaria:  ["/dashboard", "/pacientes", "/profissionais", "/tarefas", "/salas", "/financeiro", "/relatorios", "/planner"],
+  pendente:    [],
 };
 
 // Label customizada por role para /dashboard e /pacientes
@@ -38,6 +39,7 @@ const ROLE_LABEL_OVERRIDE: Record<UserRole, Partial<Record<string, string>>> = {
   supervisor:   {},
   profissional: { "/dashboard": "Minha agenda", "/pacientes": "Meus pacientes" },
   secretaria:   {},
+  pendente:     {},
 };
 
 export function Sidebar({
@@ -152,6 +154,7 @@ export function Sidebar({
     supervisor: "Supervisor",
     profissional: "Profissional",
     secretaria: "Secretaria",
+    pendente: "Pendente",
   };
 
   return (
